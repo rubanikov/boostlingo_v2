@@ -32,8 +32,23 @@ of build effort.
 
 ## Decisions so far
 
-_(none yet — stack/deadline/deployment-target/held-provider-accounts were settled by
-direct conversation before charting and are captured in Notes above, not as tickets)_
+- [Realtime API integration research](issues/02-realtime-api-integration-research.md) —
+  WebRTC direct-to-OpenAI is the supported/recommended browser path (ephemeral token
+  minted server-side via `POST /v1/realtime/client_secrets`); WebSocket is
+  server-to-server only. Surfaced a real fork: OpenAI also ships a purpose-built
+  `gpt-realtime-translate` model/endpoint distinct from the brief-named `gpt-realtime` —
+  left for [Realtime transport architecture](issues/03-realtime-transport-architecture.md)
+  to resolve.
+- [Cascade provider streaming APIs research](issues/04-cascade-provider-research.md) —
+  Deepgram (`speech_final`/`UtteranceEnd`/`SpeechStarted`) and ElevenLabs (`flush`-driven
+  chunking, no native "done" signal) integration shapes documented. Translation
+  recommendation: use a streaming LLM (OpenAI or Anthropic) over DeepL, since DeepL's
+  translate endpoint doesn't stream and would blow the <2s cascade target — OpenAI vs.
+  Anthropic left open for
+  [Cascade pipeline architecture](issues/05-cascade-pipeline-architecture.md).
+
+_(stack/deadline/deployment-target/held-provider-accounts were settled by direct
+conversation before charting and are captured in Notes above, not as tickets)_
 
 ## Not yet specified
 
