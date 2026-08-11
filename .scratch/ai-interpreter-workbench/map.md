@@ -99,6 +99,15 @@ of build effort.
   async-native shape the whole architecture needs) + **React** (frontend, flagged as
   closer to a toss-up with Svelte on pure technical fit, chosen for ecosystem depth) +
   **uv** (Python) + **Vite/npm** (TypeScript).
+- [Realtime transport architecture](issues/03-realtime-transport-architecture.md) —
+  **WebRTC direct to OpenAI**, ephemeral token minted server-side; per-stage latency
+  measured client-side and reported over the data channel, since the backend is off the
+  audio path (feeds
+  [Latency instrumentation design](issues/08-latency-instrumentation-design.md)). Model:
+  **`gpt-realtime` as literally specified**, not the better-fitting
+  `gpt-realtime-translate` — the brief calls it "required" with deliberately different
+  wording than cascade providers' "candidate's choice"; `gpt-realtime-translate` gets
+  real weight in the comparison write-up instead.
 
 _(stack/deadline/deployment-target/held-provider-accounts were settled by direct
 conversation before charting and are captured in Notes above, not as tickets)_

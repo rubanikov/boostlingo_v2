@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en" data-theme="luxury">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ticket 03 — Realtime Transport Architecture</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex) > *,
+  :where([style*="display: grid"], [style*="display:grid"], [style*="display: flex"], [style*="display:flex"]) > * {
+    min-width: 0;
+  }
+  :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, figcaption, td, th, .badge, .label) {
+    overflow-wrap: anywhere;
+  }
+  :where(img, svg, video, canvas, iframe) { max-width: 100%; height: auto; }
+  body { background: var(--color-base-100); }
+  .crux-box {
+    border: 1px solid color-mix(in oklch, var(--color-warning) 40%, transparent);
+    background: color-mix(in oklch, var(--color-warning) 8%, var(--color-base-100));
+  }
+</style>
+</head>
+<body class="min-h-screen bg-base-100 text-base-content">
+<main class="mx-auto max-w-5xl p-6 lg:p-10 space-y-10">
+
+  <div class="text-sm breadcrumbs px-0">
+    <ul>
+      <li>AI Interpreter Workbench</li>
+      <li>Wayfinder map</li>
+      <li>Ticket 03</li>
+    </ul>
+  </div>
+
+  <header class="hero bg-base-200 rounded-box">
+    <div class="hero-content flex-col items-start text-left py-8">
+      <span class="badge badge-warning badge-soft mb-2">grilling · claimed · in progress</span>
+      <h1 class="text-3xl lg:text-4xl font-bold">Realtime Transport Architecture</h1>
+      <p class="py-2 max-w-3xl text-base-content/80">
+        Two decisions: how the browser talks to OpenAI for Realtime mode (WebRTC vs. WebSocket relay), and which
+        model — the brief-named <span class="font-mono">gpt-realtime</span> or the purpose-built
+        <span class="font-mono">gpt-realtime-translate</span> ticket 02's research surfaced.
+      </p>
+    </div>
+  </header>
+
+  <!-- Question 1 -->
+  <section class="card card-border border-primary bg-base-200 shadow-lg">
+    <div class="card-body space-y-4">
+      <div class="flex items-center gap-2">
+        <span class="badge badge-warning badge-soft">question 1 of 2</span>
+        <h2 class="card-title">WebRTC direct, or backend-relayed WebSocket?</h2>
+      </div>
+
+      <div class="grid sm:grid-cols-2 gap-4 text-sm">
+        <div class="card card-border border-primary bg-base-100 shadow">
+          <div class="card-body">
+            <h3 class="font-medium text-base-content/80">WebRTC direct <span class="badge badge-primary badge-xs ml-1">recommended</span></h3>
+            <p class="text-base-content/70 mt-1">Backend mints a short-lived ephemeral token; browser connects straight to OpenAI over UDP media + a data channel. This is the path OpenAI actually documents and recommends (ticket 02's research) — WebSocket is server-to-server only, not meant for browser auth at all.</p>
+            <ul class="list-disc list-inside text-base-content/60 mt-2 space-y-1">
+              <li><strong>Latency:</strong> no relay hop — directly relevant to the brief's &lt;1.5s target.</li>
+              <li><strong>Key exposure:</strong> the permanent API key never leaves the backend; the ephemeral token is purpose-built for this exact exposure.</li>
+              <li><strong>Server-side instrumentation:</strong> the one real tradeoff — backend is off the audio path once the token is issued, so it can't timestamp audio frames directly (see note below).</li>
+            </ul>
+          </div>
+        </div>
+        <div class="card card-border bg-base-100">
+          <div class="card-body">
+            <h3 class="font-medium text-base-content/80">Backend-relayed WebSocket</h3>
+            <p class="text-base-content/70 mt-1">Every audio frame both ways goes browser→backend→OpenAI→backend→browser. Not actually how OpenAI's browser-facing auth works, so this would mean the backend using its own API key server-side and re-streaming — extra hop, TCP head-of-line blocking, base64/JSON framing overhead on what's designed to be a UDP media path.</p>
+            <ul class="list-disc list-inside text-base-content/60 mt-2 space-y-1">
+              <li><strong>Latency:</strong> worse — an added hop against a tight budget.</li>
+              <li><strong>Server-side instrumentation:</strong> the only real advantage — backend sees every frame directly.</li>
+              <li><strong>Transport consistency with Cascade mode:</strong> superficially matches (ticket 05 also uses WebSocket) — but see note below on why this isn't actually the requirement.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div role="alert" class="alert alert-info alert-soft text-sm">
+        <span><strong>On "transport consistency" with Cascade mode:</strong> the brief's actual code-quality requirement is "clean separation between mode-specific transport and mode-agnostic UI" — that's satisfied by the <em>UI</em> not knowing or caring which transport is underneath (a common session interface), not by forcing both modes onto an identical transport protocol. Ticket 05's own research found LiveKit deliberately keeps cascade and realtime provider interfaces separate for the same reason. Matching transports here would just import Cascade mode's extra hop into Realtime mode for no real architectural benefit.</span>
+      </div>
+
+      <div role="alert" class="alert alert-warning alert-soft text-sm">
+        <span><strong>On server-side latency instrumentation:</strong> since the backend is off the audio path with WebRTC direct, "speech end → first audio out" timing has to be measured <em>client-side</em> (the browser directly experiences both ends) and reported back over the data channel (the same <span class="font-mono">"oai-events"</span> channel carrying transcript deltas) for the UI/logging to aggregate — not a blocker, just a design detail ticket 08 needs to build on rather than assuming server-side timestamps like Cascade mode gets for free.</span>
+      </div>
+
+      <div class="card card-border bg-base-100 p-4">
+        <p class="text-sm font-medium mb-2">Ephemeral token flow → the Python backend's role</p>
+        <pre class="mermaid">
+sequenceDiagram
+    participant B as Browser
+    participant BE as FastAPI backend
+    participant OAI as OpenAI Realtime
+
+    B->>BE: POST /api/realtime/session
+    BE->>OAI: POST /v1/realtime/client_secrets (real API key, server-to-server)
+    OAI-->>BE: ephemeral client secret (short validity window)
+    BE-->>B: ephemeral secret + session config
+    B->>B: new RTCPeerConnection()
+    B->>B: getUserMedia() -> addTrack(mic)
+    B->>B: createDataChannel("oai-events")
+    B->>OAI: SDP offer + ephemeral secret -> POST /v1/realtime/calls
+    OAI-->>B: SDP answer
+    Note over B,OAI: Direct WebRTC media (UDP) + data channel, backend off the path
+        </pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- Question 2 -->
+  <section class="card card-border border-primary bg-base-200 shadow-lg">
+    <div class="card-body space-y-4">
+      <div class="flex items-center gap-2">
+        <span class="badge badge-warning badge-soft">question 2 of 2</span>
+        <h2 class="card-title"><span class="font-mono">gpt-realtime</span> as specified, or <span class="font-mono">gpt-realtime-translate</span>?</h2>
+      </div>
+
+      <div class="crux-box rounded-box p-4 text-sm space-y-2">
+        <p class="font-medium">The tension</p>
+        <p class="text-base-content/80"><span class="font-mono">gpt-realtime-translate</span> is architecturally a much better fit for this product — turn-free, structured language targeting, native dual-transcript streams — precisely the shape ticket 05 had to hand-build an approximation of for Cascade mode. Using it here would get "solved" continuous interpretation essentially for free from OpenAI's own model.</p>
+      </div>
+
+      <div class="grid sm:grid-cols-2 gap-4 text-sm">
+        <div class="card card-border border-primary bg-base-100 shadow">
+          <div class="card-body">
+            <h3 class="font-medium text-base-content/80"><span class="font-mono">gpt-realtime</span> as specified <span class="badge badge-primary badge-xs ml-1">recommended</span></h3>
+            <p class="text-base-content/70 mt-1">The brief's Technical Requirements section says "OpenAI Realtime API (model: <span class="font-mono">gpt-realtime</span>) <strong>required</strong> for Realtime mode." That's meaningfully different wording from "Cascade mode providers are <strong>candidate's choice</strong>" a few lines later in the same document — the brief authors distinguished what's flexible from what isn't. Deviating from an explicitly "required" spec is a real risk in an evaluated take-home, not an ambiguous judgment call.</p>
+          </div>
+        </div>
+        <div class="card card-border bg-base-100">
+          <div class="card-body">
+            <h3 class="font-medium text-base-content/80"><span class="font-mono">gpt-realtime-translate</span> instead</h3>
+            <p class="text-base-content/70 mt-1">Better architecture for the actual problem, and demonstrates deep research — but gambles on an interpretation of wording that reads as unambiguous. Risk isn't offset by architectural merit if an evaluator is checking literal compliance with a named requirement.</p>
+          </div>
+        </div>
+      </div>
+
+      <div role="alert" class="alert alert-success alert-soft text-sm">
+        <span><strong>Recommendation: build with <span class="font-mono">gpt-realtime</span></strong>, but give <span class="font-mono">gpt-realtime-translate</span> real weight in the comparison write-up — "if this were a production decision rather than a specified requirement, <span class="font-mono">gpt-realtime-translate</span> would likely be the better choice, because [turn-free design / structured language targeting / native dual transcripts]." This satisfies the letter of the requirement while demonstrating exactly the kind of judgment the brief's Problem Statement asks for ("form a defensible opinion on when each architecture fits") — without betting the submission on a reading of "required" that the text doesn't really support.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Input -->
+  <section class="card card-border bg-base-200">
+    <div class="card-body space-y-4">
+      <h2 class="card-title">Your call</h2>
+      <form data-lavish-question="ticket03" class="space-y-4" onsubmit="event.preventDefault();
+        const fd = new FormData(event.currentTarget);
+        const transport = fd.get('transport');
+        const model = fd.get('model');
+        const note = (fd.get('note') || '').toString().trim();
+        if (!transport || !model) return;
+        const transportLabels = { webrtc: 'WebRTC direct (recommended)', websocket: 'Backend-relayed WebSocket' };
+        const modelLabels = { realtime: 'gpt-realtime as specified (recommended)', translate: 'gpt-realtime-translate instead' };
+        let msg = 'Ticket 03 decisions: transport = ' + transportLabels[transport] + '; model = ' + modelLabels[model];
+        if (note) msg += ' — note: ' + note;
+        window.lavish.queuePrompt(msg, { tag: 'choice', text: 'Ticket 03: ' + transportLabels[transport] + ' / ' + modelLabels[model], element: event.currentTarget, data: { question: 'ticket03', transport, model, note } });
+        document.getElementById('queued-confirm').classList.remove('hidden');
+      ">
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">Transport</legend>
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary">
+            <input type="radio" name="transport" value="webrtc" class="radio radio-primary" checked />
+            <span class="font-medium">WebRTC direct <span class="badge badge-primary badge-xs ml-1">recommended</span></span>
+          </label>
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary mt-2">
+            <input type="radio" name="transport" value="websocket" class="radio radio-primary" />
+            <span class="font-medium">Backend-relayed WebSocket</span>
+          </label>
+        </fieldset>
+
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">Model</legend>
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary">
+            <input type="radio" name="model" value="realtime" class="radio radio-primary" checked />
+            <span class="font-medium"><span class="font-mono">gpt-realtime</span> as specified <span class="badge badge-primary badge-xs ml-1">recommended</span></span>
+          </label>
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary mt-2">
+            <input type="radio" name="model" value="translate" class="radio radio-primary" />
+            <span class="font-medium"><span class="font-mono">gpt-realtime-translate</span> instead</span>
+          </label>
+        </fieldset>
+
+        <textarea name="note" class="textarea textarea-bordered w-full" placeholder="Optional: anything to add, qualify, or push back on"></textarea>
+        <button type="submit" class="btn btn-primary">Queue this answer</button>
+        <p id="queued-confirm" class="text-sm text-success hidden">Queued — press Send to Agent (or Send &amp; End) in the top bar to deliver it.</p>
+      </form>
+    </div>
+  </section>
+
+  <div role="alert" class="alert alert-success shadow-lg">
+    <span>✓ <strong>Ticket 03 resolved.</strong> Transport: WebRTC direct to OpenAI, ephemeral token minted server-side. Model: <span class="font-mono">gpt-realtime</span> as specified, with <span class="font-mono">gpt-realtime-translate</span> weighted heavily in the comparison write-up instead. Written back to the wayfinder map.</span>
+  </div>
+
+</main>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.15.0/dist/mermaid.esm.min.mjs";
+  const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  const paint = document.createElement("canvas").getContext("2d");
+  function toRgba(color) {
+    paint.clearRect(0, 0, 1, 1);
+    paint.fillStyle = "#000";
+    paint.fillStyle = color;
+    paint.fillRect(0, 0, 1, 1);
+    return paint.getImageData(0, 0, 1, 1).data;
+  }
+  function compositeRgba(foreground, background) {
+    const foregroundAlpha = foreground[3] / 255;
+    const backgroundAlpha = background[3] / 255;
+    const alpha = foregroundAlpha + backgroundAlpha * (1 - foregroundAlpha);
+    if (alpha === 0) return [0, 0, 0, 0];
+    return [
+      (foreground[0] * foregroundAlpha + background[0] * backgroundAlpha * (1 - foregroundAlpha)) / alpha,
+      (foreground[1] * foregroundAlpha + background[1] * backgroundAlpha * (1 - foregroundAlpha)) / alpha,
+      (foreground[2] * foregroundAlpha + background[2] * backgroundAlpha * (1 - foregroundAlpha)) / alpha,
+      alpha * 255,
+    ];
+  }
+  function pageIsDark() {
+    const root = document.documentElement;
+    const rootBackground = toRgba(getComputedStyle(root).backgroundColor);
+    const bodyBackground = document.body ? toRgba(getComputedStyle(document.body).backgroundColor) : [0, 0, 0, 0];
+    const [r, g, b, a] = compositeRgba(bodyBackground, rootBackground);
+    if (a > 0) {
+      return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.5;
+    }
+    const colorScheme = getComputedStyle(root).colorScheme;
+    if (colorScheme.includes("dark") && !colorScheme.includes("light")) return true;
+    if (colorScheme.includes("light") && !colorScheme.includes("dark")) return false;
+    return darkQuery.matches;
+  }
+  const diagrams = [...document.querySelectorAll(".mermaid")].map((el) => ({ el, src: el.textContent }));
+  let applied;
+  let rendering = false;
+  let queued = false;
+  function queueRender() {
+    queued = true;
+    if (rendering) return;
+    void render();
+  }
+  async function render() {
+    rendering = true;
+    try {
+      while (queued) {
+        queued = false;
+        const theme = pageIsDark() ? "dark" : "default";
+        if (theme === applied) continue;
+        mermaid.initialize({ startOnLoad: false, theme, securityLevel: "strict" });
+        for (const { el, src } of diagrams) {
+          el.removeAttribute("data-processed");
+          el.textContent = src;
+        }
+        try {
+          await mermaid.run({ nodes: diagrams.map((d) => d.el) });
+        } catch (error) {
+          console.error("Mermaid diagram render failed:", error);
+          return;
+        }
+        applied = theme;
+      }
+    } finally {
+      rendering = false;
+      if (queued) queueRender();
+    }
+  }
+  if (document.readyState === "complete") queueRender();
+  else window.addEventListener("load", queueRender, { once: true });
+  const themeObserver = new MutationObserver(queueRender);
+  for (const el of [document.documentElement, document.body]) {
+    if (!el) continue;
+    themeObserver.observe(el, { attributes: true, attributeFilter: ["data-theme", "class", "style"] });
+  }
+  document.addEventListener("change", queueRender, true);
+  document.addEventListener("transitionend", ({ propertyName }) => { if (propertyName === "background-color") queueRender(); }, true);
+  darkQuery.addEventListener("change", queueRender);
+</script>
+
+</body>
+</html>
