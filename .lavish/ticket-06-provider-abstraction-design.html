@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="en" data-theme="luxury">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ticket 06 — Provider Abstraction Design</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex) > *,
+  :where([style*="display: grid"], [style*="display:grid"], [style*="display: flex"], [style*="display:flex"]) > * {
+    min-width: 0;
+  }
+  :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, figcaption, td, th, .badge, .label) {
+    overflow-wrap: anywhere;
+  }
+  :where(img, svg, video, canvas, iframe) { max-width: 100%; height: auto; }
+  body { background: var(--color-base-100); }
+  .code-frame { border: 1px solid var(--color-base-300); border-radius: 0.75rem; overflow: hidden; }
+</style>
+</head>
+<body class="min-h-screen bg-base-100 text-base-content">
+<main class="mx-auto max-w-5xl p-6 lg:p-10 space-y-10">
+
+  <div class="text-sm breadcrumbs px-0">
+    <ul>
+      <li>AI Interpreter Workbench</li>
+      <li>Wayfinder map</li>
+      <li>Ticket 06</li>
+    </ul>
+  </div>
+
+  <header class="hero bg-base-200 rounded-box">
+    <div class="hero-content flex-col items-start text-left py-8">
+      <span class="badge badge-warning badge-soft mb-2">prototype · claimed · in progress</span>
+      <h1 class="text-3xl lg:text-4xl font-bold">Provider Abstraction Design</h1>
+      <p class="py-2 max-w-3xl text-base-content/80">
+        A rough prototype, not final code — the actual STT/Translation/TTS provider interfaces, sized to react to.
+        Reflects the real shapes from ticket 04's research and fits ticket 05's decided pipeline (LLM-hybrid
+        segmentation, TOKEN-mode TTS with explicit flush).
+      </p>
+    </div>
+  </header>
+
+  <div role="alert" class="alert alert-info alert-soft text-sm">
+    <span>Design convergence from <strong>ticket 12's prior-art research</strong>: Pipecat, LiveKit, and Vocode independently arrive at the same swap point — "one streaming method, in: raw input, out: an async stream of typed events." Below follows that shape. Also per that research: this interface deliberately does <strong>not</strong> try to also cover the Realtime API (ticket 03) — LiveKit keeps those as separate object families on purpose.</span>
+  </div>
+
+  <!-- File 1 -->
+  <section class="space-y-2">
+    <div class="flex items-center justify-between">
+      <h2 class="text-lg font-semibold font-mono">providers/base.py</h2>
+      <span class="badge badge-ghost badge-sm">shared interfaces + types</span>
+    </div>
+    <p class="text-sm text-base-content/70">The three provider protocols (<span class="font-mono">STTProvider</span>, <span class="font-mono">TranslationProvider</span>, <span class="font-mono">TTSProvider</span>), their event types, and structured provider errors. <span class="font-mono">TTSFlush</span> is the piece that maps directly to ticket 05's TOKEN-mode-plus-explicit-flush decision — a segment boundary is a distinct event in the input stream, not just "closing the connection."</p>
+    <div class="code-frame" id="file-base"></div>
+  </section>
+
+  <!-- File 2 -->
+  <section class="space-y-2">
+    <div class="flex items-center justify-between">
+      <h2 class="text-lg font-semibold font-mono">providers/deepgram_stt.py</h2>
+      <span class="badge badge-ghost badge-sm">one concrete implementation</span>
+    </div>
+    <p class="text-sm text-base-content/70">The "one concrete provider implementation to react to" this ticket asks for — shows how a real vendor's SDK maps onto the protocol above. Swapping to a different STT vendor means writing one class like this; nothing else in the pipeline changes. The SDK event-callback-to-async-generator bridging is left illustrative (marked inline) — that's real implementation work, out of scope for a prototype.</p>
+    <div class="code-frame" id="file-deepgram"></div>
+  </section>
+
+  <!-- Rationale -->
+  <section class="space-y-3">
+    <h2 class="text-lg font-semibold">Design choices worth flagging</h2>
+    <ul class="list bg-base-100 rounded-box border border-base-300 text-sm">
+      <li class="list-row"><div><strong>Protocol, not ABC.</strong> Structural typing (PEP 544) — a test double for provider-boundary tests (ticket 10) just needs to satisfy the shape, no inheritance required. Fits "targeted tests on... provider boundaries."</div></li>
+      <li class="list-row"><div><strong><span class="font-mono">is_final</span> vs. <span class="font-mono">speech_final</span> both survive onto <span class="font-mono">TranscriptSegment</span>,</strong> not collapsed into one flag — the orchestrator's LLM clause-check (ticket 05) needs <span class="font-mono">is_final</span> segments to check for early completeness, while <span class="font-mono">speech_final</span> stays the independent fallback boundary.</div></li>
+      <li class="list-row"><div><strong>Capability-declaration dataclasses</strong> (<span class="font-mono">STTCapabilities</span>) — LiveKit's pattern from ticket 12, in case future providers don't support the same feature set (e.g. no word timings, no interim results).</div></li>
+      <li class="list-row"><div><strong>An empty final STT result is not an error</strong> — <span class="font-mono">TranscriptSegment.is_empty</span> is a valid outcome (correctly transcribing silence/noise as nothing, ticket 11's noise-rejection test), distinct from <span class="font-mono">ProviderError</span> which is for actual failures.</div></li>
+      <li class="list-row"><div><strong>Translation doesn't decide segmentation</strong> — <span class="font-mono">translate()</span> takes one already-segmented unit; the LLM-hybrid boundary logic lives in the orchestrator (ticket 05), not duplicated into this provider layer.</div></li>
+    </ul>
+  </section>
+
+  <!-- Self-review -->
+  <section class="space-y-3">
+    <h2 class="text-lg font-semibold">Self-review <span class="badge badge-ghost badge-sm align-middle">honest gaps, per your question</span></h2>
+    <div role="alert" class="alert alert-warning alert-soft text-sm">
+      <span><strong>The real gap: <span class="font-mono">deepgram_stt.py</span>'s <span class="font-mono">stream()</span> doesn't actually work as written.</strong> It defines <span class="font-mono">_pump_audio()</span> but never schedules it to run, registers an <span class="font-mono">@connection.on("Results")</span> callback but never drains those results into anything the caller can <span class="font-mono">async for</span> over, and has no <span class="font-mono">yield</span> statement at all. I labeled that section "illustrative," but that's underselling it — the missing piece is precisely the hardest and most important part of the whole class: bridging Deepgram's callback-based SDK into a real async generator, concurrently with pumping audio in. The actual shape needed: an <span class="font-mono">asyncio.Queue</span>, the <span class="font-mono">"Results"</span> callback does <span class="font-mono">queue.put_nowait(segment)</span>, <span class="font-mono">_pump_audio()</span> runs as a concurrent <span class="font-mono">asyncio.create_task</span> alongside a loop that does <span class="font-mono">while True: yield await queue.get()</span>. That's real implementation work I deliberately didn't write here (out of scope for a prototype per the map's Notes — implementation happens as a normal build afterward) — but I should have said so explicitly instead of just marking it "illustrative" and moving on.</span>
+    </div>
+    <div role="alert" class="alert alert-soft text-sm">
+      <span><strong>Smaller, not real problems, worth naming anyway:</strong> the Protocol methods are declared <span class="font-mono">def ... -&gt; AsyncIterator[...]</span>, not <span class="font-mono">async def</span> — that's intentional and correct (calling an async generator function is itself synchronous; only advancing it is awaited), but it can read as a typo to someone unfamiliar with the pattern and deserves a comment in the real code. Also a minor naming inconsistency across the event types (<span class="font-mono">TranscriptSegment</span> vs. <span class="font-mono">TranslationChunk</span> vs. <span class="font-mono">TTSText</span>/<span class="font-mono">TTSFlush</span>) — cosmetic, but worth picking one noun before this gets implemented for real.</span>
+    </div>
+  </section>
+
+  <!-- Follow-up: timing params -->
+  <section class="space-y-3">
+    <h2 class="text-lg font-semibold">When does a new phrase "start" vs. "continue"? <span class="badge badge-ghost badge-sm align-middle">answering your question</span></h2>
+    <div class="rounded-box border border-base-300 bg-base-100 p-4 text-sm space-y-2">
+      <p class="text-base-content/70"><strong>Phrase start</strong> has no separate time parameter of its own — it's Deepgram's <span class="font-mono">SpeechStarted</span> event, which fires the instant VAD detects audio resuming after silence. Since capture never stops (ticket 05), whatever comes right after a boundary is cut automatically becomes the next phrase — there's nothing extra to configure.</p>
+      <p class="text-base-content/70"><strong>Phrase end / continue</strong> does have explicit time parameters, both set in the prototype above: <span class="font-mono">endpointing=300</span> (300ms of silence triggers <span class="font-mono">speech_final</span> — ticket 04's research recommended 300-500ms for natural conversational pauses, vs. Deepgram's 10ms default meant for fast chatbot-style turns) and <span class="font-mono">utterance_end_ms=1000</span> (a 1000ms backup signal, independent of endpointing, for cases where a pause doesn't cleanly register).</p>
+      <p class="text-base-content/70"><strong>The LLM-hybrid check (ticket 05) has no time parameter at all</strong> — it's event-driven, not interval-driven: it fires on new <span class="font-mono">is_final</span> segments, judging clause-completeness from the text itself, debounced to one check in flight at a time. <em>Honest gap:</em> ticket 05 never pinned an exact minimum spacing between checks if Deepgram emits final segments faster than the LLM can judge them — that's a real open tuning parameter, not yet a hard decision.</p>
+    </div>
+  </section>
+
+  <!-- Follow-up: multi-speaker -->
+  <section class="space-y-3">
+    <h2 class="text-lg font-semibold">Multiple voices — does Deepgram handle that? <span class="badge badge-ghost badge-sm align-middle">answering your question</span></h2>
+    <div class="rounded-box border border-base-300 bg-base-100 p-4 text-sm space-y-2">
+      <p class="text-base-content/70">Yes — Deepgram supports <strong>speaker diarization</strong> via a <span class="font-mono">diarize=true</span> parameter, which tags each word with a speaker index (0, 1, 2...) based on voice clustering. It doesn't identify <em>who</em> anyone is, just separates distinct voices in one audio stream. <em>Caveat: this wasn't part of ticket 04's verified primary-source research</em> (that was scoped to endpointing/interim-results/audio-format), so treat this as general knowledge, not a confirmed spec.</p>
+      <div role="alert" class="alert alert-warning alert-soft">
+        <span><strong>This exposes a real gap: the current design implicitly assumes one active speaker per capture stream</strong> — nothing in ticket 05's architecture or this prototype accounts for two people sharing one microphone/connection. Given the brief's requirement is a language-pair toggle with source/target transcripts (not explicitly multi-party diarization within one audio channel) and the 15-20hr budget, the pragmatic default is to keep treating this as <strong>out of scope</strong> — one active speaker per capture session, with two-way conversation handled by each party having their own mic/session rather than diarizing a shared feed. Flagging this rather than silently assuming it — worth an explicit "yes, out of scope" or opening it as a real decision if that assumption is wrong.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Diarization decision -->
+  <section class="crux-box rounded-box p-5 space-y-4">
+    <h2 class="text-lg font-semibold">Adding diarization — bigger than it looks <span class="badge badge-ghost badge-sm align-middle">per your feedback</span></h2>
+    <p class="text-sm text-base-content/80">You're right to want this, and it's worth naming precisely <em>why</em>: the brief's stability benchmark says "sustain a 5-minute <strong>back-and-forth</strong> conversation" — two people alternating, in two languages. The current design (ticket 05) implicitly assumed a <em>fixed</em> session-wide translation direction (pick "English → Spanish" once, translate everything that way) — which doesn't actually support true back-and-forth without someone manually flipping a toggle between every turn. Diarization plus per-segment language detection is a real fix for that, not scope creep.</p>
+
+    <div class="grid sm:grid-cols-2 gap-4 text-sm">
+      <div class="card card-border bg-base-100">
+        <div class="card-body">
+          <h3 class="font-medium text-base-content/80">Fixed speaker→language mapping</h3>
+          <p class="text-base-content/70 mt-1">User calibrates at session start ("Speaker A speaks English"). Simple, but fragile — Deepgram's speaker index (0, 1...) is just voice clustering, nothing guarantees it stays mapped to "the English speaker" reliably.</p>
+        </div>
+      </div>
+      <div class="card card-border border-primary bg-base-100 shadow">
+        <div class="card-body">
+          <h3 class="font-medium text-base-content/80">Per-segment language detection <span class="badge badge-primary badge-xs ml-1">recommended</span></h3>
+          <p class="text-base-content/70 mt-1">Detect which of the two configured languages each segment is spoken in, translate to whichever one it <em>isn't</em>. Works cleanly because the pair is always exactly 2 languages — no speaker-identity calibration needed at all. <span class="font-mono">speaker</span> (from diarization) is then used only for UI transcript labeling and keeping each person's TTS voice consistent across the session — not for deciding translation direction.</p>
+        </div>
+      </div>
+    </div>
+
+    <div role="alert" class="alert alert-info alert-soft text-sm">
+      <span><strong>Scope call: Cascade mode only, not Realtime mode.</strong> Deepgram natively supports diarizing a shared feed; OpenAI's <span class="font-mono">gpt-realtime</span> is built around a single input stream with no equivalent multi-party lever. Forcing symmetry would mean guessing at unresearched Realtime API behavior for uncertain payoff. Recommending this becomes a deliberate, named difference between the two modes in the comparison write-up — cascade's "more control" vs. realtime's "less control" (the brief's own framing) made concrete with a real example, not just asserted.</span>
+    </div>
+
+    <p class="text-sm font-medium">Downstream, this touches more than this ticket:</p>
+    <ul class="list-disc list-inside text-sm text-base-content/70 space-y-1">
+      <li><span class="font-mono">TranscriptSegment</span> gains a <span class="font-mono">speaker: int</span> field (below); <span class="font-mono">DeepgramSTTProvider</span> sets <span class="font-mono">diarize=true</span>.</li>
+      <li><strong>Ticket 05's protocol</strong> needs a <span class="font-mono">speaker</span> field threaded alongside <span class="font-mono">segmentId</span> in every message — a follow-up amendment to that resolved ticket, not a new one.</li>
+      <li><strong>Ticket 09 (UI/UX, still open)</strong> needs per-speaker transcript display and per-speaker TTS voice assignment — this ticket should carry that requirement forward rather than it getting lost.</li>
+    </ul>
+  </section>
+
+  <div role="alert" class="alert alert-success shadow-lg">
+    <span>✓ <strong>Ticket 06 resolved</strong> — "agree, the shape works." Written back to the wayfinder map, plus a follow-up amendment to ticket 05's protocol and a carried-forward note on ticket 09.</span>
+  </div>
+
+  <!-- Input -->
+  <section class="card card-border bg-base-200">
+    <div class="card-body space-y-4">
+      <h2 class="card-title">Your call</h2>
+      <form data-lavish-question="ticket06" class="space-y-3" onsubmit="event.preventDefault();
+        const fd = new FormData(event.currentTarget);
+        const choice = fd.get('reaction');
+        const note = (fd.get('note') || '').toString().trim();
+        if (!choice) return;
+        const labels = { agree: 'Agree, this shape works', changes: 'Needs changes — see note' };
+        let msg = 'Ticket 06 decision: ' + labels[choice];
+        if (note) msg += ' — note: ' + note;
+        window.lavish.queuePrompt(msg, { tag: 'choice', text: 'Ticket 06: ' + labels[choice], element: event.currentTarget, data: { question: 'ticket06', choice, note } });
+        document.getElementById('queued-confirm').classList.remove('hidden');
+      ">
+        <fieldset class="fieldset">
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary">
+            <input type="radio" name="reaction" value="agree" class="radio radio-primary" checked />
+            <span class="font-medium">Agree, this shape works</span>
+          </label>
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary mt-2">
+            <input type="radio" name="reaction" value="changes" class="radio radio-primary" />
+            <span class="font-medium">Needs changes — explain below</span>
+          </label>
+        </fieldset>
+        <textarea name="note" class="textarea textarea-bordered w-full" placeholder="Optional: anything to add, qualify, or push back on"></textarea>
+        <button type="submit" class="btn btn-primary">Queue this answer</button>
+        <p id="queued-confirm" class="text-sm text-success hidden">Queued — press Send to Agent (or Send &amp; End) in the top bar to deliver it.</p>
+      </form>
+    </div>
+  </section>
+
+</main>
+
+<script type="module">
+  import { File } from "https://esm.sh/@pierre/diffs@1.2.10?bundle";
+
+  const theme = { light: "github-light", dark: "github-dark" };
+  const options = { theme, themeType: "dark", overflow: "wrap" };
+
+  const baseFile = {
+    name: "providers/base.py",
+    contents: `"""
+Provider-swap boundary for STT, translation, and TTS. One streaming method,
+in: raw input, out: an async stream of typed events -- the shape found
+independently in Pipecat, LiveKit, and Vocode (ticket 12 research).
+
+Deliberately NOT unified with the Realtime API's provider shape (ticket 03) --
+LiveKit's own architecture keeps those separate for good reason (ticket 12).
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from enum import Enum, auto
+from typing import AsyncIterator, Protocol
+
+
+# ---------------------------------------------------------------------------
+# Errors
+# ---------------------------------------------------------------------------
+
+class ProviderErrorKind(Enum):
+    RATE_LIMITED = auto()
+    TIMEOUT = auto()
+    CONNECTION_LOST = auto()
+    UNKNOWN = auto()
+
+
+class ProviderError(Exception):
+    """Raised by any provider on failure. \`retryable\` tells the orchestrator
+    (ticket 10's error-handling policy) whether a retry-with-backoff applies."""
+
+    def __init__(self, kind: ProviderErrorKind, provider: str, message: str, *, retryable: bool):
+        super().__init__(f"[{provider}] {kind.name}: {message}")
+        self.kind = kind
+        self.provider = provider
+        self.retryable = retryable
+
+
+# ---------------------------------------------------------------------------
+# STT
+# ---------------------------------------------------------------------------
+
+@dataclass
+class WordTiming:
+    word: str
+    start: float
+    end: float
+    confidence: float
+
+
+@dataclass
+class TranscriptSegment:
+    """One STT event. \`is_final\` and \`speech_final\` are distinct signals
+    (ticket 04's research) -- is_final means Deepgram won't revise this text
+    further; speech_final means its own endpointing detected a pause and is
+    the fallback segment boundary if the orchestrator's LLM clause-check
+    (ticket 05) hasn't already fired one.
+
+    \`speaker\` (from diarization, added per grilling feedback on this ticket)
+    is used by the orchestrator for transcript labeling and consistent
+    per-speaker TTS voice assignment -- NOT for deciding translation
+    direction. Direction comes from per-segment language detection instead,
+    since the language pair is always exactly two languages: detect which
+    one this segment is in, translate to the other. That's what actually
+    supports the brief's "back-and-forth conversation" stability benchmark
+    without a manual per-turn toggle."""
+
+    text: str
+    is_final: bool
+    speech_final: bool
+    speaker: int | None = None
+    words: tuple[WordTiming, ...] = ()
+
+    @property
+    def is_empty(self) -> bool:
+        """An empty final result is a valid, non-error outcome (silence/noise
+        correctly producing nothing) -- see ticket 11's noise-rejection test."""
+        return self.is_final and not self.text.strip()
+
+
+@dataclass(frozen=True)
+class STTCapabilities:
+    """Self-declared, per LiveKit's pattern (ticket 12) -- lets the
+    orchestrator branch on what a provider actually supports instead of
+    assuming every STT vendor is identical."""
+
+    streaming: bool
+    interim_results: bool
+    word_timings: bool
+    diarization: bool
+    languages: tuple[str, ...]
+
+
+class STTProvider(Protocol):
+    """The swap point. One long-lived call for the whole session -- audio
+    never stops flowing in (ticket 05's concurrency answer), regardless of
+    what the orchestrator's LLM clause-check is doing with the output."""
+
+    capabilities: STTCapabilities
+
+    def stream(
+        self, audio_chunks: AsyncIterator[bytes], *, languages: tuple[str, ...]
+    ) -> AsyncIterator[TranscriptSegment]:
+        """\`languages\` is the candidate set (always exactly 2 for this app,
+        e.g. ("en", "es")) -- the provider auto-detects which one each
+        segment is spoken in rather than assuming a single fixed language,
+        so translation direction can be decided per segment (see
+        TranscriptSegment's docstring). Raises ProviderError on
+        rate-limit/timeout/connection-loss."""
+        ...
+
+
+# ---------------------------------------------------------------------------
+# Translation
+# ---------------------------------------------------------------------------
+
+@dataclass
+class TranslationChunk:
+    """Streamed token(s) -- TOKEN mode per ticket 05. \`source_text\` passed to
+    translate() is one already-segmented unit from the orchestrator; this
+    stage doesn't decide segment boundaries, it only translates what it's given."""
+
+    text: str
+    is_final: bool
+
+
+class TranslationProvider(Protocol):
+    def translate(
+        self, source_text: str, *, source_lang: str, target_lang: str
+    ) -> AsyncIterator[TranslationChunk]:
+        ...
+
+
+# ---------------------------------------------------------------------------
+# TTS
+# ---------------------------------------------------------------------------
+
+@dataclass
+class TTSText:
+    text: str
+
+
+@dataclass
+class TTSFlush:
+    """Maps directly to ElevenLabs' \`flush: true\` (ticket 04/05) -- forces
+    the provider to speak whatever's buffered now instead of waiting for its
+    own internal chunk_length_schedule threshold. Fired at each segment
+    boundary the orchestrator decides on."""
+
+    segment_id: str
+
+
+@dataclass
+class AudioChunk:
+    """Carries segment_id + seq so the caller can tag outgoing
+    tts_audio_meta protocol messages (ticket 05) correctly."""
+
+    segment_id: str
+    seq: int
+    data: bytes
+    is_last: bool
+
+
+class TTSProvider(Protocol):
+    """One long-lived call for the whole session, same shape as STTProvider --
+    text streams in continuously across many segments; flush marks each one."""
+
+    def synthesize(
+        self, input_events: AsyncIterator[TTSText | TTSFlush], *, voice: str, language: str
+    ) -> AsyncIterator[AudioChunk]:
+        ...
+`,
+  };
+
+  const deepgramFile = {
+    name: "providers/deepgram_stt.py",
+    contents: `"""
+Concrete STTProvider implementation for Deepgram -- the "one provider
+implementation to react to" this ticket asks for. Maps Deepgram's real
+WS message shape (ticket 04 research) onto the STTProvider protocol.
+
+Rough / illustrative, per the prototype ticket type -- not production code.
+"""
+
+from __future__ import annotations
+
+from typing import AsyncIterator
+
+from deepgram import DeepgramClient, LiveOptions  # actual SDK, illustrative import
+
+from .base import ProviderError, ProviderErrorKind, STTCapabilities, TranscriptSegment, WordTiming
+
+
+class DeepgramSTTProvider:
+    """Swapping to a different STT vendor means writing one class like this
+    one -- nothing else in the pipeline changes (the code-quality bar this
+    ticket exists to satisfy)."""
+
+    capabilities = STTCapabilities(
+        streaming=True,
+        interim_results=True,
+        word_timings=True,
+        diarization=True,
+        languages=("en", "es"),
+    )
+
+    def __init__(self, api_key: str):
+        self._client = DeepgramClient(api_key)
+
+    async def stream(
+        self, audio_chunks: AsyncIterator[bytes], *, languages: tuple[str, ...]
+    ) -> AsyncIterator[TranscriptSegment]:
+        connection = self._client.listen.asynclive.v("1")
+        options = LiveOptions(
+            model="nova-3",
+            detect_language=True,     # per-segment, not one fixed language --
+            language=None,            # supports true back-and-forth (see base.py)
+            diarize=True,             # tag each word with a speaker index
+            interim_results=True,
+            endpointing=300,          # ticket 04: 300-500ms suits conversation
+            utterance_end_ms=1000,    # backup boundary signal
+            smart_format=True,
+        )
+        # NB: illustrative -- verifying detect_language's exact behavior when
+        # constrained to a specific 2-language candidate set (vs. Deepgram's
+        # full supported-language list) is real research this prototype
+        # hasn't done; worth a quick primary-source check before implementing.
+
+        try:
+            await connection.start(options)
+        except Exception as exc:  # SDK raises on auth/network failure
+            raise ProviderError(
+                ProviderErrorKind.CONNECTION_LOST, "deepgram", str(exc), retryable=True
+            ) from exc
+
+        # --- Illustrative from here down ---
+        # Real implementation bridges Deepgram SDK's callback-based "Results"
+        # event onto this async generator via an asyncio.Queue, and translates
+        # rate-limit / timeout SDK exceptions into ProviderError(retryable=...)
+        # at this boundary -- callers of STTProvider never see raw SDK errors.
+
+        async def _pump_audio() -> None:
+            async for chunk in audio_chunks:
+                await connection.send(chunk)
+            await connection.finish()
+
+        @connection.on("Results")
+        def _on_results(_, result, **kwargs) -> None:
+            alt = result.channel.alternatives[0]
+            # with diarize=True, each word carries its own speaker index;
+            # take the first word's as the segment's speaker (illustrative --
+            # a segment spanning a mid-utterance speaker change is an edge
+            # case this prototype doesn't resolve)
+            speaker = alt.words[0].speaker if alt.words else None
+            segment = TranscriptSegment(
+                text=alt.transcript,
+                is_final=result.is_final,
+                speech_final=result.speech_final,
+                speaker=speaker,
+                words=tuple(
+                    WordTiming(w.word, w.start, w.end, w.confidence) for w in alt.words
+                ),
+            )
+            # -> pushed onto the asyncio.Queue this generator yields from
+`,
+  };
+
+  new File(options).render({ containerWrapper: document.querySelector("#file-base"), file: baseFile });
+  new File(options).render({ containerWrapper: document.querySelector("#file-deepgram"), file: deepgramFile });
+</script>
+
+</body>
+</html>

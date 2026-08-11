@@ -130,3 +130,23 @@ such at the time: Dubbing is almost certainly much higher-latency, since it's bu
 async whole-file workflow rather than a real-time streaming API — not confirmed against
 primary sources, and didn't affect the decision either way since Dubbing was already
 ruled out on the abstraction-boundary grounds above.)
+
+## Amendment (from [Provider abstraction design](06-provider-abstraction-design.md))
+
+Diarization + per-segment language detection was added during ticket 06 to actually
+support the brief's "5-minute back-and-forth conversation" stability benchmark, which
+implies two people alternating in two languages — the original design above implicitly
+assumed one fixed session-wide translation direction. Effects on this ticket's protocol
+(decision 4):
+
+- Every message carries a `speaker: int | None` field alongside `segmentId` (from
+  Deepgram's `diarize=true`) — used for transcript labeling and consistent per-speaker
+  TTS voice, not for translation direction.
+- `start_session` now configures the **candidate language pair** (e.g. `{en, es}`)
+  rather than a fixed source→target direction; each segment's translation direction is
+  decided per-segment via language detection (which of the two configured languages was
+  this segment spoken in → translate to the other).
+- Scoped to Cascade mode only — Realtime mode (`gpt-realtime`) has no equivalent
+  multi-party lever, a deliberate, named difference for the comparison write-up.
+
+Full reasoning in ticket 06's Answer.

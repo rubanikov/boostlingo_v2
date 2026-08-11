@@ -84,7 +84,9 @@ of build effort.
   continuous chunking for Boostlingo's two-party-conversation product specifically,
   worth confirming by ear once built. Also recorded: ElevenLabs does not translate in
   this pipeline (its separate "Dubbing" product does, deliberately not used — collapses
-  provider-swap points and isn't built for streaming).
+  provider-swap points and isn't built for streaming). **Amended by ticket 06**: protocol
+  now carries a `speaker` field, and `start_session` configures a language *pair* rather
+  than a fixed direction (see below).
 - [Test dataset & translation-quality testing](issues/14-test-dataset-translation-quality.md)
   — extends ticket 11's WER dataset to also cover translation quality, which WER doesn't
   touch. Dataset: ~15-20 varied everyday-conversation items (domain-agnostic — corrected
@@ -108,6 +110,17 @@ of build effort.
   `gpt-realtime-translate` — the brief calls it "required" with deliberately different
   wording than cascade providers' "candidate's choice"; `gpt-realtime-translate` gets
   real weight in the comparison write-up instead.
+- [Provider abstraction design](issues/06-provider-abstraction-design.md) — prototyped
+  `providers/base.py` (STT/Translation/TTS `Protocol` interfaces + structured errors) and
+  `providers/deepgram_stt.py` (one concrete implementation). **Significant addition**:
+  diarization (`diarize=true`) + per-segment language detection (`detect_language=True`),
+  added because the brief's "back-and-forth conversation" stability test implies two
+  people alternating in two languages, which the original fixed-direction design (ticket
+  05) didn't actually support. `speaker` drives transcript labeling + per-speaker TTS
+  voice only; translation *direction* comes from detecting which of the 2 configured
+  languages each segment is in. **Cascade mode only** — `gpt-realtime` has no equivalent
+  lever, a deliberate named difference for the write-up. Amends ticket 05's protocol;
+  carries a new requirement forward into [UI/UX layout](issues/09-ui-ux-layout.md).
 
 _(stack/deadline/deployment-target/held-provider-accounts were settled by direct
 conversation before charting and are captured in Notes above, not as tickets)_
