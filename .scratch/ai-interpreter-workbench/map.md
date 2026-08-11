@@ -29,6 +29,15 @@ of build effort.
   server is available for pulling current OpenAI/Deepgram/ElevenLabs API docs.
 - This map plans architecture and provider decisions only — implementation happens
   afterward as a normal build (e.g. via `/implement`), not as further wayfinder tickets.
+- **Cross-cutting flag from prior-art research**: turn-based endpointing (the pattern
+  every mature framework surveyed uses by default) is explicitly the wrong shape for
+  continuous interpretation per multiple unresolved community threads and per OpenAI's
+  own turn-free `gpt-realtime-translate` design. This affects
+  [Cascade pipeline architecture](issues/05-cascade-pipeline-architecture.md) most
+  directly but echoes into [Realtime transport architecture](issues/03-realtime-transport-architecture.md),
+  [Provider abstraction interface design](issues/06-provider-abstraction-design.md), and
+  [Latency instrumentation design](issues/08-latency-instrumentation-design.md) — see
+  [Prior-art reference implementations](issues/12-prior-art-reference-implementations.md).
 
 ## Decisions so far
 
@@ -53,6 +62,18 @@ of build effort.
   real capture→STT path, plus a noise-rejection case. No per-device calibration system —
   browser-level AGC/noise-suppression + level-meter preflight instead; mic device
   coverage is a manual pass only (laptop + one other device on hand), not automated.
+- [Prior-art reference implementations](issues/12-prior-art-reference-implementations.md)
+  — surveyed Pipecat, LiveKit Agents, OpenAI's own demo repos, Vocode, and continuous-
+  translation examples. Headline finding: turn-based endpointing is the wrong shape for
+  continuous interpretation (see Notes flag above) — the two most transferable
+  continuous-shape patterns are LiveKit's `gemini-live-translate` (per-speaker-session,
+  debounced reconciliation) and the "one persistent stream per speaker, no turn boundary"
+  shape it shares with `gpt-realtime-translate`. Also: hand-building beats adopting a
+  framework wholesale (neither Pipecat nor LiveKit has solved this shape either);
+  provider-abstraction swap points converge on "streaming method in, async event stream
+  out" across all three frameworks surveyed; LiveKit deliberately keeps cascade and
+  realtime provider interfaces separate; Pipecat's OTel conversation→turn→service span
+  hierarchy is the closest prior art for latency instrumentation.
 
 _(stack/deadline/deployment-target/held-provider-accounts were settled by direct
 conversation before charting and are captured in Notes above, not as tickets)_

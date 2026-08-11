@@ -18,3 +18,14 @@ Cascade pipeline architecture
 - How clocks are synchronized/reconciled across client and server.
 - What's actually shown in the UI (per-stage breakdown vs just end-to-end).
 - How this maps onto the brief's benchmark definition ("speech end → first audio out").
+
+[Prior-art research](12-prior-art-reference-implementations.md) found Pipecat's
+OpenTelemetry span hierarchy (conversation → turn → per-service span, each carrying
+provider identity + a `ttfb` attribute) as the most complete working example of this —
+worth using as a structural reference, with the caveat that it's built around "turn" as
+the aggregation unit and this project needs an equivalent unit for continuous
+interpretation (e.g. a chunk/utterance-window ID, once
+[Cascade pipeline architecture](05-cascade-pipeline-architecture.md) settles the
+segmentation granularity). A stage → measured-contribution → running-total-vs-target
+table layout (seen in a companion doc to that research) is a reasonable structural
+template for the UI display itself.

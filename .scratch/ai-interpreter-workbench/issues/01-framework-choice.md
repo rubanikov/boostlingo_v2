@@ -16,3 +16,12 @@ Candidates to weigh:
   provider SDKs)
 - Frontend: React vs Vue vs Svelte vs vanilla+Vite
 - Package manager / build tooling: uv/poetry for Python; vite/pnpm (or equivalent) for TS
+
+[Prior-art research](12-prior-art-reference-implementations.md) supports hand-building a
+thin pipeline rather than adopting a framework like Pipecat or LiveKit Agents wholesale
+(neither has a finished answer for this project's continuous-interpretation shape either
+— see [Cascade pipeline architecture](05-cascade-pipeline-architecture.md)) — this isn't
+a dependency decision so much as confirmation that no framework needs weighing here as an
+alternative to FastAPI/Flask + React/Vue/Svelte. Their code is still worth studying as
+design reference (Pipecat's frame/processor vocabulary; LiveKit's transport/provider/
+orchestration layering), independent of what gets picked here.
