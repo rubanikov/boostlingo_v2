@@ -142,6 +142,14 @@ of build effort.
   shape extends ticket 05's protocol example with the full stage set. **Triggered an
   amendment to ticket 05** (see above): `endpointing` 300ms→500ms, plus a new
   hybrid-race-vs-LLM-priority segmentation toggle for empirical testing.
+- [UI/UX layout](issues/09-ui-ux-layout.md) — 3 structurally different variants
+  prototyped via the `/prototype` skill, populated with realistic mock data (2 diarized
+  speakers, EN↔ES). **Winner: split dual-column** (source/target panes side by side,
+  latency as a top strip, mic+level-meter centered at bottom) over a chat-thread variant
+  and an instrumentation-dashboard variant. Per-speaker color-coding (blue/orange)
+  doubles as the visual cue for each speaker's distinct TTS voice (ticket 06). Latency
+  strip matches ticket 08's asymmetric-by-mode design; error states match ticket 10's
+  taxonomy, with empty-result explicitly shown as not a user-facing error (ticket 11).
 
 _(stack/deadline/deployment-target/held-provider-accounts were settled by direct
 conversation before charting and are captured in Notes above, not as tickets)_

@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en" data-theme="luxury">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ticket 09 — UI/UX Layout Prototype</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex) > *,
+  :where([style*="display: grid"], [style*="display:grid"], [style*="display: flex"], [style*="display:flex"]) > * {
+    min-width: 0;
+  }
+  :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, figcaption, td, th, .badge, .label) {
+    overflow-wrap: anywhere;
+  }
+  :where(img, svg, video, canvas, iframe) { max-width: 100%; height: auto; }
+  body { background: var(--color-base-100); padding-bottom: 5rem; }
+  .variant { display: none; }
+  .variant.active { display: block; }
+  .switcher {
+    position: fixed; left: 50%; bottom: 1.25rem; transform: translateX(-50%);
+    z-index: 50; display: flex; align-items: center; gap: 0.75rem;
+    background: var(--color-neutral); color: var(--color-neutral-content);
+    padding: 0.5rem 0.5rem 0.5rem 0.75rem; border-radius: 999px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35); border: 1px solid color-mix(in oklch, var(--color-base-content) 15%, transparent);
+  }
+  .speakerA { border-left: 3px solid #38bdf8; }
+  .speakerB { border-left: 3px solid #fb923c; }
+  .speakerA-badge { background: #0c4a6e; color: #e0f2fe; }
+  .speakerB-badge { background: #7c2d12; color: #ffedd5; }
+  .pulse-ring { animation: pulse-ring 1.6s cubic-bezier(0.4,0,0.6,1) infinite; }
+  @keyframes pulse-ring { 0%,100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.5); } 50% { box-shadow: 0 0 0 10px rgba(16,185,129,0); } }
+</style>
+</head>
+<body class="min-h-screen bg-base-100 text-base-content">
+
+  <div class="mx-auto max-w-6xl px-4 pt-4">
+    <div class="text-sm breadcrumbs px-0">
+      <ul>
+        <li>AI Interpreter Workbench</li>
+        <li>Wayfinder map</li>
+        <li>Ticket 09 — prototype (3 variants)</li>
+      </ul>
+    </div>
+    <div role="alert" class="alert alert-success shadow-lg my-3">
+      <span>✓ <strong>Resolved — Variant A (Split dual-column) wins.</strong> Written back to the wayfinder map.</span>
+    </div>
+    <div role="alert" class="alert alert-info alert-soft text-sm my-3">
+      <span>Three structurally different layouts, populated with realistic mock data (2 diarized speakers, EN↔ES, mid-conversation). Flip between them with the switcher below or ← / →. Not final styling — the question is layout and information hierarchy, not polish.</span>
+    </div>
+  </div>
+
+  <!-- ============ VARIANT A: Split dual-column ============ -->
+  <div class="variant active" id="variant-A">
+    <div class="mx-auto max-w-6xl px-4 space-y-4">
+
+      <!-- Header -->
+      <div class="navbar bg-base-200 rounded-box">
+        <div class="navbar-start gap-3">
+          <div role="tablist" class="tabs tabs-box tabs-sm">
+            <a role="tab" class="tab tab-active">Cascade</a>
+            <a role="tab" class="tab">Realtime</a>
+          </div>
+          <select class="select select-sm w-40"><option>English ↔ Spanish</option></select>
+        </div>
+        <div class="navbar-end gap-2">
+          <span class="badge badge-success badge-soft gap-1"><span class="w-2 h-2 rounded-full bg-success"></span>Connected</span>
+        </div>
+      </div>
+
+      <!-- Latency strip -->
+      <div class="card card-border bg-base-100">
+        <div class="card-body p-3">
+          <div class="flex items-center gap-4 text-xs overflow-x-auto">
+            <span class="font-medium text-base-content/60 shrink-0">Latency</span>
+            <span class="badge badge-ghost">speech end 0ms</span>
+            <span class="text-base-content/30">→</span>
+            <span class="badge badge-ghost">translation 150ms</span>
+            <span class="text-base-content/30">→</span>
+            <span class="badge badge-warning badge-soft">translation done 400ms</span>
+            <span class="text-base-content/30">→</span>
+            <span class="badge badge-ghost">TTS first byte 600ms</span>
+            <span class="text-base-content/30">→</span>
+            <span class="badge badge-primary">playback 650ms</span>
+            <progress class="progress progress-success w-32 ml-auto shrink-0" value="650" max="2000"></progress>
+            <span class="text-base-content/50 shrink-0">/ 2000ms target</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dual columns -->
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div class="card card-border bg-base-100 h-[420px] flex flex-col">
+          <div class="card-body p-4 flex flex-col gap-3 overflow-y-auto">
+            <h3 class="text-xs uppercase tracking-wide text-base-content/50">Source</h3>
+            <div class="speakerA pl-3 py-1"><span class="badge speakerA-badge badge-xs mb-1">Speaker A · EN</span><p class="text-sm">Hi, I wanted to ask about the return policy for this item.</p></div>
+            <div class="speakerB pl-3 py-1"><span class="badge speakerB-badge badge-xs mb-1">Speaker B · ES</span><p class="text-sm">Claro, tiene usted treinta días para hacer la devolución.</p></div>
+            <div class="speakerA pl-3 py-1 opacity-70"><span class="badge speakerA-badge badge-xs mb-1">Speaker A · EN</span><p class="text-sm">Okay, and does it need the original<span class="animate-pulse">▍</span></p></div>
+          </div>
+        </div>
+        <div class="card card-border bg-base-100 h-[420px] flex flex-col">
+          <div class="card-body p-4 flex flex-col gap-3 overflow-y-auto">
+            <h3 class="text-xs uppercase tracking-wide text-base-content/50">Target</h3>
+            <div class="speakerA pl-3 py-1"><span class="badge speakerA-badge badge-xs mb-1">Speaker A → ES</span><p class="text-sm">Hola, quería preguntar sobre la política de devoluciones de este artículo.</p></div>
+            <div class="speakerB pl-3 py-1"><span class="badge speakerB-badge badge-xs mb-1">Speaker B → EN</span><p class="text-sm">Sure, you have thirty days to make the return.</p></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mic control -->
+      <div class="flex items-center justify-center gap-4 py-2">
+        <div class="w-40 h-2 rounded-full bg-base-300 overflow-hidden"><div class="h-full bg-success" style="width:35%"></div></div>
+        <button class="btn btn-circle btn-success btn-lg pulse-ring">🎙️</button>
+        <span class="badge badge-success badge-soft">Listening</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ VARIANT B: Chat thread ============ -->
+  <div class="variant" id="variant-B">
+    <div class="mx-auto max-w-3xl px-4 flex gap-4">
+      <div class="flex-1 space-y-4 py-2">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div role="tablist" class="tabs tabs-boxed tabs-xs">
+              <a role="tab" class="tab tab-active">Cascade</a>
+              <a role="tab" class="tab">Realtime</a>
+            </div>
+          </div>
+          <span class="badge badge-success badge-soft gap-1"><span class="w-2 h-2 rounded-full bg-success"></span>Connected</span>
+        </div>
+
+        <div class="h-[480px] overflow-y-auto space-y-3 pr-1">
+          <div class="chat chat-start">
+            <div class="chat-header text-xs opacity-60">Speaker A <time class="ml-1">EN</time></div>
+            <div class="chat-bubble chat-bubble-info text-sm">Hi, I wanted to ask about the return policy for this item.</div>
+            <div class="chat-footer text-xs opacity-50 mt-1">
+              <details class="inline"><summary class="cursor-pointer">→ ES · 650ms</summary>
+                <div class="mt-1 chat-bubble chat-bubble-info text-xs opacity-80">Hola, quería preguntar sobre la política de devoluciones de este artículo.</div>
+              </details>
+            </div>
+          </div>
+          <div class="chat chat-end">
+            <div class="chat-header text-xs opacity-60">Speaker B <time class="ml-1">ES</time></div>
+            <div class="chat-bubble text-sm" style="background:#7c2d12;color:#ffedd5;">Claro, tiene usted treinta días para hacer la devolución.</div>
+            <div class="chat-footer text-xs opacity-50 mt-1">
+              <details class="inline"><summary class="cursor-pointer">→ EN · 590ms</summary>
+                <div class="mt-1 chat-bubble text-xs opacity-80" style="background:#7c2d12;color:#ffedd5;">Sure, you have thirty days to make the return.</div>
+              </details>
+            </div>
+          </div>
+          <div class="chat chat-start">
+            <div class="chat-header text-xs opacity-60">Speaker A <time class="ml-1">EN</time></div>
+            <div class="chat-bubble chat-bubble-info text-sm opacity-70">Okay, and does it need the original<span class="animate-pulse">▍</span></div>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-center gap-3 pt-2">
+          <button class="btn btn-circle btn-success pulse-ring">🎙️</button>
+          <div class="w-24 h-1.5 rounded-full bg-base-300 overflow-hidden"><div class="h-full bg-success" style="width:35%"></div></div>
+        </div>
+      </div>
+
+      <!-- Sidebar -->
+      <div class="w-56 shrink-0 space-y-3 py-2">
+        <div class="card card-border bg-base-100">
+          <div class="card-body p-3 space-y-2">
+            <p class="text-xs uppercase tracking-wide text-base-content/50">Session</p>
+            <select class="select select-xs w-full"><option>English ↔ Spanish</option></select>
+            <p class="text-xs text-base-content/60">Speaker A <span class="badge speakerA-badge badge-xs ml-1">blue voice</span></p>
+            <p class="text-xs text-base-content/60">Speaker B <span class="badge speakerB-badge badge-xs ml-1">orange voice</span></p>
+          </div>
+        </div>
+        <div class="card card-border bg-base-100">
+          <div class="card-body p-3 space-y-1">
+            <p class="text-xs uppercase tracking-wide text-base-content/50">Latency</p>
+            <p class="text-xs">Total <span class="font-mono float-right text-success">650ms</span></p>
+            <progress class="progress progress-success w-full" value="650" max="2000"></progress>
+            <p class="text-[10px] text-base-content/40">tap a message for per-stage detail</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ VARIANT C: Instrumentation dashboard ============ -->
+  <div class="variant" id="variant-C">
+    <div class="mx-auto max-w-6xl px-4 space-y-4">
+
+      <div class="navbar bg-base-200 rounded-box">
+        <div class="navbar-start gap-3">
+          <button class="btn btn-circle btn-success btn-sm pulse-ring">🎙️</button>
+          <div role="tablist" class="tabs tabs-box tabs-sm">
+            <a role="tab" class="tab tab-active">Cascade</a>
+            <a role="tab" class="tab">Realtime</a>
+          </div>
+        </div>
+        <div class="navbar-center">
+          <select class="select select-sm"><option>English ↔ Spanish</option></select>
+        </div>
+        <div class="navbar-end">
+          <span class="badge badge-success badge-soft gap-1"><span class="w-2 h-2 rounded-full bg-success"></span>Connected</span>
+        </div>
+      </div>
+
+      <div class="grid sm:grid-cols-2 gap-3">
+        <div class="card card-border bg-base-100 h-[260px] flex flex-col">
+          <div class="card-body p-3 overflow-y-auto space-y-2">
+            <h3 class="text-xs uppercase tracking-wide text-base-content/50">Source</h3>
+            <div class="speakerA pl-2"><span class="badge speakerA-badge badge-xs">A</span> <span class="text-sm">Hi, I wanted to ask about the return policy for this item.</span></div>
+            <div class="speakerB pl-2"><span class="badge speakerB-badge badge-xs">B</span> <span class="text-sm">Claro, tiene usted treinta días para hacer la devolución.</span></div>
+            <div class="speakerA pl-2 opacity-70"><span class="badge speakerA-badge badge-xs">A</span> <span class="text-sm">Okay, and does it need the original▍</span></div>
+          </div>
+        </div>
+        <div class="card card-border bg-base-100 h-[260px] flex flex-col">
+          <div class="card-body p-3 overflow-y-auto space-y-2">
+            <h3 class="text-xs uppercase tracking-wide text-base-content/50">Target</h3>
+            <div class="speakerA pl-2"><span class="badge speakerA-badge badge-xs">A→ES</span> <span class="text-sm">Hola, quería preguntar sobre la política de devoluciones de este artículo.</span></div>
+            <div class="speakerB pl-2"><span class="badge speakerB-badge badge-xs">B→EN</span> <span class="text-sm">Sure, you have thirty days to make the return.</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Latency dashboard, first-class -->
+      <div class="card card-border border-primary bg-base-100 shadow">
+        <div class="card-body p-4">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-medium text-sm">Latency — this segment</h3>
+            <span class="badge badge-success">650ms / 2000ms target</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="table table-xs">
+              <thead><tr><th>Stage</th><th class="text-right">Cumulative</th><th class="text-right">Contribution</th></tr></thead>
+              <tbody>
+                <tr><td>Speech end</td><td class="text-right font-mono">0ms</td><td class="text-right text-base-content/40">—</td></tr>
+                <tr><td>Translation first token</td><td class="text-right font-mono">150ms</td><td class="text-right font-mono">150ms</td></tr>
+                <tr class="bg-warning/10"><td>Translation complete</td><td class="text-right font-mono">400ms</td><td class="text-right font-mono font-semibold">250ms ←</td></tr>
+                <tr><td>TTS first byte</td><td class="text-right font-mono">600ms</td><td class="text-right font-mono">200ms</td></tr>
+                <tr><td>Playback start</td><td class="text-right font-mono">650ms</td><td class="text-right font-mono">50ms</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Error states reference (all variants) ============ -->
+  <div class="mx-auto max-w-6xl px-4 mt-8">
+    <h3 class="text-xs uppercase tracking-wide text-base-content/50 mb-2">Error states — applies across all variants</h3>
+    <div class="grid sm:grid-cols-2 gap-2">
+      <div role="alert" class="alert alert-error alert-soft text-sm"><span><strong>Mic permission denied</strong> — "We can't hear you — check your browser's microphone permission and try again."</span></div>
+      <div role="alert" class="alert alert-warning alert-soft text-sm"><span><strong>Rate limited</strong> — "Provider is busy, retrying automatically…" with a small spinner, non-blocking.</span></div>
+      <div role="alert" class="alert alert-warning alert-soft text-sm"><span><strong>Timeout</strong> — "Taking longer than expected…" after N seconds with no response for the in-flight segment.</span></div>
+      <div role="alert" class="alert alert-soft text-sm"><span><strong>Empty result</strong> — no error shown at all; silence/noise correctly produces nothing (ticket 11) — not a user-facing failure state.</span></div>
+    </div>
+  </div>
+
+  <!-- Switcher -->
+  <div class="switcher">
+    <button id="prev" class="btn btn-circle btn-xs btn-ghost text-neutral-content">←</button>
+    <span id="label" class="text-sm font-medium min-w-[220px] text-center">A — Split dual-column</span>
+    <button id="next" class="btn btn-circle btn-xs btn-ghost text-neutral-content">→</button>
+  </div>
+
+<script>
+  const variants = [
+    { id: 'A', name: 'Split dual-column' },
+    { id: 'B', name: 'Chat thread' },
+    { id: 'C', name: 'Instrumentation dashboard' },
+  ];
+  let idx = 0;
+  function render() {
+    variants.forEach((v, i) => {
+      document.getElementById('variant-' + v.id).classList.toggle('active', i === idx);
+    });
+    document.getElementById('label').textContent = variants[idx].id + ' — ' + variants[idx].name;
+    history.replaceState(null, '', '#variant=' + variants[idx].id);
+  }
+  document.getElementById('prev').addEventListener('click', () => { idx = (idx - 1 + variants.length) % variants.length; render(); });
+  document.getElementById('next').addEventListener('click', () => { idx = (idx + 1) % variants.length; render(); });
+  document.addEventListener('keydown', (e) => {
+    const active = document.activeElement;
+    if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) return;
+    if (e.key === 'ArrowLeft') { idx = (idx - 1 + variants.length) % variants.length; render(); }
+    if (e.key === 'ArrowRight') { idx = (idx + 1) % variants.length; render(); }
+  });
+  const initial = location.hash.match(/variant=([ABC])/);
+  if (initial) idx = variants.findIndex(v => v.id === initial[1]);
+  render();
+</script>
+
+</body>
+</html>
