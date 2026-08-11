@@ -17,9 +17,9 @@ of build effort.
   WebRTC/WebSocket transport, LLM realtime voice APIs.
 - Stack decided: Python (backend) + TypeScript (frontend). Framework specifics still open
   ([Framework choice](issues/01-framework-choice.md)).
-- Already-held provider accounts: OpenAI (required), Deepgram (STT), ElevenLabs (TTS) —
-  prefer these unless a research ticket surfaces a strong reason otherwise, to avoid
-  signup friction. Translation provider still open.
+- Already-held provider accounts: OpenAI (required), Deepgram (STT), ElevenLabs (TTS).
+  Translation provider decided: OpenAI (see
+  [Cascade pipeline architecture](issues/05-cascade-pipeline-architecture.md)).
 - Deployment: local-first; AWS deploy deferred to the end, details not yet specified.
 - Timeline: soft target, some flexibility — favor sound, explainable decisions (the brief
   asks the candidate to justify choices) over raw speed, but this is a 15–20hr build —
@@ -74,6 +74,16 @@ of build effort.
   out" across all three frameworks surveyed; LiveKit deliberately keeps cascade and
   realtime provider interfaces separate; Pipecat's OTel conversation→turn→service span
   hierarchy is the closest prior art for latency instrumentation.
+- [Cascade pipeline architecture](issues/05-cascade-pipeline-architecture.md) — resolved
+  the turn-based-vs-continuous tension: **LLM-checked early segmentation (hybrid)**.
+  Partial transcripts stream live (source direct, target per-segment token-streamed).
+  TTS chunking: TOKEN mode + flush at segment boundaries. Protocol: one WebSocket,
+  JSON envelope + binary audio frames threaded by `segmentId`. Translation provider:
+  **OpenAI**. Judgment call recorded: the hybrid is expected to sound more natural than
+  continuous chunking for Boostlingo's two-party-conversation product specifically,
+  worth confirming by ear once built. Also recorded: ElevenLabs does not translate in
+  this pipeline (its separate "Dubbing" product does, deliberately not used — collapses
+  provider-swap points and isn't built for streaming).
 
 _(stack/deadline/deployment-target/held-provider-accounts were settled by direct
 conversation before charting and are captured in Notes above, not as tickets)_
@@ -87,10 +97,12 @@ conversation before charting and are captured in Notes above, not as tickets)_
   rubric) — depends on both pipelines existing and producing data; not sharp yet. WER
   measurement approach itself is now settled, see
   [STT/audio quality assurance & mic calibration strategy](issues/11-stt-quality-assurance-mic-calibration.md).
-- 5-minute stability requirement handling (reconnection strategy, drift/memory-leak
-  prevention specifics) — will sharpen once the cascade pipeline architecture exists.
 - Language pairs beyond the required English↔Spanish minimum — not decided whether to
   extend.
+
+_(5-minute stability handling graduated into
+[Stability: reconnection, drift, memory](issues/13-stability-reconnection-drift-memory.md)
+now that the cascade pipeline architecture is decided)_
 
 ## Out of scope
 

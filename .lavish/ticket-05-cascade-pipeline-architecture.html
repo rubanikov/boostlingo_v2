@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="en" data-theme="luxury">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ticket 05 — Cascade Pipeline Architecture</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex, .layout-grid, .layout-flex) > *,
+  :where([style*="display: grid"], [style*="display:grid"], [style*="display: flex"], [style*="display:flex"]) > * {
+    min-width: 0;
+  }
+  :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, figcaption, td, th, .badge, .label) {
+    overflow-wrap: anywhere;
+  }
+  :where(img, svg, video, canvas, iframe) {
+    max-width: 100%;
+    height: auto;
+  }
+  body { background: var(--color-base-100); }
+  .crux-box {
+    border: 1px solid color-mix(in oklch, var(--color-warning) 40%, transparent);
+    background: color-mix(in oklch, var(--color-warning) 8%, var(--color-base-100));
+  }
+</style>
+</head>
+<body class="min-h-screen bg-base-100 text-base-content">
+<main class="mx-auto max-w-5xl p-6 lg:p-10 space-y-10">
+
+  <!-- Breadcrumb / context -->
+  <div class="text-sm breadcrumbs px-0">
+    <ul>
+      <li>AI Interpreter Workbench</li>
+      <li>Wayfinder map</li>
+      <li>Ticket 05</li>
+    </ul>
+  </div>
+
+  <header class="hero bg-base-200 rounded-box">
+    <div class="hero-content flex-col items-start text-left py-8">
+      <span class="badge badge-warning badge-soft mb-2">grilling · claimed · in progress</span>
+      <h1 class="text-3xl lg:text-4xl font-bold">Cascade Pipeline Architecture</h1>
+      <p class="py-2 max-w-3xl text-base-content/80">
+        How audio flows <span class="font-mono text-sm">browser → backend → STT → Translation → TTS → backend → browser</span>
+        with streaming throughout — and the one threshold decision everything else in this ticket hangs on.
+      </p>
+    </div>
+  </header>
+
+  <!-- Current state -->
+  <section class="space-y-4">
+    <h2 class="text-xl font-semibold">Current state — what's already decided upstream</h2>
+    <div class="grid sm:grid-cols-3 gap-4">
+      <div class="card card-border bg-base-100">
+        <div class="card-body">
+          <h3 class="card-title text-base">STT — Deepgram</h3>
+          <p class="text-sm text-base-content/70">Signals available: <span class="font-mono">is_final</span>, <span class="font-mono">speech_final</span>, <span class="font-mono">UtteranceEnd</span>, <span class="font-mono">SpeechStarted</span></p>
+          <div class="card-actions mt-2"><span class="badge badge-ghost badge-sm">ticket 04</span></div>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body">
+          <h3 class="card-title text-base">TTS — ElevenLabs</h3>
+          <p class="text-sm text-base-content/70"><span class="font-mono">flush</span>-driven chunking; no native "utterance done" signal of its own</p>
+          <div class="card-actions mt-2"><span class="badge badge-ghost badge-sm">ticket 04</span></div>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body">
+          <h3 class="card-title text-base">Translation</h3>
+          <p class="text-sm text-base-content/70">Streaming LLM (OpenAI or Anthropic) over DeepL — final provider pick deferred to this ticket</p>
+          <div class="card-actions mt-2"><span class="badge badge-ghost badge-sm">ticket 04</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div role="alert" class="alert alert-warning alert-soft">
+      <span><strong>Prior-art finding (ticket 12):</strong> turn-based endpointing (silence → finalize → translate → speak → wait) is the default in Pipecat, LiveKit's <span class="font-mono">AgentSession</span>, and Vocode — and flagged as the <em>wrong</em> shape for continuous interpretation by two unresolved GitHub issues (LiveKit agents#3860, Pipecat#1747) and by OpenAI shipping a structurally turn-free <span class="font-mono">gpt-realtime-translate</span> rather than steering conversational <span class="font-mono">gpt-realtime</span>.</span>
+    </div>
+  </section>
+
+  <!-- Pipeline diagram -->
+  <section class="space-y-3">
+    <h2 class="text-xl font-semibold">Pipeline shape</h2>
+    <div class="card card-border bg-base-100 p-4">
+      <pre class="mermaid">
+flowchart LR
+  A["Browser<br/>mic capture"] -->|"WS: audio chunks"| B["Backend"]
+  B -->|"stream"| C["Deepgram STT"]
+  C -->|"is_final segments"| D{{"Segmentation boundary<br/>— THIS DECISION —"}}
+  D -->|"speech_final/UtteranceEnd,<br/>LLM clause-check, or<br/>continuous window"| E["Translation LLM"]
+  E -->|"streamed target text"| F["ElevenLabs TTS"]
+  F -->|"audio chunks + flush"| B
+  B -->|"WS: audio + transcripts"| G["Browser<br/>playback + live transcript"]
+
+  classDef decision fill:#f59e0b,stroke:#b45309,color:#1c1917,font-weight:bold;
+  class D decision
+      </pre>
+    </div>
+  </section>
+
+  <!-- The crux -->
+  <section class="crux-box rounded-box p-5 space-y-2">
+    <h2 class="text-lg font-semibold">The wrinkle in the prior-art finding</h2>
+    <p class="text-sm text-base-content/80">
+      The frameworks that found "turn-based is wrong" were solving either an AI agent deciding when to reply, or true
+      simultaneous conference interpretation of one continuous speaker to a passive audience. Boostlingo's actual product is
+      neither — it's interpretation <em>for a two-party conversation</em>, and the brief's own stability test says
+      "sustain a 5-minute <strong>back-and-forth</strong> conversation." Two humans taking turns is inherently
+      utterance-segmented even with a human interpreter in the loop. That's why this isn't a straight adoption of the
+      prior-art conclusion — it's a genuine open question for <em>this</em> product.
+    </p>
+  </section>
+
+  <!-- Comparison -->
+  <section class="space-y-4">
+    <h2 class="text-xl font-semibold">Segmentation granularity <span class="badge badge-success gap-1 align-middle">✓ decided — LLM-checked early segmentation (hybrid)</span></h2>
+
+    <div class="grid sm:grid-cols-2 gap-4">
+
+      <!-- Option 1: ruled out -->
+      <div class="card card-border bg-base-200 opacity-60">
+        <div class="card-body">
+          <div class="flex items-center justify-between">
+            <h3 class="card-title text-base">Full conversational-turn</h3>
+            <span class="badge badge-error badge-soft badge-sm">ruled out</span>
+          </div>
+          <ul class="steps steps-vertical text-xs mt-2">
+            <li class="step step-neutral">Speaker talks (possibly several sentences)</li>
+            <li class="step step-neutral">Whole turn finalized</li>
+            <li class="step step-neutral">Translate entire turn</li>
+            <li class="step step-neutral">Speak entire translation</li>
+          </ul>
+          <p class="text-xs text-base-content/60 mt-2">The chatbot-style shape prior art says is wrong — and it doesn't fit a live interpreter either. Not a real candidate.</p>
+        </div>
+      </div>
+
+      <!-- Option 2: baseline -->
+      <div class="card card-border border-primary bg-base-100 shadow-lg">
+        <div class="card-body">
+          <div class="flex items-center justify-between">
+            <h3 class="card-title text-base">Single-utterance segmentation</h3>
+            <span class="badge badge-primary badge-sm">baseline / low-risk</span>
+          </div>
+          <ul class="steps steps-vertical text-xs mt-2">
+            <li class="step step-primary">Speaker talks</li>
+            <li class="step step-primary"><span class="font-mono">speech_final</span> / <span class="font-mono">UtteranceEnd</span> fires</li>
+            <li class="step step-primary">Translate that one utterance</li>
+            <li class="step step-primary">TTS speaks it</li>
+            <li class="step step-primary">Listening resumes immediately</li>
+          </ul>
+          <div class="overflow-x-auto mt-3">
+            <table class="table table-xs">
+              <tbody>
+                <tr><td class="text-base-content/60">Effort</td><td class="text-right font-medium">Low — reuses Deepgram signals directly</td></tr>
+                <tr><td class="text-base-content/60">Time-budget risk</td><td class="text-right font-medium">Low</td></tr>
+                <tr><td class="text-base-content/60">Fits "back-and-forth" stability test</td><td class="text-right font-medium">Yes</td></tr>
+                <tr><td class="text-base-content/60">Fits brief's "speech end → first audio out"</td><td class="text-right font-medium">Yes, directly</td></tr>
+                <tr><td class="text-base-content/60">True simultaneous interpretation</td><td class="text-right font-medium">No — waits for a pause</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Option 3 -->
+      <div class="card card-border bg-base-100">
+        <div class="card-body">
+          <div class="flex items-center justify-between">
+            <h3 class="card-title text-base">Continuous chunking</h3>
+            <span class="badge badge-ghost badge-sm">alternative</span>
+          </div>
+          <ul class="steps steps-vertical text-xs mt-2">
+            <li class="step step-neutral">Persistent per-speaker session opens</li>
+            <li class="step step-neutral">Audio streams continuously, no pause required</li>
+            <li class="step step-neutral">Rolling windows translate as they complete</li>
+            <li class="step step-neutral">TTS speaks overlapping chunks</li>
+            <li class="step step-neutral">Session stays open (mute grace period)</li>
+          </ul>
+          <div class="overflow-x-auto mt-3">
+            <table class="table table-xs">
+              <tbody>
+                <tr><td class="text-base-content/60">Effort</td><td class="text-right font-medium">High — unsolved even in LiveKit/Pipecat</td></tr>
+                <tr><td class="text-base-content/60">Time-budget risk</td><td class="text-right font-medium">High</td></tr>
+                <tr><td class="text-base-content/60">Fits "back-and-forth" stability test</td><td class="text-right font-medium">Overkill for it</td></tr>
+                <tr><td class="text-base-content/60">Fits brief's "speech end → first audio out"</td><td class="text-right font-medium">Needs reinterpreting</td></tr>
+                <tr><td class="text-base-content/60">True simultaneous interpretation</td><td class="text-right font-medium">Yes — closest fit</td></tr>
+                <tr><td class="text-base-content/60">Perceived naturalness</td><td class="text-right font-medium">Theoretically highest — but see opinion below</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="text-xs text-base-content/60 mt-2">Modeled on LiveKit's <span class="font-mono">gemini-live-translate</span> (250ms-debounced reconciliation, 10s mute grace) and <span class="font-mono">gpt-realtime-translate</span>'s turn-free stream.</p>
+        </div>
+      </div>
+
+      <!-- Option 4: LLM-checked hybrid -->
+      <div class="card card-border border-secondary bg-base-100 shadow-lg">
+        <div class="card-body">
+          <div class="flex items-center justify-between">
+            <h3 class="card-title text-base">LLM-checked early segmentation <span class="font-normal text-xs text-base-content/50">(hybrid)</span></h3>
+            <span class="badge badge-secondary badge-sm">best fit if time allows</span>
+          </div>
+          <ul class="steps steps-vertical text-xs mt-2">
+            <li class="step step-secondary">Speaker talks; partial transcript grows</li>
+            <li class="step step-secondary">Fast LLM call checks: "is this a complete, translatable clause?"</li>
+            <li class="step step-secondary">If yes → translate <em>now</em>, before any pause</li>
+            <li class="step step-secondary">If no / LLM slow → fall back to <span class="font-mono">speech_final</span> (Option 2's boundary)</li>
+            <li class="step step-secondary">Listening resumes immediately</li>
+          </ul>
+          <div class="overflow-x-auto mt-3">
+            <table class="table table-xs">
+              <tbody>
+                <tr><td class="text-base-content/60">Effort</td><td class="text-right font-medium">Medium — one extra LLM call per partial update, + fallback logic</td></tr>
+                <tr><td class="text-base-content/60">Time-budget risk</td><td class="text-right font-medium">Medium — needs Option 2 built first as its safety net</td></tr>
+                <tr><td class="text-base-content/60">Fits "back-and-forth" stability test</td><td class="text-right font-medium">Yes</td></tr>
+                <tr><td class="text-base-content/60">Fits brief's "speech end → first audio out"</td><td class="text-right font-medium">Yes — "speech end" becomes clause-end</td></tr>
+                <tr><td class="text-base-content/60">True simultaneous interpretation</td><td class="text-right font-medium">Closer — handles multi-clause utterances without waiting for a full pause</td></tr>
+                <tr><td class="text-base-content/60">Perceived naturalness</td><td class="text-right font-medium">Most reliably natural — see opinion below</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div role="alert" class="alert alert-info alert-soft text-xs mt-2 py-2">
+            <span>Genuinely an <strong>upgrade layered on Option 2</strong>, not a replacement for it — Deepgram's <span class="font-mono">speech_final</span>/<span class="font-mono">UtteranceEnd</span> stay as the guaranteed fallback boundary, so worst case this degrades to Option 2's behavior. Closest prior-art parallel: Pipecat's two-stage VAD → "Smart Turn" design (cheap acoustic gate, then a semantic-completeness check) — same idea, but the completeness check runs on the <em>transcript text</em> via an LLM here rather than on raw audio via a purpose-trained model.</span>
+          </div>
+          <p class="text-xs text-base-content/60 mt-2">Real risk: an LLM call in the hot path on every partial-transcript update adds latency/cost and a new failure mode — needs the VAD fallback to be robust, and the completeness-check prompt tuned to avoid chopping sentences awkwardly (false positive) or never firing early (false negative, no benefit over Option 2 alone).</p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Naturalness opinion -->
+  <section class="crux-box rounded-box p-5 space-y-3">
+    <h2 class="text-lg font-semibold">Which feels more organic to the listener? <span class="badge badge-ghost badge-sm align-middle">answering your question — my opinion</span></h2>
+    <p class="text-sm font-medium">My honest read: the <strong>hybrid</strong> is more likely to feel natural in this system, even though continuous is the theoretically "more simultaneous" ideal.</p>
+    <div class="grid sm:grid-cols-2 gap-4 text-sm">
+      <div>
+        <p class="font-medium text-base-content/80 mb-1">Why continuous doesn't automatically win on "organic"</p>
+        <ul class="list-disc list-inside space-y-1 text-base-content/70">
+          <li>True simultaneous interpretation means the translated voice plays <em>while the source speaker is still talking</em> — that's how skilled human conference interpreters work, but it means two voices overlapping, which sounds chaotic to a listener who isn't used to it.</li>
+          <li>The polished examples (LiveKit's <span class="font-mono">gemini-live-translate</span>, <span class="font-mono">gpt-realtime-translate</span>) feel smooth because the underlying model does its <em>own</em> sophisticated internal segmentation — that smoothness is bought with heavy model training, not just "no discrete boundary."</li>
+          <li>A DIY rolling-window implementation, built in this timeframe without that training, risks cutting mid-clause or mid-word — which reads as <em>more</em> jarring than a clean pause, not less.</li>
+        </ul>
+      </div>
+      <div>
+        <p class="font-medium text-base-content/80 mb-1">Why the hybrid fits this product specifically</p>
+        <ul class="list-disc list-inside space-y-1 text-base-content/70">
+          <li>It produces linguistically complete, grammatically clean translated sentences — proper prosody, no truncation — because the LLM only cuts at real clause boundaries.</li>
+          <li>Boostlingo's actual product is a two-party conversation (healthcare/legal/business calls), not a conference broadcast. That's <em>consecutive</em> interpretation territory: a real human consecutive interpreter also pauses briefly, then delivers one clean sentence at a time — listeners in this domain already expect that cadence.</li>
+          <li>The brief, cheap pauses from clause-level cutting are short enough not to feel like "waiting," but long enough to avoid the overlapping-voices problem entirely.</li>
+        </ul>
+      </div>
+    </div>
+    <p class="text-xs text-base-content/60">Caveat: this is a judgment call, not a measured fact — worth actually listening to both once built, and it's exactly the kind of thing the brief's subjective-quality comparison write-up should capture with real reactions, not just this reasoning.</p>
+  </section>
+
+  <!-- Concurrency answer -->
+  <section class="space-y-3">
+    <h2 class="text-xl font-semibold">Does listening stop while the LLM judges? <span class="badge badge-ghost badge-sm align-middle">answering your question</span></h2>
+    <div role="alert" class="alert alert-success alert-soft">
+      <span><strong>No.</strong> Audio capture and Deepgram STT never pause for anything. The LLM check runs as an async
+      side-channel on a <em>snapshot</em> of the transcript-so-far — it doesn't gate the microphone, the WebSocket, or
+      Deepgram in any way. The speaker can keep talking indefinitely while a check is in flight; new words just keep
+      appending to the buffer in parallel.</span>
+    </div>
+    <div class="card card-border bg-base-100 p-4">
+      <pre class="mermaid">
+sequenceDiagram
+    participant S as Speaker
+    participant DG as Deepgram STT
+    participant BE as Backend buffer
+    participant LLM as LLM clause-check
+    participant TR as Translation + TTS
+
+    S->>DG: continuous audio (never pauses)
+    loop as speech continues
+        DG->>BE: is_final segment (words)
+        BE->>BE: append to running transcript
+    end
+    Note over BE,LLM: debounced trigger — at most one check in flight per speaker
+    BE->>LLM: snapshot of transcript up to word N (async, non-blocking)
+    par LLM judging (~100-300ms)
+        LLM-->>BE: verdict: complete / not complete
+    and speaker keeps talking, completely unaffected
+        S->>DG: more audio, no pause
+        DG->>BE: more is_final segments appended past word N
+    end
+    alt LLM says complete (as of word N)
+        BE->>TR: translate words[0..N] only; words after N start the next window
+    else LLM says not complete, or a check is already running
+        Note over BE: no early cut — just keep accumulating
+    end
+    par Independent fallback, always running
+        DG->>BE: speech_final / UtteranceEnd fires on its own timer
+        BE->>TR: translate whatever has accumulated (Option 2's behavior)
+    end
+      </pre>
+    </div>
+    <ul class="list bg-base-100 rounded-box border border-base-300 text-sm">
+      <li class="list-row"><div><strong>Throttling:</strong> a check doesn't fire on every single word — it's debounced (e.g. on new final segments, or candidate boundaries like clause-ending punctuation) and only one check is in flight per speaker at a time, so checks don't pile up faster than the LLM can answer.</div></li>
+      <li class="list-row"><div><strong>The race is resolved by position, not by locking:</strong> a "complete" verdict only ever applies to the exact word range it was asked about (word 0..N). Anything the speaker said after the snapshot was taken simply carries forward into the next window — nothing is dropped, re-checked awkwardly, or blocked.</div></li>
+      <li class="list-row"><div><strong>Deepgram's own endpointing keeps running independently</strong> the whole time, as a completely separate signal — whichever of the two (LLM verdict or <span class="font-mono">speech_final</span>) fires first for a given stretch of speech wins and triggers the cut.</div></li>
+    </ul>
+  </section>
+
+  <!-- Decision 1: resolved -->
+  <div role="alert" class="alert alert-success">
+    <span>✓ <strong>Decided — Segmentation granularity:</strong> LLM-checked early segmentation (hybrid), with Deepgram <span class="font-mono">speech_final</span>/<span class="font-mono">UtteranceEnd</span> as the guaranteed fallback boundary.</span>
+  </div>
+
+  <!-- Decision 2: partial transcript display -->
+  <section class="card card-border border-primary bg-base-200 shadow-lg">
+    <div class="card-body space-y-4">
+      <div class="flex items-center gap-2">
+        <span class="badge badge-success badge-soft">✓ decided — question 2 of 4</span>
+        <h2 class="card-title">How do partial transcripts feed the live display?</h2>
+      </div>
+      <p class="text-sm text-base-content/70">The brief requires live transcripts showing both source and target text "as they're produced" (success criterion 6). With segmentation now decided, here's my recommendation for both sides of the display:</p>
+
+      <div class="grid sm:grid-cols-2 gap-4 text-sm">
+        <div class="card card-border bg-base-100">
+          <div class="card-body">
+            <h3 class="font-medium text-base-content/80">Source-language transcript</h3>
+            <p class="text-base-content/70 mt-1">Stream Deepgram's <span class="font-mono">is_final</span> segments straight to the UI as they arrive — words appear and settle in near-real-time, independent of the segmentation decision entirely. This is the simplest possible design and matches how live captioning normally works.</p>
+          </div>
+        </div>
+        <div class="card card-border bg-base-100">
+          <div class="card-body">
+            <h3 class="font-medium text-base-content/80">Target-language transcript</h3>
+            <p class="text-base-content/70 mt-1">Appears in chunks aligned to each translated segment (from decision 1) — but stream the LLM's translation response token-by-token as it generates, rather than waiting for the full segment translation to complete. Reduces perceived latency of the <em>text</em> appearing, even though TTS audio will lag slightly behind it.</p>
+          </div>
+        </div>
+      </div>
+
+      <div role="alert" class="alert alert-info alert-soft text-xs py-2">
+        <span>Net effect: the source pane feels like live captioning (continuous), the target pane fills in segment-by-segment but with each segment itself streaming in — not a single delayed block of text.</span>
+      </div>
+
+    </div>
+  </section>
+
+  <div role="alert" class="alert alert-success">
+    <span>✓ <strong>Decided — Partial transcript display:</strong> source pane streams Deepgram output directly; target pane fills per-segment, streaming token-by-token within each segment.</span>
+  </div>
+
+  <!-- Decision 3: TTS chunking granularity -->
+  <section class="card card-border border-primary bg-base-200 shadow-lg">
+    <div class="card-body space-y-4">
+      <div class="flex items-center gap-2">
+        <span class="badge badge-success badge-soft">✓ decided — question 3 of 4</span>
+        <h2 class="card-title">Target-text chunking to TTS — word-by-word or sentence-level?</h2>
+      </div>
+      <p class="text-sm text-base-content/70">Pipecat names this the SENTENCE-vs-TOKEN tradeoff: SENTENCE mode buffers to a full sentence (~200-300ms added latency, better prosody); TOKEN mode streams tokens straight to TTS as they arrive (lower latency, quality depends on the TTS provider's own handling of partial text).</p>
+
+      <div class="rounded-box border border-primary/40 bg-base-100 p-4 text-sm space-y-2">
+        <p class="font-medium">Recommendation: TOKEN mode, with an explicit <span class="font-mono">flush</span> at each segment boundary</p>
+        <p class="text-base-content/70">ElevenLabs' streaming endpoint is <em>built</em> for this — it accepts incremental <span class="font-mono">SendText</span> messages and buffers internally via <span class="font-mono">chunk_length_schedule</span>, so it already handles natural-sounding grouping without the caller needing to pre-batch into sentences. And since segmentation (decision 1) already cuts at clause boundaries — not full multi-sentence turns — the segments arriving here are already TTS-appropriately sized. Streaming translation tokens straight through, then calling <span class="font-mono">flush: true</span> exactly when a segment completes, gets low latency <em>and</em> reasonable prosody without adding a second buffering layer on top of one that's already there.</p>
+      </div>
+
+      <form data-lavish-question="tts-chunking" class="space-y-3" onsubmit="event.preventDefault();
+        const fd = new FormData(event.currentTarget);
+        const choice = fd.get('tts-chunking');
+        const note = (fd.get('note3') || '').toString().trim();
+        if (!choice) return;
+        const labels = { 'token-flush': 'TOKEN mode with flush at segment boundaries (recommended)', 'sentence': 'SENTENCE mode — buffer to full sentence', 'other': 'Push back / change requested — see note' };
+        let msg = 'Ticket 05 TTS chunking decision: ' + labels[choice];
+        if (note) msg += ' — note: ' + note;
+        window.lavish.queuePrompt(msg, { tag: 'choice', text: 'TTS chunking: ' + labels[choice], element: event.currentTarget, data: { question: 'tts-chunking', answer: choice, note } });
+        document.getElementById('queued-confirm-3').classList.remove('hidden');
+      ">
+        <fieldset class="fieldset">
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary">
+            <input type="radio" name="tts-chunking" value="token-flush" class="radio radio-primary" checked />
+            <span class="font-medium">TOKEN mode + flush at segment boundaries <span class="badge badge-primary badge-xs ml-1">recommended</span></span>
+          </label>
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary mt-2">
+            <input type="radio" name="tts-chunking" value="sentence" class="radio radio-primary" />
+            <span class="font-medium">SENTENCE mode — buffer to full sentence</span>
+          </label>
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary mt-2">
+            <input type="radio" name="tts-chunking" value="other" class="radio radio-primary" />
+            <span class="font-medium">Push back — explain below</span>
+          </label>
+        </fieldset>
+        <textarea name="note3" class="textarea textarea-bordered w-full" placeholder="Optional: anything to add, qualify, or push back on"></textarea>
+        <button type="submit" class="btn btn-primary">Queue this answer</button>
+        <p id="queued-confirm-3" class="text-sm text-success hidden">Queued — press Send to Agent (or Send &amp; End) in the top bar to deliver it.</p>
+      </form>
+    </div>
+  </section>
+
+  <div role="alert" class="alert alert-success">
+    <span>✓ <strong>Decided — TTS chunking:</strong> TOKEN mode, streaming translation tokens straight through, with an explicit <span class="font-mono">flush: true</span> at each segment boundary.</span>
+  </div>
+
+  <!-- Decision 4: WebSocket protocol + translation provider -->
+  <section class="card card-border border-primary bg-base-200 shadow-lg">
+    <div class="card-body space-y-4">
+      <div class="flex items-center gap-2">
+        <span class="badge badge-success badge-soft">✓ decided — question 4 of 4</span>
+        <h2 class="card-title">Browser↔backend protocol, and the last small pick: translation provider</h2>
+      </div>
+
+      <div role="alert" class="alert alert-warning alert-soft text-sm">
+        <span><strong>Clarifying your question — ElevenLabs does NOT do the translation here.</strong> In this pipeline: Deepgram transcribes (speech→source text), the translation LLM translates (source text→target text), and ElevenLabs only converts already-translated text into speech (target text→target audio) — see the "Translation LLM" and "ElevenLabs TTS" boxes as two separate stages in the pipeline diagram above. The reasonable source of confusion: ElevenLabs sells a <em>separate</em> "Dubbing" product that bundles translation + speech generation into one call. We're deliberately <strong>not</strong> using that — we're using ElevenLabs' plain streaming TTS endpoint (<span class="font-mono">stream-input</span>), which only speaks text it's given, in whatever language that text is in. Using the bundled Dubbing product instead would collapse two of our three provider-swap points into one vendor, working against the brief's "provider abstractions... swapping a provider should be a contained change" requirement, and it isn't built for our low-latency incremental streaming shape the way the plain TTS endpoint is.</span>
+      </div>
+
+      <div role="alert" class="alert alert-soft text-sm">
+        <span><strong>Follow-up — is Dubbing higher-latency than LLM+TTS?</strong> Almost certainly yes, by a wide margin — but flagging honestly: this specific claim was <em>not</em> part of ticket 04's verified primary-source research (that research was scoped to the plain streaming TTS endpoint only). My understanding, unverified here: ElevenLabs' Dubbing product is built as an asynchronous whole-file workflow — submit a video/audio file, wait, get a dubbed file back — which puts it in a fundamentally different latency class (plausibly seconds-to-minutes for a full clip) than a per-utterance streaming target under 2s. It doesn't change the recommendation either way, since Dubbing was already ruled out above for the provider-abstraction reason regardless of its latency — but if this specific number ever mattered for the write-up, it'd be worth a dedicated primary-source check rather than relying on this.</span>
+      </div>
+
+      <p class="text-sm text-base-content/70">One full-duplex WebSocket per Cascade session, carrying both binary audio frames and JSON control/event messages — mirrors Pipecat's RTVI envelope pattern from the prior-art research, adapted to what this pipeline actually needs.</p>
+
+      <div role="alert" class="alert alert-info alert-soft text-sm">
+        <span><strong>Is WebSocket the only option? No</strong> — the main alternative is WebRTC (audio track + data channel), which is what Realtime mode (ticket 03) uses for its direct OpenAI connection. Not recommending it here because: both providers we're bridging to, Deepgram and ElevenLabs, already speak WebSocket themselves (per ticket 04's research) — so a WebRTC browser↔backend leg would need its own media server/transcoding step just to convert back into WebSocket-framed audio before reaching either provider, adding real infrastructure (e.g. an aiortc-based server) for no latency or quality benefit. Plain WebSocket is also literally what Pipecat's own non-hosted-SFU transport module uses for this exact shape (ticket 12's research). If mode-transport symmetry with Realtime mode mattered more than build time, WebRTC would be the honest alternative to weigh — flagging it rather than deciding it away silently.</span>
+      </div>
+
+      <div class="mockup-code text-xs">
+<pre data-prefix="→"><code>{"type":"start_session","sourceLang":"en","targetLang":"es"}</code></pre>
+<pre data-prefix="→"><code>&lt;binary frame&gt;  // raw mic audio, continuous</code></pre>
+<pre data-prefix="←"><code>{"type":"source_transcript","segmentId":"seg-42","text":"I need to return this item","isFinal":false}</code></pre>
+<pre data-prefix="←"><code>{"type":"segment_boundary","segmentId":"seg-42","trigger":"llm"}</code></pre>
+<pre data-prefix="←"><code>{"type":"target_transcript","segmentId":"seg-42","text":"Necesito devolver este","isFinal":false}</code></pre>
+<pre data-prefix="←"><code>{"type":"tts_audio_meta","segmentId":"seg-42","seq":0}</code></pre>
+<pre data-prefix="←"><code>&lt;binary frame&gt;  // TTS audio chunk for seg-42, immediately follows its meta message</code></pre>
+<pre data-prefix="←"><code>{"type":"latency","segmentId":"seg-42","stage":"stt_to_translation","ms":340}</code></pre>
+<pre data-prefix="←"><code>{"type":"error","code":"stt_timeout","message":"Deepgram connection lost, retrying"}</code></pre>
+      </div>
+      <p class="text-xs text-base-content/60">Binary audio frames aren't taggable inline, so a small JSON "meta" message immediately precedes each one — safe because WebSocket preserves message ordering on a single connection. <span class="font-mono">segmentId</span> threads every message (transcripts, boundary events, audio, latency) so the client can correlate everything belonging to one translated unit. <span class="font-mono">latency</span> messages feed forward directly into ticket 08. <span class="font-mono">error</span> messages feed forward into ticket 10.</p>
+
+      <div class="divider text-xs">translation provider — the other open item</div>
+
+      <div class="rounded-box border border-primary/40 bg-base-100 p-4 text-sm space-y-2">
+        <p class="font-medium">Recommendation: OpenAI</p>
+        <p class="text-base-content/70">Ticket 04's research called OpenAI vs. Anthropic "close to a toss-up" on latency/quality for streaming translation — no strong differentiator either way. The tie-breaker: OpenAI is <em>already</em> a required dependency for Realtime mode (<span class="font-mono">gpt-realtime</span>), so using it for Cascade-mode translation too means one fewer distinct provider/API key to manage within the time budget. The provider abstraction (ticket 06) keeps this swappable if the comparison write-up later shows Anthropic is meaningfully better.</p>
+      </div>
+
+      <form data-lavish-question="protocol-and-provider" class="space-y-3" onsubmit="event.preventDefault();
+        const fd = new FormData(event.currentTarget);
+        const choice = fd.get('protocol-and-provider');
+        const note = (fd.get('note4') || '').toString().trim();
+        if (!choice) return;
+        const labels = { 'agree': 'Agree with both — WS protocol shape and OpenAI for translation', 'other': 'Push back / change requested — see note' };
+        let msg = 'Ticket 05 protocol + translation-provider decision: ' + labels[choice];
+        if (note) msg += ' — note: ' + note;
+        window.lavish.queuePrompt(msg, { tag: 'choice', text: 'Protocol/provider: ' + labels[choice], element: event.currentTarget, data: { question: 'protocol-and-provider', answer: choice, note } });
+        document.getElementById('queued-confirm-4').classList.remove('hidden');
+      ">
+        <fieldset class="fieldset">
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary">
+            <input type="radio" name="protocol-and-provider" value="agree" class="radio radio-primary" checked />
+            <span class="font-medium">Agree with both</span>
+          </label>
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary mt-2">
+            <input type="radio" name="protocol-and-provider" value="other" class="radio radio-primary" />
+            <span class="font-medium">Push back — explain below</span>
+          </label>
+        </fieldset>
+        <textarea name="note4" class="textarea textarea-bordered w-full" placeholder="Optional: anything to add, qualify, or push back on"></textarea>
+        <button type="submit" class="btn btn-primary">Queue this answer — closes out ticket 05</button>
+        <p id="queued-confirm-4" class="text-sm text-success hidden">Queued — press Send to Agent (or Send &amp; End) in the top bar to deliver it.</p>
+      </form>
+    </div>
+  </section>
+
+  <div role="alert" class="alert alert-success shadow-lg">
+    <span>✓ <strong>Ticket 05 resolved — all 4 decisions made.</strong> Segmentation: LLM-checked hybrid. Transcript display: source live, target per-segment. TTS chunking: TOKEN + flush. Protocol: single WebSocket, JSON envelope + binary audio, translation via OpenAI. Written back to the wayfinder map.</span>
+  </div>
+
+</main>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.15.0/dist/mermaid.esm.min.mjs";
+  const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  const paint = document.createElement("canvas").getContext("2d");
+  function toRgba(color) {
+    paint.clearRect(0, 0, 1, 1);
+    paint.fillStyle = "#000";
+    paint.fillStyle = color;
+    paint.fillRect(0, 0, 1, 1);
+    return paint.getImageData(0, 0, 1, 1).data;
+  }
+  function compositeRgba(foreground, background) {
+    const foregroundAlpha = foreground[3] / 255;
+    const backgroundAlpha = background[3] / 255;
+    const alpha = foregroundAlpha + backgroundAlpha * (1 - foregroundAlpha);
+    if (alpha === 0) return [0, 0, 0, 0];
+    return [
+      (foreground[0] * foregroundAlpha + background[0] * backgroundAlpha * (1 - foregroundAlpha)) / alpha,
+      (foreground[1] * foregroundAlpha + background[1] * backgroundAlpha * (1 - foregroundAlpha)) / alpha,
+      (foreground[2] * foregroundAlpha + background[2] * backgroundAlpha * (1 - foregroundAlpha)) / alpha,
+      alpha * 255,
+    ];
+  }
+  function pageIsDark() {
+    const root = document.documentElement;
+    const rootBackground = toRgba(getComputedStyle(root).backgroundColor);
+    const bodyBackground = document.body ? toRgba(getComputedStyle(document.body).backgroundColor) : [0, 0, 0, 0];
+    const [r, g, b, a] = compositeRgba(bodyBackground, rootBackground);
+    if (a > 0) {
+      return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.5;
+    }
+    const colorScheme = getComputedStyle(root).colorScheme;
+    if (colorScheme.includes("dark") && !colorScheme.includes("light")) return true;
+    if (colorScheme.includes("light") && !colorScheme.includes("dark")) return false;
+    return darkQuery.matches;
+  }
+  const diagrams = [...document.querySelectorAll(".mermaid")].map((el) => ({ el, src: el.textContent }));
+  let applied;
+  let rendering = false;
+  let queued = false;
+  function queueRender() {
+    queued = true;
+    if (rendering) return;
+    void render();
+  }
+  async function render() {
+    rendering = true;
+    try {
+      while (queued) {
+        queued = false;
+        const theme = pageIsDark() ? "dark" : "default";
+        if (theme === applied) continue;
+        mermaid.initialize({ startOnLoad: false, theme, securityLevel: "strict" });
+        for (const { el, src } of diagrams) {
+          el.removeAttribute("data-processed");
+          el.textContent = src;
+        }
+        try {
+          await mermaid.run({ nodes: diagrams.map((d) => d.el) });
+        } catch (error) {
+          console.error("Mermaid diagram render failed:", error);
+          return;
+        }
+        applied = theme;
+      }
+    } finally {
+      rendering = false;
+      if (queued) queueRender();
+    }
+  }
+  if (document.readyState === "complete") queueRender();
+  else window.addEventListener("load", queueRender, { once: true });
+  const themeObserver = new MutationObserver(queueRender);
+  for (const el of [document.documentElement, document.body]) {
+    if (!el) continue;
+    themeObserver.observe(el, { attributes: true, attributeFilter: ["data-theme", "class", "style"] });
+  }
+  document.addEventListener("change", queueRender, true);
+  document.addEventListener("transitionend", ({ propertyName }) => { if (propertyName === "background-color") queueRender(); }, true);
+  darkQuery.addEventListener("change", queueRender);
+</script>
+
+</body>
+</html>
