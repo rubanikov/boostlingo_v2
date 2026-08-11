@@ -15,8 +15,9 @@ of build effort.
 
 - Domain: real-time/streaming speech interpretation — ASR (STT), MT (translation), TTS,
   WebRTC/WebSocket transport, LLM realtime voice APIs.
-- Stack decided: Python (backend) + TypeScript (frontend). Framework specifics still open
-  ([Framework choice](issues/01-framework-choice.md)).
+- Stack decided: Python (backend) + TypeScript (frontend). Framework specifics decided:
+  FastAPI + React, `uv` + Vite/npm (see
+  [Framework choice](issues/01-framework-choice.md)).
 - Already-held provider accounts: OpenAI (required), Deepgram (STT), ElevenLabs (TTS).
   Translation provider decided: OpenAI (see
   [Cascade pipeline architecture](issues/05-cascade-pipeline-architecture.md)).
@@ -94,6 +95,10 @@ of build effort.
   score — more actionable than BLEU/COMET, and those need a hand-written reference
   translation per sentence anyway). One shared dataset runs through both modes for a fair
   comparison in the write-up.
+- [Framework choice](issues/01-framework-choice.md) — **FastAPI** (backend, matches the
+  async-native shape the whole architecture needs) + **React** (frontend, flagged as
+  closer to a toss-up with Svelte on pure technical fit, chosen for ecosystem depth) +
+  **uv** (Python) + **Vite/npm** (TypeScript).
 
 _(stack/deadline/deployment-target/held-provider-accounts were settled by direct
 conversation before charting and are captured in Notes above, not as tickets)_

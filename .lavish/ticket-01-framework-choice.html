@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en" data-theme="luxury">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ticket 01 — Framework Choice</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex) > *,
+  :where([style*="display: grid"], [style*="display:grid"], [style*="display: flex"], [style*="display:flex"]) > * {
+    min-width: 0;
+  }
+  :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, figcaption, td, th, .badge, .label) {
+    overflow-wrap: anywhere;
+  }
+  :where(img, svg, video, canvas, iframe) { max-width: 100%; height: auto; }
+  body { background: var(--color-base-100); }
+</style>
+</head>
+<body class="min-h-screen bg-base-100 text-base-content">
+<main class="mx-auto max-w-5xl p-6 lg:p-10 space-y-10">
+
+  <div class="text-sm breadcrumbs px-0">
+    <ul>
+      <li>AI Interpreter Workbench</li>
+      <li>Wayfinder map</li>
+      <li>Ticket 01</li>
+    </ul>
+  </div>
+
+  <header class="hero bg-base-200 rounded-box">
+    <div class="hero-content flex-col items-start text-left py-8">
+      <span class="badge badge-warning badge-soft mb-2">grilling · claimed · in progress</span>
+      <h1 class="text-3xl lg:text-4xl font-bold">Framework Choice</h1>
+      <p class="py-2 max-w-3xl text-base-content/80">
+        Python + TypeScript is decided. Three picks left: backend web framework, frontend framework, and package
+        manager/build tooling — needs to support concurrent WebSocket streaming to multiple providers, fast
+        iteration within the 15–20hr budget, and clean transport/UI separation.
+      </p>
+    </div>
+  </header>
+
+  <!-- Question 1: backend -->
+  <section class="card card-border border-primary bg-base-200 shadow-lg">
+    <div class="card-body space-y-4">
+      <div class="flex items-center gap-2">
+        <span class="badge badge-warning badge-soft">question 1 of 3</span>
+        <h2 class="card-title">Backend: FastAPI or Flask?</h2>
+      </div>
+      <div class="grid sm:grid-cols-2 gap-4 text-sm">
+        <div class="card card-border border-primary bg-base-100 shadow">
+          <div class="card-body">
+            <h3 class="font-medium text-base-content/80">FastAPI <span class="badge badge-primary badge-xs ml-1">recommended</span></h3>
+            <p class="text-base-content/70 mt-1">Async-native (built on Starlette), first-class WebSocket support (<span class="font-mono">@app.websocket</span>), and the whole architecture in ticket 05 is fundamentally an async-concurrency problem — continuous audio streaming, concurrent calls to Deepgram/OpenAI/ElevenLabs, an async LLM clause-check running alongside all of it. FastAPI fits that shape directly.</p>
+          </div>
+        </div>
+        <div class="card card-border bg-base-100">
+          <div class="card-body">
+            <h3 class="font-medium text-base-content/80">Flask</h3>
+            <p class="text-base-content/70 mt-1">WSGI/sync by default — needs an extension (Flask-SocketIO) or a switch to Quart to get real async WebSocket handling. That's extra plumbing to fight the framework's grain for zero benefit, given the async shape is required either way.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Question 2: frontend -->
+  <section class="card card-border border-primary bg-base-200 shadow-lg">
+    <div class="card-body space-y-4">
+      <div class="flex items-center gap-2">
+        <span class="badge badge-warning badge-soft">question 2 of 3</span>
+        <h2 class="card-title">Frontend: React, Vue, Svelte, or vanilla+Vite?</h2>
+      </div>
+      <p class="text-sm text-base-content/70">This one's genuinely closer to a toss-up architecturally — your own familiarity matters more here than any technical edge, since it's velocity within a fixed 15–20hr budget that's on the line.</p>
+      <div class="grid sm:grid-cols-4 gap-4 text-sm">
+        <div class="card card-border border-primary bg-base-100 shadow">
+          <div class="card-body">
+            <h3 class="font-medium text-base-content/80">React <span class="badge badge-primary badge-xs ml-1">default pick</span></h3>
+            <p class="text-base-content/70 mt-1">Largest ecosystem of WebSocket/audio-hook examples to draw from quickly, most broadly recognizable choice for an evaluator skimming the submission. More boilerplate than Svelte for the many small reactive state slices this UI needs (connection status, dual transcripts, latency numbers, mode toggle).</p>
+          </div>
+        </div>
+        <div class="card card-border bg-base-100">
+          <div class="card-body">
+            <h3 class="font-medium text-base-content/80">Svelte</h3>
+            <p class="text-base-content/70 mt-1">Arguably the best <em>technical</em> fit — lightweight reactivity with no virtual-DOM diffing overhead, which suits a UI dominated by high-frequency streaming updates (live transcript tokens, latency numbers). Smaller ecosystem of real-time examples to crib from.</p>
+          </div>
+        </div>
+        <div class="card card-border bg-base-100">
+          <div class="card-body">
+            <h3 class="font-medium text-base-content/80">Vue</h3>
+            <p class="text-base-content/70 mt-1">Middle ground — gentler reactivity model than React, decent ecosystem, less community precedent specifically for real-time audio/WebSocket UIs than React.</p>
+          </div>
+        </div>
+        <div class="card card-border bg-base-100">
+          <div class="card-body">
+            <h3 class="font-medium text-base-content/80">Vanilla + Vite</h3>
+            <p class="text-base-content/70 mt-1">Zero framework overhead, but you'd hand-roll reactive state bindings for a genuinely multi-panel UI — likely <em>more</em> code to get right within the time budget, not less.</p>
+          </div>
+        </div>
+      </div>
+      <div role="alert" class="alert alert-info alert-soft text-sm">
+        <span>Real question for you: how familiar are you with each of these already? Whichever you can move fastest in in a live-coding-adjacent, time-boxed build is probably the right answer regardless of the technical nuances above.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Question 3: tooling -->
+  <section class="card card-border border-primary bg-base-200 shadow-lg">
+    <div class="card-body space-y-4">
+      <div class="flex items-center gap-2">
+        <span class="badge badge-warning badge-soft">question 3 of 3</span>
+        <h2 class="card-title">Package manager / build tooling</h2>
+      </div>
+      <div class="grid sm:grid-cols-2 gap-4 text-sm">
+        <div class="card card-border border-primary bg-base-100 shadow">
+          <div class="card-body">
+            <h3 class="font-medium text-base-content/80">Python: uv <span class="badge badge-primary badge-xs ml-1">recommended</span></h3>
+            <p class="text-base-content/70 mt-1">Fast, unified venv + dependency + lockfile tool, current default recommendation for new Python projects — noticeably quicker than Poetry for install/sync in a time-boxed build.</p>
+          </div>
+        </div>
+        <div class="card card-border border-primary bg-base-100 shadow">
+          <div class="card-body">
+            <h3 class="font-medium text-base-content/80">TS: Vite + npm <span class="badge badge-primary badge-xs ml-1">recommended</span></h3>
+            <p class="text-base-content/70 mt-1">Vite is the near-universal default dev server/bundler for a React/Vue/Svelte SPA now. Plain npm needs zero extra install step versus pnpm's marginal speed/disk edge — not worth the extra setup for a short-lived project.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Input -->
+  <section class="card card-border bg-base-200">
+    <div class="card-body space-y-4">
+      <h2 class="card-title">Your call</h2>
+      <form data-lavish-question="ticket01" class="space-y-4" onsubmit="event.preventDefault();
+        const fd = new FormData(event.currentTarget);
+        const backend = fd.get('backend');
+        const frontend = fd.get('frontend');
+        const tooling = fd.get('tooling');
+        const note = (fd.get('note') || '').toString().trim();
+        if (!backend || !frontend || !tooling) return;
+        const backendLabels = { fastapi: 'FastAPI (recommended)', flask: 'Flask' };
+        const frontendLabels = { react: 'React (default pick)', svelte: 'Svelte', vue: 'Vue', vanilla: 'Vanilla + Vite' };
+        const toolingLabels = { standard: 'uv + Vite/npm (recommended)', other: 'Different tooling — see note' };
+        let msg = 'Ticket 01 decisions: backend = ' + backendLabels[backend] + '; frontend = ' + frontendLabels[frontend] + '; tooling = ' + toolingLabels[tooling];
+        if (note) msg += ' — note: ' + note;
+        window.lavish.queuePrompt(msg, { tag: 'choice', text: 'Ticket 01: ' + backendLabels[backend] + ' / ' + frontendLabels[frontend] + ' / ' + toolingLabels[tooling], element: event.currentTarget, data: { question: 'ticket01', backend, frontend, tooling, note } });
+        document.getElementById('queued-confirm').classList.remove('hidden');
+      ">
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">Backend</legend>
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary">
+            <input type="radio" name="backend" value="fastapi" class="radio radio-primary" checked />
+            <span class="font-medium">FastAPI <span class="badge badge-primary badge-xs ml-1">recommended</span></span>
+          </label>
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary mt-2">
+            <input type="radio" name="backend" value="flask" class="radio radio-primary" />
+            <span class="font-medium">Flask</span>
+          </label>
+        </fieldset>
+
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">Frontend</legend>
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary">
+            <input type="radio" name="frontend" value="react" class="radio radio-primary" checked />
+            <span class="font-medium">React <span class="badge badge-primary badge-xs ml-1">default pick</span></span>
+          </label>
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary mt-2">
+            <input type="radio" name="frontend" value="svelte" class="radio radio-primary" />
+            <span class="font-medium">Svelte</span>
+          </label>
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary mt-2">
+            <input type="radio" name="frontend" value="vue" class="radio radio-primary" />
+            <span class="font-medium">Vue</span>
+          </label>
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary mt-2">
+            <input type="radio" name="frontend" value="vanilla" class="radio radio-primary" />
+            <span class="font-medium">Vanilla + Vite</span>
+          </label>
+        </fieldset>
+
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">Tooling</legend>
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary">
+            <input type="radio" name="tooling" value="standard" class="radio radio-primary" checked />
+            <span class="font-medium">uv + Vite/npm <span class="badge badge-primary badge-xs ml-1">recommended</span></span>
+          </label>
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary mt-2">
+            <input type="radio" name="tooling" value="other" class="radio radio-primary" />
+            <span class="font-medium">Different tooling — explain below</span>
+          </label>
+        </fieldset>
+
+        <textarea name="note" class="textarea textarea-bordered w-full" placeholder="Optional: your familiarity with the frontend options, or anything to push back on"></textarea>
+        <button type="submit" class="btn btn-primary">Queue this answer</button>
+        <p id="queued-confirm" class="text-sm text-success hidden">Queued — press Send to Agent (or Send &amp; End) in the top bar to deliver it.</p>
+      </form>
+    </div>
+  </section>
+
+  <div role="alert" class="alert alert-success shadow-lg">
+    <span>✓ <strong>Ticket 01 resolved.</strong> Backend: FastAPI. Frontend: React. Tooling: uv (Python) + Vite/npm (TypeScript). Written back to the wayfinder map.</span>
+  </div>
+
+</main>
+</body>
+</html>
