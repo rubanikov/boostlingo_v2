@@ -121,6 +121,15 @@ of build effort.
   languages each segment is in. **Cascade mode only** — `gpt-realtime` has no equivalent
   lever, a deliberate named difference for the write-up. Amends ticket 05's protocol;
   carries a new requirement forward into [UI/UX layout](issues/09-ui-ux-layout.md).
+- [Audio capture & playback strategy](issues/07-audio-capture-playback-strategy.md) —
+  splits cleanly by mode off one shared `getUserMedia()` call. **Realtime**: WebRTC native
+  for both capture (`addTrack`) and playback (`pc.ontrack` → `<audio>.srcObject`), no
+  manual audio handling at all. **Cascade**: AudioWorklet for raw-PCM capture (Float32→
+  Int16, ~20-40ms buffering) and Web Audio API buffer scheduling for gapless playback of
+  ElevenLabs' raw-PCM output — MediaSource Extensions rejected as a mismatch (built for
+  compressed/adaptive-video streaming, not raw-PCM low-latency voice). Gotchas pinned:
+  tie `AudioContext` resume to the mic-permission user gesture; catch `NotAllowedError`
+  by name for ticket 10's mic-permission-denied case.
 
 _(stack/deadline/deployment-target/held-provider-accounts were settled by direct
 conversation before charting and are captured in Notes above, not as tickets)_

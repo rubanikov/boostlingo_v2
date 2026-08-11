@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en" data-theme="luxury">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ticket 07 — Audio Capture &amp; Playback Strategy</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex) > *,
+  :where([style*="display: grid"], [style*="display:grid"], [style*="display: flex"], [style*="display:flex"]) > * {
+    min-width: 0;
+  }
+  :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, figcaption, td, th, .badge, .label) {
+    overflow-wrap: anywhere;
+  }
+  :where(img, svg, video, canvas, iframe) { max-width: 100%; height: auto; }
+  body { background: var(--color-base-100); }
+</style>
+</head>
+<body class="min-h-screen bg-base-100 text-base-content">
+<main class="mx-auto max-w-5xl p-6 lg:p-10 space-y-10">
+
+  <div class="text-sm breadcrumbs px-0">
+    <ul>
+      <li>AI Interpreter Workbench</li>
+      <li>Wayfinder map</li>
+      <li>Ticket 07</li>
+    </ul>
+  </div>
+
+  <header class="hero bg-base-200 rounded-box">
+    <div class="hero-content flex-col items-start text-left py-8">
+      <span class="badge badge-warning badge-soft mb-2">grilling · claimed · in progress</span>
+      <h1 class="text-3xl lg:text-4xl font-bold">Audio Capture &amp; Playback Strategy</h1>
+      <p class="py-2 max-w-3xl text-base-content/80">
+        Both modes share the same starting point — one <span class="font-mono">getUserMedia()</span> call — but
+        what happens after diverges by mode. That split turns out to be the whole answer to this ticket.
+      </p>
+    </div>
+  </header>
+
+  <div class="card card-border bg-base-100 p-4">
+    <pre class="mermaid">
+flowchart TD
+  A["User clicks Start - user gesture"] --> B["getUserMedia with autoGainControl,<br/>noiseSuppression, echoCancellation<br/>ticket 11's constraints"]
+  B --> C{{"Mode?"}}
+  C -->|"Realtime"| D["WebRTC addTrack from raw MediaStream<br/>encode + transport handled natively"]
+  C -->|"Cascade"| E["AudioWorkletNode reads raw PCM<br/>Float32 to Int16, buffered ~20-40ms"]
+  E --> F["WebSocket binary frames to backend,<br/>then to Deepgram"]
+  D --> G["OpenAI Realtime<br/>model speaks back directly"]
+
+  F --> Seg{{"LLM clause-check plus<br/>Deepgram endpointing<br/>ticket 05 - not this ticket"}}
+  Seg --> Trans["Translation LLM streams<br/>target text (ticket 05)"]
+  Trans --> TTSStage["ElevenLabs TTS streams<br/>raw PCM audio (ticket 04/05/06)"]
+
+  TTSStage --> Play["Web Audio API buffer scheduling<br/>THIS ticket's playback answer"]
+  G --> RTPlay["pc.ontrack to audio element srcObject<br/>THIS ticket's playback answer"]
+
+  B -.-> H["AnalyserNode, shared + mode-agnostic<br/>level meter + VAD-state UI, ticket 11"]
+
+  classDef shared fill:#f59e0b,stroke:#b45309,color:#1c1917,font-weight:bold;
+  classDef other fill:#6b7280,stroke:#374151,color:#f9fafb;
+  classDef thisticket fill:#059669,stroke:#065f46,color:#f0fdf4,font-weight:bold;
+  class B,H shared
+  class Seg,Trans,TTSStage other
+  class Play,RTPlay thisticket
+    </pre>
+  </div>
+
+  <!-- Question 1 -->
+  <section class="card card-border border-primary bg-base-200 shadow-lg">
+    <div class="card-body space-y-4">
+      <div class="flex items-center gap-2">
+        <span class="badge badge-warning badge-soft">question 1 of 2</span>
+        <h2 class="card-title">Capture: MediaRecorder or AudioWorklet?</h2>
+      </div>
+      <p class="text-sm text-base-content/70">This isn't actually one answer for the whole app — the two modes need genuinely different mechanisms after the shared <span class="font-mono">getUserMedia()</span> call.</p>
+      <div class="grid sm:grid-cols-2 gap-4 text-sm">
+        <div class="card card-border bg-base-100">
+          <div class="card-body">
+            <h3 class="font-medium text-base-content/80">Realtime mode — neither</h3>
+            <p class="text-base-content/70 mt-1">WebRTC (ticket 03) handles capture, encoding, and transport natively once you call <span class="font-mono">pc.addTrack(stream.getTracks()[0])</span> on the raw <span class="font-mono">MediaStream</span>. No worklet, no recorder — the browser's WebRTC engine does the rest.</p>
+          </div>
+        </div>
+        <div class="card card-border border-primary bg-base-100 shadow">
+          <div class="card-body">
+            <h3 class="font-medium text-base-content/80">Cascade mode — AudioWorklet <span class="badge badge-primary badge-xs ml-1">recommended</span></h3>
+            <p class="text-base-content/70 mt-1">Deepgram wants raw PCM binary frames, no container (ticket 04's research). AudioWorklet gives direct access to raw samples on the audio thread; convert Float32→Int16, buffer to ~20-40ms per WebSocket frame (its native 128-frame callback size is too chatty to send per-callback). MediaRecorder would hand back compressed webm/opus <em>blobs</em> at coarse timeslices — wrong shape entirely, and would force Deepgram to decode a container server-side for no benefit.</p>
+          </div>
+        </div>
+      </div>
+      <div role="alert" class="alert alert-info alert-soft text-sm">
+        <span>The level meter + VAD-state UI (ticket 11) taps an <span class="font-mono">AnalyserNode</span> off the same raw <span class="font-mono">MediaStream</span> regardless of mode — genuinely shared, mode-agnostic code, satisfying the "clean separation between mode-specific transport and mode-agnostic UI" bar directly rather than just asserting it.</span>
+      </div>
+
+      <div class="rounded-box border border-base-300 bg-base-100 p-4 text-sm space-y-2">
+        <p class="font-medium">Why Float32 → Int16, and what about rounding? <span class="badge badge-ghost badge-xs ml-1">answering your question</span></p>
+        <p class="text-base-content/70"><strong>Why the conversion:</strong> Web Audio API's AudioWorklet always hands you samples as 32-bit IEEE float in the range -1.0 to 1.0 — that's just the browser's internal format, not a choice. 16-bit signed integer PCM ("linear16") is the de facto standard raw format for streaming ASR APIs generally, Deepgram included (ticket 04's research). It's not strictly the <em>only</em> option — Deepgram's docs also list a "linear32" mode — but that almost certainly means 32-bit <em>integer</em> PCM, a different byte layout than Web Audio's IEEE float, not a way to skip conversion entirely. <em>Flagging honestly: which exact encodings Deepgram accepts wasn't re-verified here, this is carried over from ticket 04.</em> Int16 is the pragmatic default: half the bytes of int32 over the wire, and its ~96dB dynamic range is already far more than speech or consumer mic hardware need.</p>
+        <p class="text-base-content/70"><strong>Rounding:</strong> it's a plain linear scale-and-clamp, nothing fancier — <span class="font-mono">int16 = clamp(round(float32 * 32767), -32768, 32767)</span>. <strong>No pre/post-processing like dithering is applied</strong>, and that's a deliberate omission, not an oversight: dithering (adding tiny controlled noise before quantizing) is a professional audio-mastering technique for when human ears are critically listening to the result. Here the destination is an ASR model, not a listener — 16-bit quantization noise sits far below the noise floor of any consumer microphone and below the dynamic range speech actually uses, so it's inaudible/immaterial in practice, and STT models are trained on oceans of naturally 16-bit audio already. The actual quality-limiting factors in this pipeline are mic hardware and network conditions, not this rounding step.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Question 2 -->
+  <section class="card card-border border-primary bg-base-200 shadow-lg">
+    <div class="card-body space-y-4">
+      <div class="flex items-center gap-2">
+        <span class="badge badge-warning badge-soft">question 2 of 2</span>
+        <h2 class="card-title">Playback: how do incrementally-arriving audio chunks get played?</h2>
+      </div>
+      <div class="grid sm:grid-cols-3 gap-4 text-sm">
+        <div class="card card-border bg-base-100">
+          <div class="card-body">
+            <h3 class="font-medium text-base-content/80">Streamed <span class="font-mono">&lt;audio&gt;</span> src</h3>
+            <p class="text-base-content/70 mt-1">Simplest API, but a poor fit for true chunk-by-chunk streaming — wants a complete-ish resource, not a running feed of separately-arriving fragments.</p>
+          </div>
+        </div>
+        <div class="card card-border bg-base-100">
+          <div class="card-body">
+            <h3 class="font-medium text-base-content/80">MediaSource Extensions</h3>
+            <p class="text-base-content/70 mt-1"><span class="font-mono">SourceBuffer.appendBuffer()</span> works for compressed, container-aligned chunks — but adds real complexity (codec/container fragment alignment) and is designed more for adaptive video streaming than lowest-latency voice.</p>
+          </div>
+        </div>
+        <div class="card card-border border-primary bg-base-100 shadow">
+          <div class="card-body">
+            <h3 class="font-medium text-base-content/80">Web Audio API scheduling <span class="badge badge-primary badge-xs ml-1">recommended (Cascade)</span></h3>
+            <p class="text-base-content/70 mt-1">Request raw PCM from ElevenLabs (skips decoding entirely). Each chunk becomes an <span class="font-mono">AudioBuffer</span>, scheduled via <span class="font-mono">AudioBufferSourceNode.start(nextTime)</span> where <span class="font-mono">nextTime</span> tracks the previous chunk's end — gapless, sample-accurate, and you can start playing the very first chunk the instant it arrives.</p>
+          </div>
+        </div>
+      </div>
+      <div role="alert" class="alert alert-info alert-soft text-sm">
+        <span><strong>Realtime mode doesn't need any of this.</strong> WebRTC delivers the model's audio as a media track via <span class="font-mono">pc.ontrack</span> — assign <span class="font-mono">e.streams[0]</span> straight to an <span class="font-mono">&lt;audio&gt;</span> element's <span class="font-mono">srcObject</span> (the exact pattern in OpenAI's own <span class="font-mono">openai-realtime-console</span>, ticket 02's research). The browser's native jitter buffer and audio pipeline handle playback — manual scheduling is a Cascade-mode-only concern.</span>
+      </div>
+
+      <div class="rounded-box border border-base-300 bg-base-100 p-4 text-sm space-y-3">
+        <p class="font-medium">MSE vs. Web Audio API, in full <span class="badge badge-ghost badge-xs ml-1">answering your question</span></p>
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div>
+            <p class="font-medium text-base-content/80">MediaSource Extensions</p>
+            <ul class="list-disc list-inside text-base-content/70 mt-1 space-y-1">
+              <li><strong>Pro:</strong> purpose-built browser API for streaming into <span class="font-mono">&lt;audio&gt;</span>/<span class="font-mono">&lt;video&gt;</span>; handles buffering/underrun via the browser's own media pipeline.</li>
+              <li><strong>Pro:</strong> works well with compressed formats — smaller bandwidth if streaming Opus/MP3.</li>
+              <li><strong>Con:</strong> chunks must be valid, container-aligned codec fragments — ElevenLabs' streamed output doesn't naturally arrive pre-chunked at clean fragment boundaries, so this is real added complexity, not a drop-in fit.</li>
+              <li><strong>Con:</strong> designed around adaptive video streaming's latency budget, not lowest-latency voice — wants a <span class="font-mono">sourceopen</span> + initial segment before playback starts, adding startup latency vs. scheduling audio the instant it arrives.</li>
+              <li><strong>Con:</strong> no natural way to tie playback position back to <span class="font-mono">segmentId</span> for UI sync (e.g. highlighting the currently-speaking segment in the transcript, ticket 09) — that's opaque inside the browser's buffer.</li>
+            </ul>
+          </div>
+          <div>
+            <p class="font-medium text-base-content/80">Web Audio API scheduling</p>
+            <ul class="list-disc list-inside text-base-content/70 mt-1 space-y-1">
+              <li><strong>Pro:</strong> works directly with raw PCM — no decode step, pairs naturally with requesting raw PCM from ElevenLabs.</li>
+              <li><strong>Pro:</strong> minimal startup latency — first chunk plays the instant it's turned into an <span class="font-mono">AudioBuffer</span>, no waiting on MSE's readiness machinery.</li>
+              <li><strong>Pro:</strong> full control over scheduling means each <span class="font-mono">AudioBufferSourceNode</span> can carry its <span class="font-mono">segmentId</span> — enables exact "now playing this segment" UI sync for free.</li>
+              <li><strong>Con:</strong> you own the bookkeeping — the "next scheduled time" pointer, and handling gaps if network is slow, rather than getting that from browser-managed buffering.</li>
+            </ul>
+          </div>
+        </div>
+        <p class="text-base-content/60">Net: MSE's strengths (compressed formats, browser-managed buffering) don't line up with what this app actually needs (raw PCM, segment-aware UI, lowest possible startup latency) — recommendation stands.</p>
+      </div>
+
+      <div class="rounded-box border border-base-300 bg-base-100 p-4 text-sm space-y-2">
+        <p class="font-medium">Will the target text look smooth or stuttery? <span class="badge badge-ghost badge-xs ml-1">answering your question</span></p>
+        <p class="text-base-content/70"><strong>Within one segment: smooth, like any LLM chat UI's streaming text</strong> — tokens arrive with small, irregular gaps (typically tens of milliseconds), but human reading speed is far slower than that, so it reads as natural incremental typing, not stutter. That's the same pattern essentially every LLM chat product uses. <em>Implementation caveat worth stating plainly, not just assuming</em>: this only holds if the UI appends new text rather than re-rendering the whole block on every token — a full re-render per token is a common mistake that <em>does</em> cause visible jank, independent of how smooth the underlying token stream is.</p>
+        <p class="text-base-content/70"><strong>Between segments: a real, natural-feeling pause</strong> — while the next chunk of speech is captured, transcribed, and judged complete (ticket 05's segmentation), no target text is arriving at all. This isn't a flaw to hide; it mirrors the actual pause in the spoken audio, so the text experience and the audio experience stay in sync with each other rather than one looking "laggy" relative to the other.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Gotchas -->
+  <section class="space-y-3">
+    <h2 class="text-lg font-semibold">Browser gotchas worth pinning down now</h2>
+    <ul class="list bg-base-100 rounded-box border border-base-300 text-sm">
+      <li class="list-row"><div><strong>Autoplay policy:</strong> browsers block audio playback without a prior user gesture. Since starting a session already requires a click (to trigger the mic-permission prompt), reuse that same gesture to create/<span class="font-mono">resume()</span> the <span class="font-mono">AudioContext</span> — don't create it lazily on first audio arrival, or playback can silently fail.</div></li>
+      <li class="list-row"><div><strong>Mic permission denied:</strong> <span class="font-mono">getUserMedia()</span> rejects with a <span class="font-mono">NotAllowedError</span> specifically — catch that named error for the brief's mic-permission-denied error case (ticket 10) rather than a generic catch-all.</div></li>
+      <li class="list-row"><div><strong><span class="font-mono">getUserMedia</span> constraints</strong> (ticket 11, already decided): <span class="font-mono">autoGainControl</span>, <span class="font-mono">noiseSuppression</span>, <span class="font-mono">echoCancellation</span> all set to <span class="font-mono">true</span> at the one shared capture call, before the mode split.</div></li>
+    </ul>
+  </section>
+
+  <!-- Input -->
+  <section class="card card-border bg-base-200">
+    <div class="card-body space-y-4">
+      <h2 class="card-title">Your call</h2>
+      <form data-lavish-question="ticket07" class="space-y-4" onsubmit="event.preventDefault();
+        const fd = new FormData(event.currentTarget);
+        const capture = fd.get('capture');
+        const playback = fd.get('playback');
+        const note = (fd.get('note') || '').toString().trim();
+        if (!capture || !playback) return;
+        const captureLabels = { split: 'WebRTC native (Realtime) + AudioWorklet (Cascade) (recommended)', mediarecorder: 'MediaRecorder for both' };
+        const playbackLabels = { split: 'WebRTC native audio (Realtime) + Web Audio API scheduling (Cascade) (recommended)', mse: 'MediaSource Extensions for Cascade instead' };
+        let msg = 'Ticket 07 decisions: capture = ' + captureLabels[capture] + '; playback = ' + playbackLabels[playback];
+        if (note) msg += ' — note: ' + note;
+        window.lavish.queuePrompt(msg, { tag: 'choice', text: 'Ticket 07: ' + captureLabels[capture] + ' / ' + playbackLabels[playback], element: event.currentTarget, data: { question: 'ticket07', capture, playback, note } });
+        document.getElementById('queued-confirm').classList.remove('hidden');
+      ">
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">Capture</legend>
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary">
+            <input type="radio" name="capture" value="split" class="radio radio-primary" checked />
+            <span class="font-medium">WebRTC native (Realtime) + AudioWorklet (Cascade) <span class="badge badge-primary badge-xs ml-1">recommended</span></span>
+          </label>
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary mt-2">
+            <input type="radio" name="capture" value="mediarecorder" class="radio radio-primary" />
+            <span class="font-medium">MediaRecorder for both</span>
+          </label>
+        </fieldset>
+
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">Playback</legend>
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary">
+            <input type="radio" name="playback" value="split" class="radio radio-primary" checked />
+            <span class="font-medium">WebRTC native (Realtime) + Web Audio API scheduling (Cascade) <span class="badge badge-primary badge-xs ml-1">recommended</span></span>
+          </label>
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary mt-2">
+            <input type="radio" name="playback" value="mse" class="radio radio-primary" />
+            <span class="font-medium">MediaSource Extensions for Cascade instead</span>
+          </label>
+        </fieldset>
+
+        <textarea name="note" class="textarea textarea-bordered w-full" placeholder="Optional: anything to add, qualify, or push back on"></textarea>
+        <button type="submit" class="btn btn-primary">Queue this answer</button>
+        <p id="queued-confirm" class="text-sm text-success hidden">Queued — press Send to Agent (or Send &amp; End) in the top bar to deliver it.</p>
+      </form>
+    </div>
+  </section>
+
+  <div role="alert" class="alert alert-success shadow-lg">
+    <span>✓ <strong>Ticket 07 resolved.</strong> Capture: WebRTC native (Realtime) + AudioWorklet raw PCM (Cascade). Playback: WebRTC native audio element (Realtime) + Web Audio API buffer scheduling (Cascade). Written back to the wayfinder map.</span>
+  </div>
+
+</main>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.15.0/dist/mermaid.esm.min.mjs";
+  const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  const paint = document.createElement("canvas").getContext("2d");
+  function toRgba(color) {
+    paint.clearRect(0, 0, 1, 1);
+    paint.fillStyle = "#000";
+    paint.fillStyle = color;
+    paint.fillRect(0, 0, 1, 1);
+    return paint.getImageData(0, 0, 1, 1).data;
+  }
+  function compositeRgba(foreground, background) {
+    const foregroundAlpha = foreground[3] / 255;
+    const backgroundAlpha = background[3] / 255;
+    const alpha = foregroundAlpha + backgroundAlpha * (1 - foregroundAlpha);
+    if (alpha === 0) return [0, 0, 0, 0];
+    return [
+      (foreground[0] * foregroundAlpha + background[0] * backgroundAlpha * (1 - foregroundAlpha)) / alpha,
+      (foreground[1] * foregroundAlpha + background[1] * backgroundAlpha * (1 - foregroundAlpha)) / alpha,
+      (foreground[2] * foregroundAlpha + background[2] * backgroundAlpha * (1 - foregroundAlpha)) / alpha,
+      alpha * 255,
+    ];
+  }
+  function pageIsDark() {
+    const root = document.documentElement;
+    const rootBackground = toRgba(getComputedStyle(root).backgroundColor);
+    const bodyBackground = document.body ? toRgba(getComputedStyle(document.body).backgroundColor) : [0, 0, 0, 0];
+    const [r, g, b, a] = compositeRgba(bodyBackground, rootBackground);
+    if (a > 0) {
+      return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.5;
+    }
+    const colorScheme = getComputedStyle(root).colorScheme;
+    if (colorScheme.includes("dark") && !colorScheme.includes("light")) return true;
+    if (colorScheme.includes("light") && !colorScheme.includes("dark")) return false;
+    return darkQuery.matches;
+  }
+  const diagrams = [...document.querySelectorAll(".mermaid")].map((el) => ({ el, src: el.textContent }));
+  let applied;
+  let rendering = false;
+  let queued = false;
+  function queueRender() {
+    queued = true;
+    if (rendering) return;
+    void render();
+  }
+  async function render() {
+    rendering = true;
+    try {
+      while (queued) {
+        queued = false;
+        const theme = pageIsDark() ? "dark" : "default";
+        if (theme === applied) continue;
+        mermaid.initialize({ startOnLoad: false, theme, securityLevel: "strict" });
+        for (const { el, src } of diagrams) {
+          el.removeAttribute("data-processed");
+          el.textContent = src;
+        }
+        try {
+          await mermaid.run({ nodes: diagrams.map((d) => d.el) });
+        } catch (error) {
+          console.error("Mermaid diagram render failed:", error);
+          return;
+        }
+        applied = theme;
+      }
+    } finally {
+      rendering = false;
+      if (queued) queueRender();
+    }
+  }
+  if (document.readyState === "complete") queueRender();
+  else window.addEventListener("load", queueRender, { once: true });
+  const themeObserver = new MutationObserver(queueRender);
+  for (const el of [document.documentElement, document.body]) {
+    if (!el) continue;
+    themeObserver.observe(el, { attributes: true, attributeFilter: ["data-theme", "class", "style"] });
+  }
+  document.addEventListener("change", queueRender, true);
+  document.addEventListener("transitionend", ({ propertyName }) => { if (propertyName === "background-color") queueRender(); }, true);
+  darkQuery.addEventListener("change", queueRender);
+</script>
+
+</body>
+</html>
