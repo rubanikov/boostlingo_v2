@@ -150,6 +150,20 @@ of build effort.
   doubles as the visual cue for each speaker's distinct TTS voice (ticket 06). Latency
   strip matches ticket 08's asymmetric-by-mode design; error states match ticket 10's
   taxonomy, with empty-result explicitly shown as not a user-facing error (ticket 11).
+- [Error handling & test strategy](issues/10-error-handling-test-strategy.md) — every
+  failure scoped to **one segment**, never the whole session: bounded retries (2x,
+  200/400ms) for rate-limit/timeout then drop+log; empty STT result usually isn't an
+  error at all (ticket 06); empty translation gets one retry then drop+log; mic denied
+  blocks session start with a retry button. **No automatic runtime provider fallback**
+  (swappability is build-time, not a failover system) and **no per-failure session
+  termination** — only a 5-consecutive-failure circuit breaker (an actual dropped
+  connection is ticket 13's territory). Critical-path tests: provider boundary contracts
+  against mocked SDKs, the LLM-hybrid segmentation race (most complex custom logic in
+  the system), retry/circuit-breaker logic — complementing, not duplicating, ticket 11's
+  E2E test. **Amended ticket 11**: real audio recordings added alongside the
+  TTS-generated corpus (surfaces real noise/volume variance TTS can't, validates
+  ticket 07's AGC/noise-suppression constraints), reusing the same fake-mic harness —
+  no new infrastructure, supplementary/manual-tier.
 
 _(stack/deadline/deployment-target/held-provider-accounts were settled by direct
 conversation before charting and are captured in Notes above, not as tickets)_

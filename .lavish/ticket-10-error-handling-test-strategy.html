@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en" data-theme="luxury">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ticket 10 — Error Handling &amp; Test Strategy</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex) > *,
+  :where([style*="display: grid"], [style*="display:grid"], [style*="display: flex"], [style*="display:flex"]) > * {
+    min-width: 0;
+  }
+  :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, figcaption, td, th, .badge, .label) {
+    overflow-wrap: anywhere;
+  }
+  :where(img, svg, video, canvas, iframe) { max-width: 100%; height: auto; }
+  body { background: var(--color-base-100); }
+</style>
+</head>
+<body class="min-h-screen bg-base-100 text-base-content">
+<main class="mx-auto max-w-5xl p-6 lg:p-10 space-y-10">
+
+  <div class="text-sm breadcrumbs px-0">
+    <ul>
+      <li>AI Interpreter Workbench</li>
+      <li>Wayfinder map</li>
+      <li>Ticket 10 — last one on the map</li>
+    </ul>
+  </div>
+
+  <header class="hero bg-base-200 rounded-box">
+    <div class="hero-content flex-col items-start text-left py-8">
+      <span class="badge badge-warning badge-soft mb-2">grilling · claimed · in progress</span>
+      <h1 class="text-3xl lg:text-4xl font-bold">Error Handling &amp; Test Strategy</h1>
+      <p class="py-2 max-w-3xl text-base-content/80">
+        Two decisions: concrete behavior for each brief-mandated failure mode, and what "critical path" means for
+        the targeted tests the brief requires. The throughline for both: failures are scoped to <em>one segment</em>,
+        never the whole session, with a circuit breaker as the backstop.
+      </p>
+    </div>
+  </header>
+
+  <!-- Question 1 -->
+  <section class="card card-border border-primary bg-base-200 shadow-lg">
+    <div class="card-body space-y-4">
+      <div class="flex items-center gap-2">
+        <span class="badge badge-warning badge-soft">question 1 of 2</span>
+        <h2 class="card-title">Error-handling behavior, per failure mode</h2>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="table table-sm">
+          <thead><tr><th>Failure mode</th><th>Behavior</th><th>User sees</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="font-medium">Rate limit</td>
+              <td>2 retries, backoff 200ms → 400ms (bounded — real-time voice can't tolerate long waits). Exhausted → drop this segment, keep session alive.</td>
+              <td>Brief non-blocking toast: "Provider busy, retrying…" — only if it takes long enough to notice.</td>
+            </tr>
+            <tr>
+              <td class="font-medium">Timeout</td>
+              <td>Per-stage timeout budget tied to ticket 08's latency targets — if a stage overruns its budget, 1 retry, then drop the segment.</td>
+              <td>Segment silently skipped; next utterance proceeds normally.</td>
+            </tr>
+            <tr>
+              <td class="font-medium">Empty STT result</td>
+              <td><strong>Usually not an error at all</strong> — <span class="font-mono">TranscriptSegment.is_empty</span> (ticket 06) is the correct outcome for silence/noise. Only flagged if <span class="font-mono">SpeechStarted</span> fired but STT still produced nothing — logged, segment dropped, no retry (nothing to retry against).</td>
+              <td>Nothing — silence should look like silence.</td>
+            </tr>
+            <tr>
+              <td class="font-medium">Empty translation result</td>
+              <td>A real anomaly (translation shouldn't legitimately return blank for non-empty input) — 1 retry, then <strong>logged</strong>, segment dropped rather than show untranslated source text (more confusing than a brief gap).</td>
+              <td>Segment silently skipped (logged server-side for debugging).</td>
+            </tr>
+            <tr>
+              <td class="font-medium">Mic permission denied</td>
+              <td>Not a provider error — a browser-level <span class="font-mono">NotAllowedError</span> (ticket 07), blocks session start entirely. No auto-retry (requires the user to change browser settings).</td>
+              <td>Blocking error banner (ticket 09) with a "try again" button that re-attempts <span class="font-mono">getUserMedia()</span> once fixed — not a full page reload.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div role="alert" class="alert alert-info alert-soft text-sm">
+        <span><strong>Fallback provider — explicitly not automatic.</strong> Ticket 06's swappable-provider design is a build-time/config-time property (the whole point of the abstraction), not a runtime automatic-failover feature. Wiring up live automatic failover between multiple concurrently-connected providers is meaningfully more engineering than a 15-20hr build serves, for a benefit outside what the brief evaluates (one working implementation with swappable providers, not a redundancy system). Stating this explicitly to avoid ambiguity, not leaving it silently unaddressed.</span>
+      </div>
+
+      <div role="alert" class="alert alert-warning alert-soft text-sm">
+        <span><strong>Session termination — circuit breaker, not per-failure.</strong> Every failure above is scoped to one segment; the session itself stays alive. The one exception: <strong>5 consecutive segment failures</strong> trips a circuit breaker — that pattern suggests something structurally broken (bad API key, provider fully down), not a transient blip, and surfaces a hard "interpretation unavailable" state rather than silently limping along forever. An actual dropped WebSocket connection is a different case, owned by <span class="font-mono">Stability: reconnection, drift, memory</span> (ticket 13), not this ticket.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Question 2 -->
+  <section class="card card-border border-primary bg-base-200 shadow-lg">
+    <div class="card-body space-y-4">
+      <div class="flex items-center gap-2">
+        <span class="badge badge-warning badge-soft">question 2 of 2</span>
+        <h2 class="card-title">What counts as "critical path" for tests?</h2>
+      </div>
+
+      <div class="grid sm:grid-cols-2 gap-4 text-sm">
+        <div class="card card-border border-primary bg-base-100 shadow">
+          <div class="card-body">
+            <h3 class="font-medium text-base-content/80">In scope</h3>
+            <ul class="list-disc list-inside space-y-1 text-base-content/70">
+              <li><strong>Provider boundary contract tests</strong> — each Protocol implementation (ticket 06) tested against a <em>mocked</em> SDK, verifying normal streaming maps correctly to <span class="font-mono">TranscriptSegment</span>/<span class="font-mono">TranslationChunk</span>/<span class="font-mono">AudioChunk</span>, and each failure mode above maps to the right <span class="font-mono">ProviderError</span> kind + <span class="font-mono">retryable</span> flag.</li>
+              <li><strong>Segmentation logic tests</strong> — the LLM-hybrid clause-check vs. Deepgram-fallback race (ticket 05) is the single most complex custom logic in the system: fallback fires when the LLM doesn't respond in time, LLM verdict wins when it arrives first, "carry forward" behaves correctly when new words land after a snapshot.</li>
+              <li><strong>Retry/circuit-breaker logic tests</strong> — given a provider that fails N times then succeeds, correct attempt count and backoff timing; given 5 consecutive failures, the circuit breaker actually trips.</li>
+              <li><strong>End-to-end pipeline</strong> — already decided (ticket 11): the Playwright fake-mic E2E test exercises the whole real pipeline, not just isolated units. This ticket's tests complement it rather than duplicating it.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="card card-border bg-base-100">
+          <div class="card-body">
+            <h3 class="font-medium text-base-content/80">Explicitly not in scope</h3>
+            <p class="text-base-content/70">Matches the brief's own "full coverage not required": exhaustive testing of every provider's every documented parameter, UI component snapshot tests, load/stress testing, multi-provider combinatorial testing (only one provider per category is actually implemented — ticket 06's scope).</p>
+          </div>
+        </div>
+      </div>
+
+      <div role="alert" class="alert alert-info alert-soft text-sm">
+        <span><strong>Tooling:</strong> pytest + pytest-asyncio for the async provider/segmentation logic, with hand-mocked provider SDKs or fake WebSocket connection objects rather than live network calls — fast, deterministic, no flakiness from real API dependencies in the test suite.</span>
+      </div>
+
+      <div class="rounded-box border border-base-300 bg-base-100 p-4 text-sm space-y-2">
+        <p class="font-medium">Real recordings alongside the TTS-generated corpus <span class="badge badge-ghost badge-xs ml-1">good addition, per your feedback</span></p>
+        <p class="text-base-content/70">Genuinely valuable and worth doing: TTS-generated audio (ticket 11/14's corpus) is clean and consistent — it validates the pipeline mechanically but can't surface how the system handles real background noise, natural volume/distance variance, or actual voice characteristics the way a real recording does. It's also the only real way to <em>validate</em> that the <span class="font-mono">autoGainControl</span>/<span class="font-mono">noiseSuppression</span>/<span class="font-mono">echoCancellation</span> constraints (ticket 07) are actually doing something, rather than just assuming they are.</p>
+        <p class="text-base-content/70"><strong>No new test infrastructure needed</strong> — this drops directly into the harness ticket 11 already decided: the Playwright fake-mic E2E test feeds a WAV file via Chrome's <span class="font-mono">--use-file-for-fake-audio-capture</span> flag, and that flag doesn't care whether the file is TTS-generated or a real recording. Real recordings become additional fixture files run through the exact same WER/E2E harness, not a parallel system.</p>
+        <p class="text-base-content/70">Practically: record a handful of real clips (varied conditions — quiet room, some background noise, normal speaking distance vs. a bit farther from the mic) covering the same ticket 14 sentence set or a subset of it, and drop them in alongside the TTS fixtures. Worth treating these as supplementary/manual-tier rather than blocking automated CI on a real voice recording being available — same spirit as ticket 11's "device coverage is a manual pass, not automated" call.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Input -->
+  <section class="card card-border bg-base-200">
+    <div class="card-body space-y-4">
+      <h2 class="card-title">Your call</h2>
+      <form data-lavish-question="ticket10" class="space-y-3" onsubmit="event.preventDefault();
+        const fd = new FormData(event.currentTarget);
+        const choice = fd.get('reaction');
+        const note = (fd.get('note') || '').toString().trim();
+        if (!choice) return;
+        const labels = { agree: 'Agree with the design as described', changes: 'Needs changes — see note' };
+        let msg = 'Ticket 10 decision: ' + labels[choice];
+        if (note) msg += ' — note: ' + note;
+        window.lavish.queuePrompt(msg, { tag: 'choice', text: 'Ticket 10: ' + labels[choice], element: event.currentTarget, data: { question: 'ticket10', choice, note } });
+        document.getElementById('queued-confirm').classList.remove('hidden');
+      ">
+        <fieldset class="fieldset">
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary">
+            <input type="radio" name="reaction" value="agree" class="radio radio-primary" checked />
+            <span class="font-medium">Agree with the design as described</span>
+          </label>
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary mt-2">
+            <input type="radio" name="reaction" value="changes" class="radio radio-primary" />
+            <span class="font-medium">Needs changes — explain below</span>
+          </label>
+        </fieldset>
+        <textarea name="note" class="textarea textarea-bordered w-full" placeholder="Optional: anything to add, qualify, or push back on"></textarea>
+        <button type="submit" class="btn btn-primary">Queue this answer</button>
+        <p id="queued-confirm" class="text-sm text-success hidden">Queued — press Send to Agent (or Send &amp; End) in the top bar to deliver it.</p>
+      </form>
+    </div>
+  </section>
+
+  <div role="alert" class="alert alert-success shadow-lg">
+    <span>✓ <strong>Ticket 10 resolved — the last ticket charted on this map.</strong> Empty-translation-result logging added per feedback. Written back to the wayfinder map; ticket 13 (Stability) is now unblocked.</span>
+  </div>
+
+</main>
+</body>
+</html>

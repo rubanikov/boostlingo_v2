@@ -53,3 +53,17 @@ calibrating across different physical microphones.
   hand (laptop built-in mic + one other, e.g. USB or Bluetooth headset — Bluetooth is
   the usual worst case, often capped to 16kHz narrowband). No dedicated automated
   tooling for this; note results/limitations in the comparison write-up.
+
+## Amendment (from [Error handling & test strategy](10-error-handling-test-strategy.md))
+
+Real audio recordings added alongside the TTS-generated WER/E2E corpus above — TTS
+audio is clean and consistent, so it can't surface real background noise, natural
+volume/distance variance, or actual voice characteristics; real recordings are also the
+only real way to *validate* the `autoGainControl`/`noiseSuppression`/`echoCancellation`
+constraints above are doing anything, rather than just assuming they are. No new test
+infrastructure needed — Chrome's `--use-file-for-fake-audio-capture` flag doesn't care
+whether the WAV is synthetic or real, so these are additional fixture files through the
+exact same harness. Practically: a handful of real clips across varied conditions (quiet
+room, some background noise, normal vs. farther mic distance) covering the ticket 14
+sentence set or a subset of it. Treated as supplementary/manual-tier, same spirit as the
+device-coverage call above — not blocking automated CI on a recording being available.
