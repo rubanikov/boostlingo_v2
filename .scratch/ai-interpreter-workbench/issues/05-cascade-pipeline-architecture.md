@@ -150,3 +150,27 @@ assumed one fixed session-wide translation direction. Effects on this ticket's p
   multi-party lever, a deliberate, named difference for the comparison write-up.
 
 Full reasoning in ticket 06's Answer.
+
+## Amendment (from [Latency instrumentation design](08-latency-instrumentation-design.md))
+
+A validated concern surfaced during ticket 08's grilling: Deepgram's `endpointing=300`
+(300ms silence threshold, decision 1's original choice) is too aggressive for natural
+"thinking pauses" mid-utterance — someone pausing to find the right word easily exceeds
+300ms without being done speaking. Two changes:
+
+- **`endpointing` bumped from 300ms to 500ms** — the top of ticket 04's own researched
+  range for natural conversation ("300-500ms recommended"), not a new number. Reduces
+  premature cuts with zero added risk.
+- **New configurable segmentation mode**, added specifically so this can be tested
+  empirically rather than only reasoned about: **hybrid race** (today's default — LLM
+  clause-check verdict vs. Deepgram's `speech_final`/`UtteranceEnd`, whichever fires
+  first) vs. **LLM-priority mode** (the LLM verdict is preferred and Deepgram's fast
+  `speech_final` is ignored as a competing signal, but the slower `UtteranceEnd`
+  — already in the design, 1000ms+ — stays as a hard fallback ceiling). The ceiling is
+  deliberately kept in LLM-priority mode too: a pure LLM-only design with no fallback at
+  all risks a segment hanging indefinitely if a clause-check ever fails to fire (a
+  malformed check, a rambling non-clause-shaped utterance, a slow API response) — the
+  guaranteed-progress property from decision 1 is preserved, just given a longer leash.
+
+Both modes should get exercised in the comparison write-up — real empirical segmentation
+behavior differences are stronger evidence than reasoning alone.

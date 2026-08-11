@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en" data-theme="luxury">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ticket 08 — Latency Instrumentation Design</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex) > *,
+  :where([style*="display: grid"], [style*="display:grid"], [style*="display: flex"], [style*="display:flex"]) > * {
+    min-width: 0;
+  }
+  :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, figcaption, td, th, .badge, .label) {
+    overflow-wrap: anywhere;
+  }
+  :where(img, svg, video, canvas, iframe) { max-width: 100%; height: auto; }
+  body { background: var(--color-base-100); }
+</style>
+</head>
+<body class="min-h-screen bg-base-100 text-base-content">
+<main class="mx-auto max-w-5xl p-6 lg:p-10 space-y-10">
+
+  <div class="text-sm breadcrumbs px-0">
+    <ul>
+      <li>AI Interpreter Workbench</li>
+      <li>Wayfinder map</li>
+      <li>Ticket 08</li>
+    </ul>
+  </div>
+
+  <header class="hero bg-base-200 rounded-box">
+    <div class="hero-content flex-col items-start text-left py-8">
+      <span class="badge badge-warning badge-soft mb-2">grilling · claimed · in progress</span>
+      <h1 class="text-3xl lg:text-4xl font-bold">Latency Instrumentation Design</h1>
+      <p class="py-2 max-w-3xl text-base-content/80">
+        Three decisions: what gets timestamped per mode, how client/server clocks reconcile, and what actually
+        shows in the UI. The honest headline: the two modes can't get symmetric instrumentation, and that
+        asymmetry is itself worth showing, not hiding.
+      </p>
+    </div>
+  </header>
+
+  <div role="alert" class="alert alert-warning alert-soft text-sm">
+    <span><strong>Clarifying the original question:</strong> there's no distinct "mic capture end" event to timestamp — capture never stops (ticket 05's concurrency answer). The only meaningful "end" moment is the segmentation boundary firing (the LLM clause-check verdict or Deepgram's <span class="font-mono">speech_final</span>/<span class="font-mono">UtteranceEnd</span> fallback) — that <em>is</em> "speech end" for measurement purposes.</span>
+  </div>
+
+  <!-- Question 1 -->
+  <section class="card card-border border-primary bg-base-200 shadow-lg">
+    <div class="card-body space-y-4">
+      <div class="flex items-center gap-2">
+        <span class="badge badge-warning badge-soft">question 1 of 3</span>
+        <h2 class="card-title">What gets timestamped, per mode?</h2>
+      </div>
+      <div class="grid sm:grid-cols-2 gap-4 text-sm">
+        <div class="card card-border border-primary bg-base-100 shadow">
+          <div class="card-body">
+            <h3 class="font-medium text-base-content/80">Cascade — rich, per-stage</h3>
+            <p class="text-base-content/70 mt-1">The backend owns every stage, so it can timestamp all of them: segment boundary fires (<span class="font-mono">t_speech_end</span>) → translation first token → translation complete → TTS first byte → client reports playback start. Full breakdown, all server-computed.</p>
+          </div>
+        </div>
+        <div class="card card-border bg-base-100">
+          <div class="card-body">
+            <h3 class="font-medium text-base-content/80">Realtime — coarse, end-to-end only</h3>
+            <p class="text-base-content/70 mt-1">The backend is off the audio path (ticket 03) and everything happens inside one opaque model call — there's no sub-stage to see. Only two measurable points exist: the data-channel's speech-stopped signal, and the browser's audio element starting to play. <strong>This isn't a shortcoming to paper over</strong> — it's a direct, visible consequence of the architecture, and a genuinely useful data point for the brief's controllability comparison.</p>
+          </div>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100 p-4">
+        <p class="text-sm font-medium mb-2">Cascade mode — incremental latency reporting per segment</p>
+        <pre class="mermaid">
+sequenceDiagram
+    participant BE as Backend
+    participant TR as Translation LLM
+    participant TTS as ElevenLabs
+    participant CL as Client
+
+    Note over BE: segment boundary fires - t_speech_end (0ms)
+    BE->>CL: latency stage=speech_end ms=0
+    BE->>TR: translate segment text
+    TR-->>BE: first token
+    BE->>CL: latency stage=translation_first_token ms=X
+    TR-->>BE: translation complete
+    BE->>CL: latency stage=translation_complete ms=Y
+    BE->>TTS: stream text, flush at segment end
+    TTS-->>BE: first audio byte
+    BE->>CL: latency stage=tts_first_byte ms=Z
+    CL->>CL: schedule AudioBuffer, playback starts
+    CL->>BE: playback_started at client time T
+    BE->>CL: latency stage=playback_start ms=W (final, end-to-end)
+        </pre>
+      </div>
+
+      <div class="rounded-box border border-base-300 bg-base-100 p-4 text-sm space-y-2">
+        <p class="font-medium">Conversation end vs. segment boundary <span class="badge badge-ghost badge-xs ml-1">answering your question</span></p>
+        <p class="text-base-content/70">Worth separating two different "end" concepts explicitly: <strong>session end</strong> is the user pressing the stop/end button — terminates the connection, one-time, out of scope for this ticket. <strong>Segment boundary</strong> is what this whole ticket measures — it recurs continuously throughout a session, once per spoken chunk, and is what the UI shows as a new line/block in the transcript panes (both source and target) each time it fires — confirmed, that's exactly ticket 05's "partial transcript display" design.</p>
+        <p class="text-base-content/70"><strong>Correcting one detail: it's not exclusively the LLM that decides a segment boundary.</strong> It's a <em>race</em> between two independent signals (ticket 05) — the LLM clause-check verdict (judging the transcript text itself) and Deepgram's own audio-based endpointing (<span class="font-mono">speech_final</span>/<span class="font-mono">UtteranceEnd</span>, a silence-pause detector) — whichever fires first for a given stretch of speech wins. In practice, for short simple utterances Deepgram's fast endpointing (300ms silence) will often win the race on its own; the LLM verdict mainly "wins" when it catches a complete clause <em>before</em> a natural pause would show up — e.g. partway through a longer multi-clause sentence. So "the user pauses, waiting for translation" is usually Deepgram detecting that pause, with the LLM check as the early-cut path for longer utterances specifically.</p>
+      </div>
+
+      <div class="crux-box rounded-box p-4 text-sm space-y-2" style="border:1px solid color-mix(in oklch, var(--color-warning) 40%, transparent); background: color-mix(in oklch, var(--color-warning) 8%, var(--color-base-100));">
+        <p class="font-medium">Your 300ms concern, and the toggle request <span class="badge badge-ghost badge-xs ml-1">real issue, worth answering carefully</span></p>
+        <p class="text-base-content/70">You're right that 300ms is genuinely too aggressive for "thinking pauses" — someone pausing mid-thought to find the right word easily exceeds that. But I wouldn't remove Deepgram's fallback entirely and let the LLM decide alone: it exists specifically as a <strong>guaranteed-progress safety net</strong> (ticket 05) — if the LLM check ever fails to fire a "complete" verdict (a malformed check, a rambling non-clause-shaped utterance, a slow API response), a pure LLM-only design would just hang with no boundary ever firing. That's the actual risk being traded off, not a preference for Deepgram over the LLM.</p>
+        <p class="text-base-content/70">Two changes I'd make instead, both addressing your concern directly:</p>
+        <ul class="list-disc list-inside text-base-content/70 space-y-1">
+          <li><strong>Bump <span class="font-mono">endpointing</span> from 300ms to 500ms</strong> — the top of ticket 04's own researched range for natural conversation, not a new number. Directly reduces premature cuts during thinking-pauses, zero added risk.</li>
+          <li><strong>Add the toggle you asked for</strong> — a configurable segmentation mode: today's hybrid race (current default) vs. an "LLM-priority" mode where the LLM verdict is preferred and Deepgram's <em>fast</em> <span class="font-mono">speech_final</span> is ignored, but the <em>slower</em> <span class="font-mono">UtteranceEnd</span> (already in the design, 1000ms+) stays as the hard fallback so there's still a guaranteed ceiling on how long a segment can hang open. Genuinely useful for testing, and strengthens the comparison write-up with real empirical behavior instead of just asserted reasoning.</li>
+        </ul>
+        <p class="text-base-content/70">This is really ticket 05's territory (segmentation architecture), not this ticket's — I'll write it up as an amendment there, the same way ticket 06's diarization addition got folded back in, rather than silently absorbing it into latency instrumentation's scope.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Question 2 -->
+  <section class="card card-border border-primary bg-base-200 shadow-lg">
+    <div class="card-body space-y-4">
+      <div class="flex items-center gap-2">
+        <span class="badge badge-warning badge-soft">question 2 of 3</span>
+        <h2 class="card-title">Clock synchronization</h2>
+      </div>
+      <div role="alert" class="alert alert-info alert-soft text-sm">
+        <span><strong>Recommendation: one-time offset at session start, all "official" numbers computed server-side in one clock frame.</strong> A quick ping/pong at connection time (client sends its clock, server echoes with its own, client derives an NTP-style offset with ±RTT/2 uncertainty — plenty precise for a latency <em>display</em>, not a scientific benchmark). The client then reports "playback started at client-time T" back to the backend, which converts that using the stored offset and computes the full per-stage breakdown itself — so every number the UI shows was computed in a single consistent clock, not stitched together from two clocks per message.</span>
+      </div>
+      <div role="alert" class="alert alert-success alert-soft text-sm">
+        <span><strong>Realtime mode needs none of this</strong> — an accidental upside of the backend being off the audio path (ticket 03): both measurable timestamps (speech-stopped signal, audio-playing state) happen in the same browser clock, no client/server reconciliation required at all.</span>
+      </div>
+
+      <div class="rounded-box border border-base-300 bg-base-100 p-4 text-sm space-y-2">
+        <p class="font-medium">Disadvantages, and what a network issue does to this <span class="badge badge-ghost badge-xs ml-1">answering your question</span></p>
+        <p class="text-base-content/70"><strong>Real disadvantage: a one-time offset can go stale over a long session.</strong> Computer clocks drift — gain or lose milliseconds over time — and the brief's own stability benchmark is a <em>5-minute</em> session, long enough for drift to actually accumulate into visible error by the end. <strong>Amending the recommendation</strong>: re-run the ping/pong every 30s (confirmed), not purely once at session start, and always after any reconnect (ties directly into <span class="font-mono">Stability: reconnection, drift, memory</span>, ticket 13 — which should own the reconnect trigger, this ticket owns re-running the offset calculation when that trigger fires).</p>
+        <p class="text-base-content/70"><strong>Network issue mid-segment</strong> (your specific question): a transient hiccup during a segment's processing shows up as an inflated stage latency in the measurement — that's the instrumentation doing its job correctly, not a flaw to fix. A dropped/delayed <span class="font-mono">latency</span> message itself just means that one number doesn't appear in the UI for that segment — acceptable graceful degradation, since these are diagnostic-only messages, not on the actual translation pipeline's critical path (losing one doesn't break interpretation, only the diagnostic display for that data point). A network issue severe enough to actually drop the WebSocket connection is the harder case ticket 13 owns — and per the point above, offset resync needs to be part of that reconnect flow, not assumed to still be valid.</p>
+        <p class="text-base-content/70"><strong>Also a real disadvantage even without drift or reconnects:</strong> the offset math assumes a roughly symmetric network path (upload and download latency similar) — on an asymmetric connection (common on many home/mobile networks) the one-shot offset carries a bias for the entire session. Periodic resync partially mitigates this too, since it gives more samples to average, though it doesn't eliminate the assumption itself.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Question 3 -->
+  <section class="card card-border border-primary bg-base-200 shadow-lg">
+    <div class="card-body space-y-4">
+      <div class="flex items-center gap-2">
+        <span class="badge badge-warning badge-soft">question 3 of 3</span>
+        <h2 class="card-title">What shows in the UI?</h2>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="table table-zebra table-sm">
+          <thead><tr><th>Mode</th><th>Display</th><th>Basis</th></tr></thead>
+          <tbody>
+            <tr><td>Cascade</td><td>Per-stage running-total table (speech end → translation → TTS → playback), live-updating per segment, vs. the &lt;2s target</td><td>Pipecat's stage → measured-contribution → running-total pattern (ticket 12's research)</td></tr>
+            <tr><td>Realtime</td><td>End-to-end number only, vs. the &lt;1.5s target</td><td>No sub-stage visibility exists to show (see question 1)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div role="alert" class="alert alert-info alert-soft text-sm">
+        <span><strong>The aggregation unit ticket 12's research flagged as needed is already solved</strong> — Pipecat's hierarchy uses "turn" as its unit; this project's equivalent is <span class="font-mono">segmentId</span>, already threaded through every message in ticket 05's protocol. No new concept needed, just reuse what's there.</span>
+      </div>
+      <div class="rounded-box border border-base-300 bg-base-100 p-4 text-sm">
+        <p class="font-medium mb-1">Message shape — builds directly on ticket 05's protocol example</p>
+        <p class="text-base-content/70">Ticket 05 already sketched <span class="font-mono">{"type":"latency","segmentId":"seg-42","stage":"stt_to_translation","ms":340}</span>. Enumerating the actual stage values needed, sent incrementally as each is crossed (not bundled at the end, so the UI populates live): <span class="font-mono">speech_end</span> (always 0, the reference point), <span class="font-mono">translation_first_token</span>, <span class="font-mono">translation_complete</span>, <span class="font-mono">tts_first_byte</span>, <span class="font-mono">playback_start</span> (final — this is the brief's "speech end → first audio out" number). Each <span class="font-mono">ms</span> value is cumulative elapsed-since-speech_end, matching the running-total table shape directly, not a delta from the previous stage.</p>
+      </div>
+
+      <div class="rounded-box border border-base-300 bg-base-100 p-4 text-sm space-y-3">
+        <p class="font-medium">Concrete example — spotting the bottleneck stage <span class="badge badge-ghost badge-xs ml-1">answering your question</span></p>
+        <p class="text-base-content/70">Yes — this is exactly the point of showing cumulative values per stage rather than just one end-to-end number. Illustrative example for one segment:</p>
+        <div class="overflow-x-auto">
+          <table class="table table-xs">
+            <thead><tr><th>Stage</th><th class="text-right">Cumulative</th><th class="text-right">This stage took</th></tr></thead>
+            <tbody>
+              <tr><td>Speech end</td><td class="text-right font-mono">0ms</td><td class="text-right text-base-content/50">—</td></tr>
+              <tr><td>Translation: first token</td><td class="text-right font-mono">150ms</td><td class="text-right font-mono">150ms</td></tr>
+              <tr class="bg-warning/10"><td>Translation: complete</td><td class="text-right font-mono">400ms</td><td class="text-right font-mono font-semibold">250ms ← biggest single contributor</td></tr>
+              <tr><td>TTS: first byte</td><td class="text-right font-mono">600ms</td><td class="text-right font-mono">200ms</td></tr>
+              <tr><td>Playback start</td><td class="text-right font-mono">650ms</td><td class="text-right font-mono">50ms</td></tr>
+              <tr class="font-semibold"><td>Total vs. 2000ms target</td><td class="text-right font-mono">650ms</td><td class="text-right text-success">well under budget</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="text-base-content/70">The UI computes "this stage took" as the delta between consecutive cumulative values on the fly (cumulative is what's transmitted, per-stage deltas are a display-layer calculation) — highlighting the largest delta makes the bottleneck visually obvious per segment, and tracking it across many segments over a session would show whether one stage (e.g. translation, if it's consistently the largest) is the systematic thing worth optimizing first.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Input -->
+  <section class="card card-border bg-base-200">
+    <div class="card-body space-y-4">
+      <h2 class="card-title">Your call</h2>
+      <form data-lavish-question="ticket08" class="space-y-3" onsubmit="event.preventDefault();
+        const fd = new FormData(event.currentTarget);
+        const choice = fd.get('reaction');
+        const note = (fd.get('note') || '').toString().trim();
+        if (!choice) return;
+        const labels = { agree: 'Agree with the design as described', changes: 'Needs changes — see note' };
+        let msg = 'Ticket 08 decision: ' + labels[choice];
+        if (note) msg += ' — note: ' + note;
+        window.lavish.queuePrompt(msg, { tag: 'choice', text: 'Ticket 08: ' + labels[choice], element: event.currentTarget, data: { question: 'ticket08', choice, note } });
+        document.getElementById('queued-confirm').classList.remove('hidden');
+      ">
+        <fieldset class="fieldset">
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary">
+            <input type="radio" name="reaction" value="agree" class="radio radio-primary" checked />
+            <span class="font-medium">Agree with the design as described</span>
+          </label>
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary mt-2">
+            <input type="radio" name="reaction" value="changes" class="radio radio-primary" />
+            <span class="font-medium">Needs changes — explain below</span>
+          </label>
+        </fieldset>
+        <textarea name="note" class="textarea textarea-bordered w-full" placeholder="Optional: anything to add, qualify, or push back on"></textarea>
+        <button type="submit" class="btn btn-primary">Queue this answer</button>
+        <p id="queued-confirm" class="text-sm text-success hidden">Queued — press Send to Agent (or Send &amp; End) in the top bar to deliver it.</p>
+      </form>
+    </div>
+  </section>
+
+  <div role="alert" class="alert alert-success shadow-lg">
+    <span>✓ <strong>Ticket 08 resolved</strong> — agreed. Written back to the wayfinder map, plus a follow-up amendment to ticket 05 (endpointing bump + segmentation-mode toggle).</span>
+  </div>
+
+</main>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.15.0/dist/mermaid.esm.min.mjs";
+  const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  const paint = document.createElement("canvas").getContext("2d");
+  function toRgba(color) {
+    paint.clearRect(0, 0, 1, 1);
+    paint.fillStyle = "#000";
+    paint.fillStyle = color;
+    paint.fillRect(0, 0, 1, 1);
+    return paint.getImageData(0, 0, 1, 1).data;
+  }
+  function compositeRgba(foreground, background) {
+    const foregroundAlpha = foreground[3] / 255;
+    const backgroundAlpha = background[3] / 255;
+    const alpha = foregroundAlpha + backgroundAlpha * (1 - foregroundAlpha);
+    if (alpha === 0) return [0, 0, 0, 0];
+    return [
+      (foreground[0] * foregroundAlpha + background[0] * backgroundAlpha * (1 - foregroundAlpha)) / alpha,
+      (foreground[1] * foregroundAlpha + background[1] * backgroundAlpha * (1 - foregroundAlpha)) / alpha,
+      (foreground[2] * foregroundAlpha + background[2] * backgroundAlpha * (1 - foregroundAlpha)) / alpha,
+      alpha * 255,
+    ];
+  }
+  function pageIsDark() {
+    const root = document.documentElement;
+    const rootBackground = toRgba(getComputedStyle(root).backgroundColor);
+    const bodyBackground = document.body ? toRgba(getComputedStyle(document.body).backgroundColor) : [0, 0, 0, 0];
+    const [r, g, b, a] = compositeRgba(bodyBackground, rootBackground);
+    if (a > 0) {
+      return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.5;
+    }
+    const colorScheme = getComputedStyle(root).colorScheme;
+    if (colorScheme.includes("dark") && !colorScheme.includes("light")) return true;
+    if (colorScheme.includes("light") && !colorScheme.includes("dark")) return false;
+    return darkQuery.matches;
+  }
+  const diagrams = [...document.querySelectorAll(".mermaid")].map((el) => ({ el, src: el.textContent }));
+  let applied;
+  let rendering = false;
+  let queued = false;
+  function queueRender() {
+    queued = true;
+    if (rendering) return;
+    void render();
+  }
+  async function render() {
+    rendering = true;
+    try {
+      while (queued) {
+        queued = false;
+        const theme = pageIsDark() ? "dark" : "default";
+        if (theme === applied) continue;
+        mermaid.initialize({ startOnLoad: false, theme, securityLevel: "strict" });
+        for (const { el, src } of diagrams) {
+          el.removeAttribute("data-processed");
+          el.textContent = src;
+        }
+        try {
+          await mermaid.run({ nodes: diagrams.map((d) => d.el) });
+        } catch (error) {
+          console.error("Mermaid diagram render failed:", error);
+          return;
+        }
+        applied = theme;
+      }
+    } finally {
+      rendering = false;
+      if (queued) queueRender();
+    }
+  }
+  if (document.readyState === "complete") queueRender();
+  else window.addEventListener("load", queueRender, { once: true });
+  const themeObserver = new MutationObserver(queueRender);
+  for (const el of [document.documentElement, document.body]) {
+    if (!el) continue;
+    themeObserver.observe(el, { attributes: true, attributeFilter: ["data-theme", "class", "style"] });
+  }
+  document.addEventListener("change", queueRender, true);
+  document.addEventListener("transitionend", ({ propertyName }) => { if (propertyName === "background-color") queueRender(); }, true);
+  darkQuery.addEventListener("change", queueRender);
+</script>
+
+</body>
+</html>

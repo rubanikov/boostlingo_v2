@@ -86,7 +86,10 @@ of build effort.
   this pipeline (its separate "Dubbing" product does, deliberately not used — collapses
   provider-swap points and isn't built for streaming). **Amended by ticket 06**: protocol
   now carries a `speaker` field, and `start_session` configures a language *pair* rather
-  than a fixed direction (see below).
+  than a fixed direction (see below). **Amended by ticket 08**: `endpointing` bumped
+  300ms → 500ms (natural thinking-pauses were getting cut prematurely); new configurable
+  segmentation mode (hybrid race, default, vs. LLM-priority with `UtteranceEnd` as a hard
+  ceiling) added for empirical A/B testing in the comparison write-up.
 - [Test dataset & translation-quality testing](issues/14-test-dataset-translation-quality.md)
   — extends ticket 11's WER dataset to also cover translation quality, which WER doesn't
   touch. Dataset: ~15-20 varied everyday-conversation items (domain-agnostic — corrected
@@ -130,6 +133,15 @@ of build effort.
   compressed/adaptive-video streaming, not raw-PCM low-latency voice). Gotchas pinned:
   tie `AudioContext` resume to the mic-permission user gesture; catch `NotAllowedError`
   by name for ticket 10's mic-permission-denied case.
+- [Latency instrumentation design](issues/08-latency-instrumentation-design.md) — genuinely
+  **asymmetric by mode**: Cascade gets a full per-stage running-total table (server owns
+  every stage), Realtime gets end-to-end only (backend off the audio path, no sub-stage
+  visibility exists) — framed as a real finding for the controllability comparison, not
+  hidden. Clock sync: offset re-computed every 30s (not just once — clocks drift over the
+  5-minute stability session) plus after any reconnect (ties into ticket 13). Message
+  shape extends ticket 05's protocol example with the full stage set. **Triggered an
+  amendment to ticket 05** (see above): `endpointing` 300ms→500ms, plus a new
+  hybrid-race-vs-LLM-priority segmentation toggle for empirical testing.
 
 _(stack/deadline/deployment-target/held-provider-accounts were settled by direct
 conversation before charting and are captured in Notes above, not as tickets)_
