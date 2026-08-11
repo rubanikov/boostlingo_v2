@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en" data-theme="luxury">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ticket 14 — Test Dataset & Translation Quality</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex) > *,
+  :where([style*="display: grid"], [style*="display:grid"], [style*="display: flex"], [style*="display:flex"]) > * {
+    min-width: 0;
+  }
+  :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, figcaption, td, th, .badge, .label) {
+    overflow-wrap: anywhere;
+  }
+  :where(img, svg, video, canvas, iframe) { max-width: 100%; height: auto; }
+  body { background: var(--color-base-100); }
+  .crux-box {
+    border: 1px solid color-mix(in oklch, var(--color-warning) 40%, transparent);
+    background: color-mix(in oklch, var(--color-warning) 8%, var(--color-base-100));
+  }
+</style>
+</head>
+<body class="min-h-screen bg-base-100 text-base-content">
+<main class="mx-auto max-w-5xl p-6 lg:p-10 space-y-10">
+
+  <div class="text-sm breadcrumbs px-0">
+    <ul>
+      <li>AI Interpreter Workbench</li>
+      <li>Wayfinder map</li>
+      <li>Ticket 14</li>
+    </ul>
+  </div>
+
+  <header class="hero bg-base-200 rounded-box">
+    <div class="hero-content flex-col items-start text-left py-8">
+      <span class="badge badge-warning badge-soft mb-2">grilling · claimed · in progress</span>
+      <h1 class="text-3xl lg:text-4xl font-bold">Test Dataset &amp; Translation-Quality Testing</h1>
+      <p class="py-2 max-w-3xl text-base-content/80">
+        Ticket 11 already decided <em>how</em> to test STT accuracy (WER). This ticket decides what the shared
+        test dataset actually contains, and how — or whether — to test <em>translation</em> quality, which WER
+        doesn't touch at all.
+      </p>
+    </div>
+  </header>
+
+  <!-- The gap -->
+  <div role="alert" class="alert alert-warning alert-soft">
+    <span><strong>The gap WER leaves open:</strong> WER only measures whether Deepgram transcribed the right <em>words</em> in the source language. It says nothing about whether the translation stage produced a correct, fluent target-language sentence. The brief names "interpretation quality (subjective + WER)" as a Key Impact Metric — WER is one half of that; nothing in the map yet covers the "subjective" half in a repeatable way.</span>
+  </div>
+
+  <div class="rounded-box border border-base-300 bg-base-100 p-4 text-sm space-y-2">
+    <p class="font-medium">What WER actually is <span class="badge badge-ghost badge-xs ml-1">explaining, per your question</span></p>
+    <p class="text-base-content/70">Word Error Rate = (Substitutions + Deletions + Insertions) ÷ (words in the correct reference text) — a Substitution is a word Deepgram heard as the wrong word, a Deletion is a word it missed entirely, an Insertion is a word it hallucinated that was never spoken. Computed by aligning Deepgram's output against the known-correct source text with an edit-distance algorithm (<span class="font-mono">jiwer</span> does this). 0% = perfect transcription; lower is better.</p>
+    <p class="text-base-content/70"><strong>Does the recommended dataset (question 1) cover it?</strong> Yes — WER needs exactly what "varied everyday conversation" already is: known source-language sentences, TTS-generated into audio, fed through Deepgram, scored against that known text. It's the <em>same</em> dataset serving double duty: WER checks Deepgram's output against the source text; this ticket's new translation-quality check runs on what comes out the other end of the pipeline, from that same source text. One dataset, two measurement points.</p>
+  </div>
+  </div>
+
+  <!-- Current state -->
+  <section class="space-y-3">
+    <h2 class="text-xl font-semibold">Current state — from ticket 11</h2>
+    <div class="card card-border bg-base-100">
+      <div class="card-body">
+        <p class="text-sm text-base-content/70">TTS-generate ~10–15 known sentences per language (EN, ES), run through STT, score against known source text via edit-distance (<span class="font-mono">jiwer</span>). Plus a Playwright fake-mic E2E test and a noise-rejection case. Fully automated, per decision.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Question 1 -->
+  <section class="card card-border border-primary bg-base-200 shadow-lg">
+    <div class="card-body space-y-4">
+      <div role="alert" class="alert alert-warning alert-soft text-sm">
+        <span><strong>Correction:</strong> the brief never names a specific domain (healthcare/legal/etc.) — it only says Boostlingo "connects people who need language interpretation with professional human interpreters." My earlier framing assumed a domain the brief doesn't actually state. Reframed below around general street conversation instead.</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="badge badge-warning badge-soft">question 1 of 3</span>
+        <h2 class="card-title">What should the shared dataset actually contain?</h2>
+      </div>
+      <div class="grid sm:grid-cols-3 gap-4 text-sm">
+        <div class="card card-border bg-base-100">
+          <div class="card-body">
+            <h3 class="font-medium text-base-content/80">Minimal — a few clean sentences</h3>
+            <p class="text-base-content/70 mt-1">Simple, grammatically tidy sentences. Fastest to build, but doesn't stress-test how the pipeline handles natural speech — filler words, contractions, casual phrasing, mid-sentence corrections.</p>
+          </div>
+        </div>
+        <div class="card card-border border-primary bg-base-100 shadow">
+          <div class="card-body">
+            <h3 class="font-medium text-base-content/80">Varied everyday conversation <span class="badge badge-primary badge-xs ml-1">recommended</span></h3>
+            <p class="text-base-content/70 mt-1">~15-20 short items: greetings, questions, requests, casual asides, a couple of contractions/filler words ("um," "you know") — general street conversation, no assumed professional domain. <strong>Updated per feedback:</strong> also folds in 2-3 longer, multi-clause sentences into the same set (not a separate dataset) — e.g. a run-on sentence with a mid-thought correction — so segmentation gets stress-tested for free within the one varied corpus, instead of needing a dedicated long-sentences-only set.</p>
+          </div>
+        </div>
+        <div class="card card-border bg-base-100">
+          <div class="card-body">
+            <h3 class="font-medium text-base-content/80">Long/complex sentences only</h3>
+            <p class="text-base-content/70 mt-1">Multi-clause sentences throughout, as the entire set. Now redundant with the recommended option above, which already includes a few — kept here only if you want a dedicated stress set instead of folding it in.</p>
+          </div>
+        </div>
+      </div>
+      <div role="alert" class="alert alert-info alert-soft text-sm">
+        <span>Also recommending: include 2-3 longer <strong>multi-turn conversation snippets</strong> (not just single sentences) — general street conversation like making weekend plans, asking for directions, or a casual complaint about a delayed order. These exercise the segmentation-boundary logic from ticket 05 (does the LLM-hybrid cut clauses sensibly across a real back-and-forth?) and double as ready-made material for the 5-minute stability test (ticket 13), instead of building separate content for each.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Question 2 -->
+  <section class="card card-border border-primary bg-base-200 shadow-lg">
+    <div class="card-body space-y-4">
+      <div class="flex items-center gap-2">
+        <span class="badge badge-warning badge-soft">question 2 of 3</span>
+        <h2 class="card-title">How do we test translation quality?</h2>
+      </div>
+      <p class="text-sm text-base-content/70">The brief says "subjective + WER" — not BLEU/COMET or other automated MT metrics. That's a real signal about scope, not just an omission.</p>
+      <div class="grid sm:grid-cols-3 gap-4 text-sm">
+        <div class="card card-border bg-base-100">
+          <div class="card-body">
+            <h3 class="font-medium text-base-content/80">Manual review only</h3>
+            <p class="text-base-content/70 mt-1">You read/listen to outputs and judge quality by hand for the write-up. Zero build cost, but not repeatable — can't catch a regression between two runs automatically.</p>
+          </div>
+        </div>
+        <div class="card card-border border-primary bg-base-100 shadow">
+          <div class="card-body">
+            <h3 class="font-medium text-base-content/80">+ LLM-as-judge <span class="badge badge-primary badge-xs ml-1">recommended</span></h3>
+            <p class="text-base-content/70 mt-1">Manual review stays primary, plus a cheap automated supplement: feed source + translated text to a capable LLM, ask it to rate accuracy/fluency 1-5 and flag mistranslations. One extra API call per test item — matches the brief's "subjective" framing since it's a judgment call, just an automatable one.</p>
+          </div>
+        </div>
+        <div class="card card-border bg-base-100">
+          <div class="card-body">
+            <h3 class="font-medium text-base-content/80">Full MT metrics (BLEU/COMET)</h3>
+            <p class="text-base-content/70 mt-1">Standard MT-research rigor — reference translations, automated scoring pipeline. Real build cost for a metric the brief never asked for; over-engineering relative to "subjective."</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="rounded-box border border-base-300 bg-base-100 p-4 text-sm space-y-3">
+        <p class="font-medium">What BLEU and COMET actually are <span class="badge badge-ghost badge-xs ml-1">explaining, per your question</span></p>
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div>
+            <p class="font-medium text-base-content/80">BLEU (2002, the classic one)</p>
+            <p class="text-base-content/70 mt-1">You first need a <strong>human-written "reference" translation</strong> for every source sentence — the "correct answer." BLEU then counts how many overlapping word-sequences (1-word, 2-word, 3-word, 4-word chunks) the machine's translation shares with that reference, with a penalty if the machine translation is suspiciously short. Output is a 0-100 score — higher means more word-for-word overlap with the reference.</p>
+            <p class="text-base-content/60 mt-1"><strong>Weakness:</strong> purely mechanical word-matching. A perfectly good translation that just phrases things differently than the reference gets punished for "not matching," even though a human would call it correct.</p>
+          </div>
+          <div>
+            <p class="font-medium text-base-content/80">COMET (2020, the modern one)</p>
+            <p class="text-base-content/70 mt-1">A small neural model, pre-trained on thousands of real human quality ratings, that reads the source sentence, the machine translation, and (usually) a reference, then predicts the score a human rater would likely give. Because it understands meaning rather than just matching words, it correctly rewards valid paraphrases BLEU would wrongly penalize.</p>
+            <p class="text-base-content/60 mt-1"><strong>Weakness:</strong> still generally needs that same human-written reference translation per sentence — the model just scores against it more intelligently.</p>
+          </div>
+        </div>
+        <p class="text-base-content/60">The real cost either way isn't running the metric — it's <strong>writing a correct human reference translation for every single test sentence first</strong>, which is exactly the extra work the "manual + LLM-as-judge" option above avoids, since an LLM judge can rate a translation directly without needing a pre-written reference to compare against.</p>
+      </div>
+
+      <div role="alert" class="alert alert-success alert-soft text-sm">
+        <span><strong>Which one actually helps improve quality, not just measure it? <span class="badge badge-ghost badge-xs">per your question</span></strong> — LLM-as-judge, and by a clear margin. Prompt it to explain <em>what's wrong</em>, not just output a score ("lost the conditional tense," "translation is too formal for a casual complaint," "dropped the negation entirely") — that's directly actionable in a way a BLEU/COMET number never is; those just tell you quality moved, not why. Manual review gives the deepest nuance but doesn't scale — you can't run it after every prompt tweak. BLEU/COMET are built for tracking aggregate trends across hundreds or thousands of examples in a research pipeline; on a ~15-20 item dataset there isn't enough volume for the number to be statistically meaningful anyway. LLM-as-judge is the one that's both repeatable <em>and</em> gives you something to act on.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Question 3 -->
+  <section class="card card-border border-primary bg-base-200 shadow-lg">
+    <div class="card-body space-y-4">
+      <div class="flex items-center gap-2">
+        <span class="badge badge-warning badge-soft">question 3 of 3</span>
+        <h2 class="card-title">One shared dataset across both modes?</h2>
+      </div>
+      <div role="alert" class="alert alert-info alert-soft text-sm">
+        <span><strong>Recommendation: yes.</strong> Run the exact same corpus through both Realtime and Cascade modes. The brief's comparison write-up needs an apples-to-apples read on latency/quality/cost between the two architectures — that's only a fair comparison if both modes are tested against identical input. A second, mode-specific dataset would just be extra build time for a weaker comparison.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Input -->
+  <section class="card card-border bg-base-200">
+    <div class="card-body space-y-4">
+      <h2 class="card-title">Your call</h2>
+      <form data-lavish-question="ticket14" class="space-y-4" onsubmit="event.preventDefault();
+        const fd = new FormData(event.currentTarget);
+        const composition = fd.get('composition');
+        const quality = fd.get('quality');
+        const shared = fd.get('shared');
+        const note = (fd.get('note') || '').toString().trim();
+        if (!composition || !quality || !shared) return;
+        const compLabels = { varied: 'Varied everyday conversation (recommended)', minimal: 'Minimal — a few clean sentences', complex: 'Long/complex sentences only' };
+        const qualLabels = { judge: 'Manual + LLM-as-judge (recommended)', manual: 'Manual review only', full: 'Full MT metrics (BLEU/COMET)' };
+        const sharedLabels = { yes: 'Yes, one shared dataset across both modes', no: 'No, separate datasets per mode' };
+        let msg = 'Ticket 14 decisions: dataset composition = ' + compLabels[composition] + '; translation-quality method = ' + qualLabels[quality] + '; shared across modes = ' + sharedLabels[shared];
+        if (note) msg += ' — note: ' + note;
+        window.lavish.queuePrompt(msg, { tag: 'choice', text: 'Ticket 14: ' + compLabels[composition] + ' / ' + qualLabels[quality] + ' / ' + sharedLabels[shared], element: event.currentTarget, data: { question: 'ticket14', composition, quality, shared, note } });
+        document.getElementById('queued-confirm').classList.remove('hidden');
+      ">
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">Dataset composition</legend>
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary">
+            <input type="radio" name="composition" value="varied" class="radio radio-primary" checked />
+            <span class="font-medium">Varied everyday conversation <span class="badge badge-primary badge-xs ml-1">recommended</span></span>
+          </label>
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary mt-2">
+            <input type="radio" name="composition" value="minimal" class="radio radio-primary" />
+            <span class="font-medium">Minimal — a few clean sentences</span>
+          </label>
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary mt-2">
+            <input type="radio" name="composition" value="complex" class="radio radio-primary" />
+            <span class="font-medium">Long/complex sentences only</span>
+          </label>
+        </fieldset>
+
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">Translation-quality methodology</legend>
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary">
+            <input type="radio" name="quality" value="judge" class="radio radio-primary" checked />
+            <span class="font-medium">Manual + LLM-as-judge <span class="badge badge-primary badge-xs ml-1">recommended</span></span>
+          </label>
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary mt-2">
+            <input type="radio" name="quality" value="manual" class="radio radio-primary" />
+            <span class="font-medium">Manual review only</span>
+          </label>
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary mt-2">
+            <input type="radio" name="quality" value="full" class="radio radio-primary" />
+            <span class="font-medium">Full MT metrics (BLEU/COMET)</span>
+          </label>
+        </fieldset>
+
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">Shared across modes?</legend>
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary">
+            <input type="radio" name="shared" value="yes" class="radio radio-primary" checked />
+            <span class="font-medium">Yes, one shared dataset <span class="badge badge-primary badge-xs ml-1">recommended</span></span>
+          </label>
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary mt-2">
+            <input type="radio" name="shared" value="no" class="radio radio-primary" />
+            <span class="font-medium">No, separate per mode</span>
+          </label>
+        </fieldset>
+
+        <textarea name="note" class="textarea textarea-bordered w-full" placeholder="Optional: anything to add, qualify, or push back on"></textarea>
+        <button type="submit" class="btn btn-primary">Queue this answer</button>
+        <p id="queued-confirm" class="text-sm text-success hidden">Queued — press Send to Agent (or Send &amp; End) in the top bar to deliver it.</p>
+      </form>
+    </div>
+  </section>
+
+  <div role="alert" class="alert alert-success shadow-lg">
+    <span>✓ <strong>Ticket 14 resolved.</strong> Dataset: varied everyday conversation (~15-20 items, no assumed domain, folds in a few long/complex sentences). Translation quality: manual review + LLM-as-judge. One shared dataset across both modes. Written back to the wayfinder map.</span>
+  </div>
+
+</main>
+</body>
+</html>

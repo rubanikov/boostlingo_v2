@@ -84,6 +84,16 @@ of build effort.
   worth confirming by ear once built. Also recorded: ElevenLabs does not translate in
   this pipeline (its separate "Dubbing" product does, deliberately not used — collapses
   provider-swap points and isn't built for streaming).
+- [Test dataset & translation-quality testing](issues/14-test-dataset-translation-quality.md)
+  — extends ticket 11's WER dataset to also cover translation quality, which WER doesn't
+  touch. Dataset: ~15-20 varied everyday-conversation items (domain-agnostic — corrected
+  an earlier unsupported healthcare/legal assumption mid-session), folding in a few
+  long/complex sentences plus 2-3 multi-turn snippets reused for
+  [Stability: reconnection, drift, memory](issues/13-stability-reconnection-drift-memory.md).
+  Translation quality: manual review + LLM-as-judge (explains *what's* wrong, not just a
+  score — more actionable than BLEU/COMET, and those need a hand-written reference
+  translation per sentence anyway). One shared dataset runs through both modes for a fair
+  comparison in the write-up.
 
 _(stack/deadline/deployment-target/held-provider-accounts were settled by direct
 conversation before charting and are captured in Notes above, not as tickets)_
