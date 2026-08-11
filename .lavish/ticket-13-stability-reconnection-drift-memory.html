@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en" data-theme="luxury">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ticket 13 — Stability: Reconnection, Drift, Memory</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex) > *,
+  :where([style*="display: grid"], [style*="display:grid"], [style*="display: flex"], [style*="display:flex"]) > * {
+    min-width: 0;
+  }
+  :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, figcaption, td, th, .badge, .label) {
+    overflow-wrap: anywhere;
+  }
+  :where(img, svg, video, canvas, iframe) { max-width: 100%; height: auto; }
+  body { background: var(--color-base-100); }
+</style>
+</head>
+<body class="min-h-screen bg-base-100 text-base-content">
+<main class="mx-auto max-w-5xl p-6 lg:p-10 space-y-10">
+
+  <div class="text-sm breadcrumbs px-0">
+    <ul>
+      <li>AI Interpreter Workbench</li>
+      <li>Wayfinder map</li>
+      <li>Ticket 13 — final ticket on the map</li>
+    </ul>
+  </div>
+
+  <header class="hero bg-base-200 rounded-box">
+    <div class="hero-content flex-col items-start text-left py-8">
+      <span class="badge badge-warning badge-soft mb-2">grilling · claimed · in progress</span>
+      <h1 class="text-3xl lg:text-4xl font-bold">Stability: Reconnection, Drift, Memory</h1>
+      <p class="py-2 max-w-3xl text-base-content/80">
+        The last decision on the map. Three sub-questions, and two of them turn out to already be answered by
+        earlier decisions — this ticket mostly wires those together rather than inventing new mechanisms.
+      </p>
+    </div>
+  </header>
+
+  <!-- Question 1 -->
+  <section class="card card-border border-primary bg-base-200 shadow-lg">
+    <div class="card-body space-y-4">
+      <div class="flex items-center gap-2">
+        <span class="badge badge-warning badge-soft">question 1 of 3</span>
+        <h2 class="card-title">Reconnection — what happens when a connection drops mid-session?</h2>
+      </div>
+
+      <div class="grid sm:grid-cols-2 gap-4 text-sm">
+        <div class="card card-border bg-base-100">
+          <div class="card-body">
+            <h3 class="font-medium text-base-content/80">Backend ↔ Provider (Deepgram/ElevenLabs)</h3>
+            <p class="text-base-content/70 mt-1">Backend detects the drop, attempts reconnect with backoff (500ms → 1s → 2s, capped), <strong>without tearing down the browser↔backend WebSocket</strong> — transparent where possible. Any segment in flight when the drop happens is dropped and logged (ticket 10's "scoped to one segment" philosophy extended here, not a new rule). If reconnect attempts are exhausted, this <strong>reuses ticket 10's circuit breaker</strong> — the same "something structurally broken" signal, not a parallel concept.</p>
+          </div>
+        </div>
+        <div class="card card-border bg-base-100">
+          <div class="card-body">
+            <h3 class="font-medium text-base-content/80">Browser ↔ Backend</h3>
+            <p class="text-base-content/70 mt-1">The more realistic real-world failure (wifi handoff, laptop sleep) — browser attempts a short-window reconnect (a few seconds, backend keeps session state alive that long). <strong>Scoping call</strong>: full session-resumption beyond that short grace window is out of scope for the time budget — if it fails, the session ends and the user restarts manually. Named explicitly rather than silently left undefined.</p>
+          </div>
+        </div>
+      </div>
+
+      <div role="alert" class="alert alert-info alert-soft text-sm">
+        <span><strong>User sees a visible "Reconnecting…" state</strong> — the connection-status badge in ticket 09's winning layout (currently "Connected") is the natural home for this: turns yellow/amber during a reconnect attempt, without disrupting the rest of the screen. Subtle, not alarming — same pattern as Slack/Zoom's reconnect indicators.</span>
+      </div>
+
+      <div class="card card-border bg-base-100 p-4">
+        <pre class="mermaid">
+sequenceDiagram
+    participant B as Browser
+    participant BE as Backend
+    participant DG as Deepgram
+
+    Note over BE,DG: connection drops mid-session
+    BE->>B: connection_status = reconnecting
+    Note over B: badge turns amber, rest of UI undisturbed
+    loop backoff 500ms, 1s, 2s (capped)
+        BE->>DG: reconnect attempt
+    end
+    alt reconnect succeeds
+        DG-->>BE: connected
+        BE->>B: connection_status = connected
+        Note over BE: next segment proceeds normally
+    else attempts exhausted
+        Note over BE: reuses ticket 10's circuit breaker
+        BE->>B: hard failure state
+    end
+        </pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- Question 2 -->
+  <section class="card card-border border-primary bg-base-200 shadow-lg">
+    <div class="card-body space-y-4">
+      <div class="flex items-center gap-2">
+        <span class="badge badge-warning badge-soft">question 2 of 3</span>
+        <h2 class="card-title">Audio / clock drift</h2>
+      </div>
+
+      <div role="alert" class="alert alert-success alert-soft text-sm">
+        <span><strong>Clock drift (for latency display) — already answered by ticket 08.</strong> Offset re-computed every 30s, plus after any reconnect. This ticket's reconnection design (question 1) is exactly one of the resync triggers ticket 08 already specified — no new mechanism, just confirming the wiring: a reconnect event fires the same offset-resync ticket 08 defined.</span>
+      </div>
+
+      <div role="alert" class="alert alert-success alert-soft text-sm">
+        <span><strong>Audio playback drift — not actually a risk, thanks to segmentation already being decided.</strong> Web Audio API buffer-scheduling drift (accumulated floating-point error across many scheduled buffers) would only matter for one continuous unbroken playback stream lasting the whole 5 minutes. But ticket 05's segmented architecture means playback happens in short per-segment bursts with natural gaps between them — each segment's <span class="font-mono">AudioBufferSourceNode</span> chain (ticket 07) starts scheduling fresh from "now," not building on a stale multi-minute-old pointer. No accumulation within a segment (a few seconds, imperceptible) and none across segments (each starts clean). A genuine side-benefit of the segmentation decision, not something requiring new design work here.</span>
+      </div>
+
+      <div role="alert" class="alert alert-info alert-soft text-sm">
+        <span><strong>Realtime mode:</strong> WebRTC's own jitter buffer and audio pipeline is engineered specifically for long-running continuous real-time audio without drift — that's core to what WebRTC does. Nothing for this project to add.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Question 3 -->
+  <section class="card card-border border-primary bg-base-200 shadow-lg">
+    <div class="card-body space-y-4">
+      <div class="flex items-center gap-2">
+        <span class="badge badge-warning badge-soft">question 3 of 3</span>
+        <h2 class="card-title">Memory bounds</h2>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="table table-sm">
+          <thead><tr><th>What could grow</th><th>Verdict</th><th>Why / mitigation</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Transcript text history</td>
+              <td><span class="badge badge-success badge-sm">negligible</span></td>
+              <td>A 5-minute conversation is maybe 30-60 segments — a few KB of text total. Not worth engineering around at this scale.</td>
+            </tr>
+            <tr>
+              <td>Raw audio buffers (in/out)</td>
+              <td><span class="badge badge-warning badge-sm">real, but simple</span></td>
+              <td>~10MB of raw PCM over 5 minutes if never released. Fix: release each chunk's reference once sent (STT) or played (TTS) — don't push incoming chunks into an ever-growing array "for later."</td>
+            </tr>
+            <tr>
+              <td>Per-segment orchestrator state</td>
+              <td><span class="badge badge-warning badge-sm">real, but simple</span></td>
+              <td>Reset cleanly after each segment boundary fires — keep a small rolling window (last 1-2 segments) for display/debugging, not a growing list of every segment since session start.</td>
+            </tr>
+            <tr>
+              <td>WebSocket send/receive queues</td>
+              <td><span class="badge badge-info badge-sm">apply backpressure</span></td>
+              <td>If a queue exceeds a threshold under slow network, that's itself a signal worth logging — not something to let grow silently forever.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div role="alert" class="alert alert-info alert-soft text-sm">
+        <span><strong>Testable addition to ticket 10's suite</strong>, not just a design principle: run the Playwright E2E test for a full simulated 5-minute session with a simple process-memory check (e.g. via <span class="font-mono">psutil</span>) before/after, to catch leak regressions empirically rather than relying on code review alone.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Input -->
+  <section class="card card-border bg-base-200">
+    <div class="card-body space-y-4">
+      <h2 class="card-title">Your call — the last one</h2>
+      <form data-lavish-question="ticket13" class="space-y-3" onsubmit="event.preventDefault();
+        const fd = new FormData(event.currentTarget);
+        const choice = fd.get('reaction');
+        const note = (fd.get('note') || '').toString().trim();
+        if (!choice) return;
+        const labels = { agree: 'Agree with the design as described', changes: 'Needs changes — see note' };
+        let msg = 'Ticket 13 decision: ' + labels[choice];
+        if (note) msg += ' — note: ' + note;
+        window.lavish.queuePrompt(msg, { tag: 'choice', text: 'Ticket 13: ' + labels[choice], element: event.currentTarget, data: { question: 'ticket13', choice, note } });
+        document.getElementById('queued-confirm').classList.remove('hidden');
+      ">
+        <fieldset class="fieldset">
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary">
+            <input type="radio" name="reaction" value="agree" class="radio radio-primary" checked />
+            <span class="font-medium">Agree with the design as described</span>
+          </label>
+          <label class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 p-3 hover:border-primary mt-2">
+            <input type="radio" name="reaction" value="changes" class="radio radio-primary" />
+            <span class="font-medium">Needs changes — explain below</span>
+          </label>
+        </fieldset>
+        <textarea name="note" class="textarea textarea-bordered w-full" placeholder="Optional: anything to add, qualify, or push back on"></textarea>
+        <button type="submit" class="btn btn-primary">Queue this answer — completes the map</button>
+        <p id="queued-confirm" class="text-sm text-success hidden">Queued — press Send to Agent (or Send &amp; End) in the top bar to deliver it.</p>
+      </form>
+    </div>
+  </section>
+
+  <div role="alert" class="alert alert-success shadow-lg">
+    <span>✓ <strong>Ticket 13 resolved — the wayfinder map is complete.</strong> All 14 tickets on the AI Interpreter Workbench map are now resolved. Written back to the wayfinder map.</span>
+  </div>
+
+</main>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.15.0/dist/mermaid.esm.min.mjs";
+  const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  const paint = document.createElement("canvas").getContext("2d");
+  function toRgba(color) {
+    paint.clearRect(0, 0, 1, 1);
+    paint.fillStyle = "#000";
+    paint.fillStyle = color;
+    paint.fillRect(0, 0, 1, 1);
+    return paint.getImageData(0, 0, 1, 1).data;
+  }
+  function compositeRgba(foreground, background) {
+    const foregroundAlpha = foreground[3] / 255;
+    const backgroundAlpha = background[3] / 255;
+    const alpha = foregroundAlpha + backgroundAlpha * (1 - foregroundAlpha);
+    if (alpha === 0) return [0, 0, 0, 0];
+    return [
+      (foreground[0] * foregroundAlpha + background[0] * backgroundAlpha * (1 - foregroundAlpha)) / alpha,
+      (foreground[1] * foregroundAlpha + background[1] * backgroundAlpha * (1 - foregroundAlpha)) / alpha,
+      (foreground[2] * foregroundAlpha + background[2] * backgroundAlpha * (1 - foregroundAlpha)) / alpha,
+      alpha * 255,
+    ];
+  }
+  function pageIsDark() {
+    const root = document.documentElement;
+    const rootBackground = toRgba(getComputedStyle(root).backgroundColor);
+    const bodyBackground = document.body ? toRgba(getComputedStyle(document.body).backgroundColor) : [0, 0, 0, 0];
+    const [r, g, b, a] = compositeRgba(bodyBackground, rootBackground);
+    if (a > 0) {
+      return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.5;
+    }
+    const colorScheme = getComputedStyle(root).colorScheme;
+    if (colorScheme.includes("dark") && !colorScheme.includes("light")) return true;
+    if (colorScheme.includes("light") && !colorScheme.includes("dark")) return false;
+    return darkQuery.matches;
+  }
+  const diagrams = [...document.querySelectorAll(".mermaid")].map((el) => ({ el, src: el.textContent }));
+  let applied;
+  let rendering = false;
+  let queued = false;
+  function queueRender() {
+    queued = true;
+    if (rendering) return;
+    void render();
+  }
+  async function render() {
+    rendering = true;
+    try {
+      while (queued) {
+        queued = false;
+        const theme = pageIsDark() ? "dark" : "default";
+        if (theme === applied) continue;
+        mermaid.initialize({ startOnLoad: false, theme, securityLevel: "strict" });
+        for (const { el, src } of diagrams) {
+          el.removeAttribute("data-processed");
+          el.textContent = src;
+        }
+        try {
+          await mermaid.run({ nodes: diagrams.map((d) => d.el) });
+        } catch (error) {
+          console.error("Mermaid diagram render failed:", error);
+          return;
+        }
+        applied = theme;
+      }
+    } finally {
+      rendering = false;
+      if (queued) queueRender();
+    }
+  }
+  if (document.readyState === "complete") queueRender();
+  else window.addEventListener("load", queueRender, { once: true });
+  const themeObserver = new MutationObserver(queueRender);
+  for (const el of [document.documentElement, document.body]) {
+    if (!el) continue;
+    themeObserver.observe(el, { attributes: true, attributeFilter: ["data-theme", "class", "style"] });
+  }
+  document.addEventListener("change", queueRender, true);
+  document.addEventListener("transitionend", ({ propertyName }) => { if (propertyName === "background-color") queueRender(); }, true);
+  darkQuery.addEventListener("change", queueRender);
+</script>
+
+</body>
+</html>

@@ -1,5 +1,9 @@
 # AI Interpreter Workbench — Map
 
+**Status: complete — all 14 tickets resolved.** The map's job (chart the architecture and
+provider decisions needed before implementation) is done; what remains
+([Not yet specified](#not-yet-specified) below) is deliberately deferred, not unresolved.
+
 ## Destination
 
 A working AI Interpreter Workbench (Python backend, TypeScript frontend) implementing
@@ -164,6 +168,18 @@ of build effort.
   TTS-generated corpus (surfaces real noise/volume variance TTS can't, validates
   ticket 07's AGC/noise-suppression constraints), reusing the same fake-mic harness —
   no new infrastructure, supplementary/manual-tier.
+- [Stability: reconnection, drift, memory](issues/13-stability-reconnection-drift-memory.md)
+  — **the final ticket.** Two of three sub-questions were already solved by earlier
+  decisions: clock drift reuses ticket 08's 30s-resync design directly (a reconnect is
+  just one of its resync triggers), and audio playback drift isn't actually a risk
+  thanks to ticket 05's segmented architecture (each segment schedules playback fresh,
+  no multi-minute accumulation possible). Reconnection is the genuinely new piece:
+  backend↔provider drops get backoff retries without tearing down the browser
+  connection, reusing ticket 10's circuit breaker if exhausted; browser↔backend drops
+  get a short grace-window reconnect, with full session resumption beyond that
+  explicitly out of scope. Memory bounds need clean release/reset, not new
+  architecture, plus a testable addition to ticket 10's suite: a process-memory sample
+  before/after a simulated 5-minute E2E run.
 
 _(stack/deadline/deployment-target/held-provider-accounts were settled by direct
 conversation before charting and are captured in Notes above, not as tickets)_
@@ -180,10 +196,13 @@ conversation before charting and are captured in Notes above, not as tickets)_
 - Language pairs beyond the required English↔Spanish minimum — not decided whether to
   extend.
 
-_(5-minute stability handling graduated into
-[Stability: reconnection, drift, memory](issues/13-stability-reconnection-drift-memory.md)
-now that the cascade pipeline architecture is decided)_
+Both items above are deliberately deferred rather than unresolved: AWS deployment is
+scoped to happen after a working local build exists (per Destination), and the
+comparison write-up needs real data from both built pipelines before its methodology
+can be pinned down. Neither was sharp enough to ticket during this planning effort —
+revisit each when its blocking condition (a working build; real comparison data)
+actually exists.
 
 ## Out of scope
 
-_(none yet)_
+_(none)_
