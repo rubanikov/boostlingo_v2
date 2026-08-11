@@ -46,6 +46,13 @@ of build effort.
   translate endpoint doesn't stream and would blow the <2s cascade target — OpenAI vs.
   Anthropic left open for
   [Cascade pipeline architecture](issues/05-cascade-pipeline-architecture.md).
+- [STT/audio quality assurance & mic calibration strategy](issues/11-stt-quality-assurance-mic-calibration.md)
+  — level meter + VAD-state indicator + test-mic preflight in the UI; full automation
+  chosen for STT-quality testing: TTS-generated WER regression test (`jiwer`) plus a
+  Playwright fake-mic E2E test (Chrome's `--use-file-for-fake-audio-capture`) driving the
+  real capture→STT path, plus a noise-rejection case. No per-device calibration system —
+  browser-level AGC/noise-suppression + level-meter preflight instead; mic device
+  coverage is a manual pass only (laptop + one other device on hand), not automated.
 
 _(stack/deadline/deployment-target/held-provider-accounts were settled by direct
 conversation before charting and are captured in Notes above, not as tickets)_
@@ -56,8 +63,9 @@ conversation before charting and are captured in Notes above, not as tickets)_
   management, HTTPS for mic access) — depends on framework choice and a working app;
   not sharp yet.
 - Comparison write-up methodology (test scenarios, trial count, subjective-quality
-  rubric, WER measurement approach) — depends on both pipelines existing and producing
-  data; not sharp yet.
+  rubric) — depends on both pipelines existing and producing data; not sharp yet. WER
+  measurement approach itself is now settled, see
+  [STT/audio quality assurance & mic calibration strategy](issues/11-stt-quality-assurance-mic-calibration.md).
 - 5-minute stability requirement handling (reconnection strategy, drift/memory-leak
   prevention specifics) — will sharpen once the cascade pipeline architecture exists.
 - Language pairs beyond the required English↔Spanish minimum — not decided whether to

@@ -15,3 +15,7 @@ playback:
 Needs to work for both modes (Realtime and Cascade) to keep the UI mode-agnostic per the
 code-quality bar. Note current browser support/gotchas (autoplay policies, mic permission
 handling — the brief calls out mic-permission-denied as an error case to handle).
+
+Also wire in the `getUserMedia` constraints (`autoGainControl`, `noiseSuppression`,
+`echoCancellation`) and the level-meter/VAD-state UI decided in
+[STT/audio quality assurance & mic calibration strategy](11-stt-quality-assurance-mic-calibration.md).
