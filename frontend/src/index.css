@@ -1,0 +1,26 @@
+@import "tailwindcss";
+@plugin "daisyui" {
+  themes: luxury --default;
+}
+
+/*
+ * Diarized speaker treatment for Cascade-mode transcript panes (ticket 04 —
+ * per-speaker voice/badges; Cascade only, no Realtime-mode equivalent).
+ * Speaker 0 gets the blue "A" styling, speaker 1 the orange "B" styling,
+ * matching the approved prototype
+ * (.lavish/ticket-09-ui-ux-layout.html, Variant A).
+ */
+.speakerA {
+  border-left: 3px solid #38bdf8;
+}
+.speakerB {
+  border-left: 3px solid #fb923c;
+}
+.speakerA-badge {
+  background: #0c4a6e;
+  color: #e0f2fe;
+}
+.speakerB-badge {
+  background: #7c2d12;
+  color: #ffedd5;
+}
