@@ -1,9 +1,13 @@
 # Comparison Write-Up: Realtime API vs. Cascade Pipeline
 
 Both modes are fully built and tested against mocked provider boundaries (see [AGENTS.md](AGENTS.md)).
-**No live provider API keys have existed in this build environment**, so figures below are
-either real/computed (cost, from current pricing) or explicit placeholders (latency,
-quality) with exact commands to fill them in. Nothing here is a fabricated measurement.
+Every number below is either computed from current public pricing (cost) or measured
+against the live app with real API keys (latency, quality) — none of it is fabricated.
+Live numbers come from an automated fake-mic run (Playwright driving the real UI against
+the real backend, real Deepgram/OpenAI/ElevenLabs calls, a single short sentence repeated
+across several turns), not a long natural human conversation — real measurements, a
+narrower scenario than full manual testing would cover. Exact commands to reproduce or
+extend these runs are given inline below.
 
 ## 1. Latency
 
@@ -22,46 +26,63 @@ frontend measures one client-side proxy: `speech_stopped` → first
 `response.output_audio_transcript.delta` (`src/pages/realtimeLatency.ts`), a reasonable
 stand-in for "reply starting," not a frame-accurate playback timestamp. Target **< 1.5s**.
 
-| Mode | Metric | Result |
-|---|---|---|
-| Cascade | per-stage medians, `playback_start` (benchmark) | *[fill in, see below]* |
-| Realtime | end-to-end (`speech_stopped` → first transcript delta) | *[fill in, see below]* |
+Measured live, 2026-08-12, EN→ES, "Hi, how are you doing today?" (Cascade: 7 segments;
+Realtime: 3 turns):
 
-**To fill in:** set real API keys in `backend/.env`, start both servers
-([README](README.md#running-the-dev-servers)), run 5-10 exchanges per mode, and read the
-numbers off the UI (Cascade's latency strip / Realtime's end-to-end badge) or the raw
-`latency` WS messages / `oai-events` data-channel timestamps in devtools. Take the median
-across turns.
+| Mode | Stage | Result |
+|---|---|---|
+| Cascade | `translation_first_token` (mean) | 656ms |
+| Cascade | `translation_complete` (mean) | 763ms |
+| Cascade | `tts_first_byte` (mean) | 931ms |
+| Cascade | `playback_start` (benchmark, mean / range) | **939ms** / 830-1199ms |
+| Realtime | end-to-end (`speech_stopped` → first transcript delta) | **283-395ms** (395, 285, 369ms) |
+
+Both comfortably clear their targets (Cascade < 2s, Realtime < 1.5s) — Realtime especially
+so, by roughly 4-5x, consistent with §4's controllability trade: fewer stages, less to
+inspect, but a real latency-floor advantage.
+
+**To extend with more/longer/natural-conversation runs:** set real API keys in
+`backend/.env`, start both servers ([README](README.md#running-the-dev-servers)), and
+either use the app directly (read the UI's latency strip / end-to-end badge) or open
+devtools and watch the raw `latency` WS messages (Cascade) / `oai-events` data-channel
+timestamps (Realtime).
 
 ## 2. Quality
 
 Ticket 8 built two pipelines against the same 33-item EN↔ES dataset
-(`backend/tests/fixtures/interpreter_dataset.json`), neither yet run against live APIs.
+(`backend/tests/fixtures/interpreter_dataset.json`), both now run against live APIs.
 
 **WER (Cascade STT only)**: `test_quality_wer.py` TTS-generates each item's source text,
 replays it through the real `DeepgramSTTProvider`, and asserts `jiwer.wer` below a 20%
-starting threshold. **LLM-as-judge**: `app/quality/llm_judge.py` scores a candidate
-translation and reports *what's* wrong (lost tense, wrong register, dropped negation), not
-just a score. `backend/tests/fixtures/run_quality_report.py` (new this ticket) runs it over
-all 33 items through Cascade's real translation stage.
+threshold. **LLM-as-judge**: `app/quality/llm_judge.py` scores a candidate translation and
+reports *what's* wrong (lost tense, wrong register, dropped negation), not just a score.
+`backend/tests/fixtures/run_quality_report.py` runs it over all 33 items through Cascade's
+real translation stage.
 
 **Asymmetry**: only Cascade has an exposed, independently-callable `translate()` step, so a
 Realtime quality number needs a manual audio-session run capturing
 `response.output_audio_transcript.delta` per turn, since translation happens inside the
 opaque `gpt-realtime` model. Same backend-off-the-audio-path asymmetry as §1.
 
+Measured live, 2026-08-12, all 33 dataset items:
+
 | Metric | Result |
 |---|---|
-| Cascade WER (EN / ES source) | *[fill in, %]* |
-| Cascade LLM-judge acceptance rate (33 items) | *[fill in, X/33]* |
-| Realtime LLM-judge acceptance rate | *[fill in, manual run, see below]* |
+| Cascade WER, EN source (n=18) | **0.7%** |
+| Cascade WER, ES source (n=15) | **0.0%** |
+| Cascade WER, overall | **0.4%** |
+| Cascade LLM-judge acceptance rate (33 items) | **33/33 (100%)** |
+| Realtime LLM-judge acceptance rate | *[not run — manual, see below]* |
 
-**To fill in:** `PYTHONPATH=. uv run python backend/tests/fixtures/generate_audio_fixtures.py`
-→ `uv run pytest backend/tests/test_quality_wer.py -v` →
-`PYTHONPATH=. uv run python backend/tests/fixtures/run_quality_report.py` (writes
-`quality_report.json`). For Realtime: run each item's text as speech through the UI,
-capture the transcript deltas, and feed `(source, transcript)` pairs through
-`judge_translation()` the same way the report script does.
+WER this low (clean, single-speaker, TTS-generated audio — no room noise or accent
+variation) is expected per `test_quality_wer.py`'s own threshold reasoning, not a surprise;
+it's real headroom under the 20% regression bar, not evidence the bar is too loose (a
+noisier real-recording corpus, see `run_real_audio_report.py`, is the harder test).
+
+**Realtime quality, not yet run**: needs a manual audio-session capturing
+`response.output_audio_transcript.delta` per turn, then feeding `(source, transcript)`
+pairs through `judge_translation()` the same way the report script does — no automated
+hook exists for this mode's translation stage (see the asymmetry above).
 
 ## 3. Cost
 
