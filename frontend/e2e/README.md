@@ -74,6 +74,13 @@ real-speech.wav" (needs the File System Access API — Chrome/Edge — and repo
 folder access granted in that page first). It writes an already-correct
 `e2e/fixtures/real-speech.wav` directly, no `ffmpeg` step.
 
+Opening the file directly (`file://`) works in Chrome/Edge, but if prompts
+won't select or Record does nothing, some browsers block microphone access on
+`file://` pages entirely — the page itself will show a red error banner
+explaining why. Fix: from the repo root, run
+`npx --yes serve backend/tests/fixtures/real_audio` and open the
+`http://localhost:...` URL it prints instead.
+
 **Manual path**:
 
 1. Record yourself (or someone else) speaking a short EN or ES sentence —

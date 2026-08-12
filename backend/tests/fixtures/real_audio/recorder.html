@@ -4,6 +4,31 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Real Speech Recorder — AI Interpreter Workbench</title>
+<script>
+  // Registered before anything else loads (including the CDN tags below) so
+  // it catches CDN load failures and early script errors too, not just
+  // errors thrown later by our own code. Capture phase because resource
+  // load-error events (a <script> or <link> failing to fetch) don't bubble.
+  window.__recorderErrors = [];
+  function __recorderCapture(msg) {
+    window.__recorderErrors.push(msg);
+    if (window.__recorderShowFatal) window.__recorderShowFatal(msg);
+  }
+  window.addEventListener('error', (e) => {
+    const target = e.target;
+    // Only SCRIPT/LINK here (the CDN tags) — other elements (like the
+    // <audio> playback element, which starts with no src) fire spurious
+    // load-error events on page init that aren't actually failures.
+    if (target && (target.tagName === 'SCRIPT' || target.tagName === 'LINK')) {
+      __recorderCapture(`Failed to load ${target.tagName}: ${target.src || target.href}`);
+    } else if (target === window || !target) {
+      __recorderCapture(e.message || String(e.error || 'Unknown script error'));
+    }
+  }, true);
+  window.addEventListener('unhandledrejection', (e) => {
+    __recorderCapture('Unhandled error: ' + (e.reason?.message || e.reason));
+  });
+</script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css" integrity="sha384-/NNZlK8J6WoD6FfmmLzhqE1x/aTnlIJzc75uc+dFz8aI+/sD2ArUirQhs3hbeqBe" crossorigin="anonymous">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css" integrity="sha384-ai6dM6tUdx0lUGOHd8x3eGevvDdj0p+CPoJp7Ve+h+kRkt08XtqX/g3a+1cPYKCm" crossorigin="anonymous">
 <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js" integrity="sha384-v5YF9xS+gLRWdvrQ0u/WRbCkjSIH0NjHIPe8tBL1ZRrmI7PiSH6LLdzs0aAIMCuh" crossorigin="anonymous"></script>
@@ -16,6 +41,7 @@
 </style>
 </head>
 <body class="bg-base-100 text-base-content">
+<div id="fatalBanner" role="alert" class="hidden alert alert-error mx-auto max-w-6xl mt-4 mb-0 text-sm whitespace-pre-wrap"></div>
 <main class="mx-auto max-w-6xl p-4 lg:p-8 space-y-6">
 
   <header class="space-y-2">
@@ -29,6 +55,16 @@
       already the exact format the pipeline expects (mono 16-bit PCM WAV,
       16000Hz) — no <code>ffmpeg</code> conversion needed.
     </p>
+    <div id="fileProtocolNotice" role="status" class="hidden alert alert-info alert-soft text-sm">
+      <span>
+        Opened directly as a local file. This works in Chrome/Edge, but if the
+        recorder doesn't respond (prompts don't select, or Record does
+        nothing), some browsers block microphone access on <code>file://</code>
+        pages entirely. Fix: from the repo root, run
+        <code>npx --yes serve backend/tests/fixtures/real_audio</code> and
+        open the <code>http://localhost:...</code> URL it prints instead.
+      </span>
+    </div>
     <div id="folderStatus" role="alert" class="alert alert-warning alert-soft text-sm">
       <span>
         No folder access yet. Click <strong>Grant repo access</strong> below
@@ -178,6 +214,30 @@ function log(msg) {
   logEl.textContent = line + '\n' + logEl.textContent;
 }
 
+// ---- Fatal error banner -----------------------------------------------------
+// Anything that stops the recorder from working shows up here, not just in
+// the small log box below — this is what `window.onerror` (wired at the very
+// top of <head>, before the CDN tags) reports into once the DOM exists.
+const fatalBanner = document.getElementById('fatalBanner');
+window.__recorderShowFatal = (msg) => {
+  fatalBanner.textContent = msg;
+  fatalBanner.classList.remove('hidden');
+  log(`ERROR: ${msg}`);
+};
+window.__recorderErrors.forEach(window.__recorderShowFatal);
+
+if (location.protocol === 'file:') {
+  document.getElementById('fileProtocolNotice').classList.remove('hidden');
+}
+
+if (!navigator.mediaDevices?.getUserMedia) {
+  window.__recorderShowFatal(
+    'This browser will not allow microphone access on this page (navigator.mediaDevices is unavailable here). ' +
+      'Prompts can still be picked, but recording cannot work until you serve this file over http://localhost — ' +
+      'see the notice above.',
+  );
+}
+
 // ---- Prompt list UI --------------------------------------------------------
 let activePrompt = null;
 const promptListEl = document.getElementById('promptList');
@@ -244,6 +304,7 @@ function resetRecordingState() {
 }
 
 async function startRecording() {
+  fatalBanner.classList.add('hidden');
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
   sourceNode = audioContext.createMediaStreamSource(stream);
@@ -331,7 +392,24 @@ function stopRecording() {
   log(`Recorded ${activePrompt.id}: ${(totalLength / SAMPLE_RATE).toFixed(1)}s`);
 }
 
-recordBtn.addEventListener('click', () => startRecording().catch((err) => log(`Mic error: ${err.message}`)));
+const MIC_ERROR_HINTS = {
+  NotAllowedError:
+    'Microphone permission was denied. Check the permission icon in the browser address bar, and (on Windows) ' +
+    'Settings -> Privacy & security -> Microphone -> make sure your browser is allowed.',
+  NotFoundError: 'No microphone was found. Plug one in or check your OS sound input settings.',
+  NotReadableError: 'The microphone is already in use by another application.',
+  NotSupportedError:
+    'This browser/page does not support microphone access here. If you opened this file directly (file://), ' +
+    'serve it locally instead: run `npx --yes serve backend/tests/fixtures/real_audio` from the repo root and ' +
+    'open the http://localhost URL it prints.',
+};
+
+recordBtn.addEventListener('click', () =>
+  startRecording().catch((err) => {
+    const hint = MIC_ERROR_HINTS[err.name];
+    window.__recorderShowFatal(`Mic error (${err.name || 'unknown'}): ${err.message}${hint ? '\n' + hint : ''}`);
+  }),
+);
 stopBtn.addEventListener('click', stopRecording);
 reRecordBtn.addEventListener('click', resetRecordingState);
 
