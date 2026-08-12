@@ -1,0 +1,635 @@
+<title>Step 9 Gate — Ticket Breakdown</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex) > * { min-width: 0; }
+  :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, td, th, .badge, .label) { overflow-wrap: anywhere; }
+  .mermaid { display: flex; justify-content: center; }
+  html { scroll-behavior: smooth; }
+</style>
+
+<html data-theme="luxury">
+<body class="bg-base-100 text-base-content min-h-screen">
+<main class="mx-auto max-w-5xl p-6 lg:p-10 space-y-10">
+
+  <header class="space-y-3">
+    <div class="flex flex-wrap items-center gap-3">
+      <span class="badge badge-warning badge-lg">Feature Factory — Step 9 GATE</span>
+      <span class="badge badge-ghost">Draft, not yet published</span>
+    </div>
+    <h1 class="text-4xl font-bold">AI Interpreter Workbench — Vertical Ticket Breakdown</h1>
+    <p class="text-base-content/70 max-w-3xl">
+      The ticket-slicer pass read the assignment brief, the fully-resolved
+      <a class="link link-primary" href="https://github.com/rubanikov/boostlingo_v2/issues/1" target="_blank" rel="noopener">wayfinder map</a>,
+      all 14 decision tickets, and the winning UI prototype, and sliced the build into
+      <strong>9 vertical tracer-bullet tickets</strong>. Nothing has been built or published yet —
+      this is the approval gate before any code gets written.
+    </p>
+    <div class="stats stats-vertical sm:stats-horizontal shadow bg-base-200 w-full">
+      <div class="stat">
+        <div class="stat-title">Tickets</div>
+        <div class="stat-value text-primary">9</div>
+        <div class="stat-desc">2 start immediately in parallel</div>
+      </div>
+      <div class="stat">
+        <div class="stat-title">Estimated effort</div>
+        <div class="stat-value text-warning">21–24 hrs</div>
+        <div class="stat-desc">brief's soft target: 15–20 hrs</div>
+      </div>
+      <div class="stat">
+        <div class="stat-title">Waves</div>
+        <div class="stat-value">6</div>
+        <div class="stat-desc">Wave 0 → Wave 5 (capstone)</div>
+      </div>
+    </div>
+  </header>
+
+  <section role="alert" class="alert alert-warning alert-soft">
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0 stroke-current" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
+    <div>
+      <div class="font-semibold">Time-budget check: this draft runs ~1–4 hours over the brief's 15–20hr soft target.</div>
+      <div class="text-sm opacity-90">See <a class="link" href="#cuts">Cut candidates</a> below for three ranked, pre-analyzed ways to bring it back in budget — or approve as-is and treat the target as genuinely soft.</div>
+    </div>
+  </section>
+
+  <nav class="flex flex-wrap gap-2 text-sm">
+    <a href="#waves" class="btn btn-xs btn-ghost">Waves</a>
+    <a href="#wave-0" class="btn btn-xs btn-ghost">Wave 0</a>
+    <a href="#wave-1" class="btn btn-xs btn-ghost">Wave 1</a>
+    <a href="#wave-2" class="btn btn-xs btn-ghost">Wave 2</a>
+    <a href="#wave-3" class="btn btn-xs btn-ghost">Wave 3</a>
+    <a href="#wave-4" class="btn btn-xs btn-ghost">Wave 4</a>
+    <a href="#wave-5" class="btn btn-xs btn-ghost">Wave 5</a>
+    <a href="#cuts" class="btn btn-xs btn-ghost">Cut candidates</a>
+    <a href="#assumptions" class="btn btn-xs btn-ghost">Assumptions</a>
+    <a href="#decision" class="btn btn-xs btn-primary">Decision</a>
+  </nav>
+
+  <section id="waves" class="space-y-3">
+    <h2 class="text-2xl font-bold">Frontier &amp; build waves</h2>
+    <p class="text-base-content/70">Tickets 1 and 2 are independent walking skeletons — they share no runtime code, only a trivial one-time project scaffold. Everything else unlocks in waves as its blockers close.</p>
+    <div class="mermaid">
+flowchart TD
+  subgraph W0["Wave 0 - frontier, start now, parallel"]
+    T1["Ticket 1 - Realtime MVP"]
+    T2["Ticket 2 - Cascade MVP"]
+  end
+  subgraph W1["Wave 1"]
+    T3["Ticket 3 - Unified Workbench Shell"]
+  end
+  subgraph W2["Wave 2 - parallel"]
+    T4["Ticket 4 - Diarization"]
+    T6["Ticket 6 - Latency Instrumentation"]
+    T7["Ticket 7 - Error Handling and Resilience"]
+  end
+  subgraph W3["Wave 3"]
+    T5["Ticket 5 - LLM-Hybrid Segmentation"]
+  end
+  subgraph W4["Wave 4"]
+    T8["Ticket 8 - Quality Validation Suite"]
+  end
+  subgraph W5["Wave 5 - capstone"]
+    T9["Ticket 9 - Comparison Write-up"]
+  end
+
+  T1 --> T3
+  T2 --> T3
+  T3 --> T4
+  T3 --> T6
+  T3 --> T7
+  T4 --> T5
+  T4 --> T8
+  T5 --> T8
+  T6 --> T8
+  T7 --> T8
+  T6 --> T9
+  T8 --> T9
+    </div>
+    <p class="text-sm text-base-content/60">Wave 2's three tickets (Diarization, Latency, Error handling) run in parallel — the skill's own rule is to ask before exceeding 3 concurrent ticket builds, so this wave sits right at that ceiling and will be flagged again once we get there.</p>
+  </section>
+
+  <!-- ============ WAVE 0 ============ -->
+  <section id="wave-0" class="space-y-4">
+    <h2 class="text-2xl font-bold flex items-center gap-2">Wave 0 <span class="badge badge-primary">frontier — start now, parallel</span></h2>
+
+    <div class="card card-border bg-base-100 border-l-4 border-l-primary">
+      <div class="card-body">
+        <div class="flex flex-wrap items-center gap-2">
+          <h3 class="card-title">Ticket 1 — Realtime mode: voice-in/voice-out MVP</h3>
+          <span class="badge badge-success badge-soft">right-sized · ~2 hrs</span>
+        </div>
+        <div class="flex flex-wrap gap-1 text-xs">
+          <span class="badge badge-ghost">Depends on: none</span>
+        </div>
+        <div class="grid sm:grid-cols-2 gap-4 mt-2 text-sm">
+          <div>
+            <div class="font-semibold mb-1">Backend</div>
+            <p><code>POST /api/realtime/session</code> mints an ephemeral client secret server-side via OpenAI's <code>POST /v1/realtime/client_secrets</code>. Session instructions steer <code>gpt-realtime</code> to translate (turn-based) for a hardcoded EN↔ES pair.</p>
+          </div>
+          <div>
+            <div class="font-semibold mb-1">Frontend</div>
+            <p>Minimal shell: "Connect" button → mic permission → <code>RTCPeerConnection</code> direct to OpenAI (SDP offer/answer, data channel <code>oai-events</code>), <code>pc.ontrack</code> → audio element. No dual-column UI yet — that's Ticket 3.</p>
+          </div>
+        </div>
+        <details class="collapse collapse-arrow bg-base-200 mt-2">
+          <summary class="collapse-title text-sm font-medium">Acceptance criteria &amp; API notes</summary>
+          <div class="collapse-content text-sm space-y-2">
+            <ul class="list-disc list-inside space-y-1">
+              <li>Speaking English produces spoken Spanish, and vice versa, using literally <code>gpt-realtime</code> (brief calls it "required").</li>
+              <li>The real OpenAI API key never reaches the browser — only the short-lived ephemeral secret.</li>
+              <li>Speech-end → first-audio-out feels well under 1.5s by ear (formal instrumentation is Ticket 6).</li>
+              <li>Denying mic permission shouldn't crash the tab (graceful UX is Ticket 7).</li>
+            </ul>
+            <p class="text-base-content/70"><strong>Contract:</strong> browser owns the <code>RTCPeerConnection</code> directly once the ephemeral secret is issued — backend is off the audio path from that point on.</p>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <div class="card card-border bg-base-100 border-l-4 border-l-primary">
+      <div class="card-body">
+        <div class="flex flex-wrap items-center gap-2">
+          <h3 class="card-title">Ticket 2 — Cascade mode: end-to-end MVP with provider abstraction</h3>
+          <span class="badge badge-warning badge-soft">right-sized but large · ~4–5 hrs</span>
+          <span class="badge badge-info badge-soft">includes provider contract tests</span>
+        </div>
+        <div class="flex flex-wrap gap-1 text-xs">
+          <span class="badge badge-ghost">Depends on: none (parallel with Ticket 1)</span>
+        </div>
+        <div class="grid sm:grid-cols-2 gap-4 mt-2 text-sm">
+          <div>
+            <div class="font-semibold mb-1">Backend</div>
+            <p><code>providers/base.py</code> — <code>STTProvider</code> / <code>TranslationProvider</code> / <code>TTSProvider</code> as <code>Protocol</code>, structured <code>ProviderError</code>. <code>DeepgramSTTProvider</code> (WS, <code>endpointing=500</code>, real async-generator bridge over the callback SDK — the wayfinder's own prototype left this sketched, not wired), <code>OpenAITranslationProvider</code>, <code>ElevenLabsTTSProvider</code> (WS <code>stream-input</code>, TOKEN mode, explicit flush at boundaries). Orchestrator: STT → single-utterance segmentation (Deepgram <code>speech_final</code> only — LLM-hybrid is Ticket 5) → translation → TTS, one full-duplex WebSocket per session.</p>
+          </div>
+          <div>
+            <div class="font-semibold mb-1">Frontend</div>
+            <p>AudioWorklet capture (Float32→Int16 scale-and-clamp, ~20–40ms frames), minimal unstyled UI (two text blocks), Web Audio API buffer scheduling for gapless raw-PCM TTS playback.</p>
+          </div>
+        </div>
+        <details class="collapse collapse-arrow bg-base-200 mt-2">
+          <summary class="collapse-title text-sm font-medium">Why this ticket is the thickest — and why it isn't being split</summary>
+          <div class="collapse-content text-sm space-y-2">
+            <p>Considered splitting into "text pipeline" (STT→Translation) + "add TTS" — rejected because the TTS-only remainder (~1–1.5 hrs) would be too thin to justify its own orchestration overhead. The thickness matches the architecture's own inherent complexity (this pipeline is "meaningfully more engineering" than Realtime mode, per the wayfinder itself), not a slicing failure.</p>
+          </div>
+        </details>
+        <details class="collapse collapse-arrow bg-base-200 mt-2">
+          <summary class="collapse-title text-sm font-medium">Acceptance criteria &amp; API notes</summary>
+          <div class="collapse-content text-sm space-y-2">
+            <ul class="list-disc list-inside space-y-1">
+              <li>Speaking English produces a live English transcript, a live translated Spanish text block, and spoken Spanish audio out (hardcoded EN↔ES, single speaker/direction).</li>
+              <li>STT/Translation/TTS calls go only through the <code>Protocol</code> interfaces — swapping <code>ElevenLabsTTSProvider</code> should touch one file.</li>
+              <li>Silence (empty final STT) doesn't raise a <code>ProviderError</code> — it's a valid <code>is_empty=True</code> outcome.</li>
+              <li>Provider contract tests pass for all three providers: happy path + every documented failure → <code>ProviderError</code> mapping (pytest + pytest-asyncio, hand-mocked SDKs, no live network calls).</li>
+              <li>Streaming throughout — no full-utterance blocking at any stage.</li>
+            </ul>
+            <p class="text-base-content/70"><strong>Contract:</strong> one full-duplex WebSocket per session. Client → <code>start_session</code> (language pair), binary PCM frames. Server → <code>source_transcript</code>/<code>target_transcript</code> (with <code>segmentId</code>, <code>isFinal</code>), <code>segment_boundary</code> (trigger: <code>llm</code> or Deepgram signal — always Deepgram for now), <code>tts_audio_meta</code> + binary audio frame. Translation provider: OpenAI.</p>
+          </div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ WAVE 1 ============ -->
+  <section id="wave-1" class="space-y-4">
+    <h2 class="text-2xl font-bold flex items-center gap-2">Wave 1</h2>
+    <div class="card card-border bg-base-100 border-l-4 border-l-secondary">
+      <div class="card-body">
+        <div class="flex flex-wrap items-center gap-2">
+          <h3 class="card-title">Ticket 3 — Unified workbench shell: mode toggle, language selector, dual-column transcripts</h3>
+          <span class="badge badge-success badge-soft">right-sized · ~2 hrs</span>
+        </div>
+        <div class="flex flex-wrap gap-1 text-xs">
+          <span class="badge badge-ghost">Depends on: Ticket 1, Ticket 2</span>
+        </div>
+        <div class="grid sm:grid-cols-2 gap-4 mt-2 text-sm">
+          <div>
+            <div class="font-semibold mb-1">Backend</div>
+            <p>Thin — extend the session endpoint and <code>start_session</code> message to accept a real (not hardcoded) language pair.</p>
+          </div>
+          <div>
+            <div class="font-semibold mb-1">Frontend</div>
+            <p>Replace both minimal UIs with the winning layout (ticket 09, split dual-column variant): navbar with mode tabs + language selector + connection-status badge; dual-column transcript panes; mic control with level meter. Wires mid-session mode switching, reusing Ticket 1/2's transport as-is — UI consolidation, not new transport work.</p>
+          </div>
+        </div>
+        <div role="alert" class="alert alert-info alert-soft mt-2 text-sm">
+          <span><strong>Flagged assumption:</strong> the wayfinder never specifies how Realtime-mode transcripts are obtained (the native dual-transcript stream belongs to the not-chosen <code>gpt-realtime-translate</code>). Assumed standard <code>input_audio_transcription</code> + <code>response.audio_transcript.delta</code> — worth a quick primary-source check before building.</span>
+        </div>
+        <details class="collapse collapse-arrow bg-base-200 mt-2">
+          <summary class="collapse-title text-sm font-medium">Acceptance criteria</summary>
+          <div class="collapse-content text-sm">
+            <ul class="list-disc list-inside space-y-1">
+              <li>Mode switches both before a session starts and mid-session.</li>
+              <li>Language selector defaults to and supports English ↔ Spanish.</li>
+              <li>Both transcripts stream live in both modes, appended not re-rendered per token.</li>
+              <li>Mode-specific transport code (WebRTC vs. WebSocket) never leaks into shared UI components.</li>
+              <li>Connection-status badge shows "Connected" once a session is live.</li>
+            </ul>
+          </div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ WAVE 2 ============ -->
+  <section id="wave-2" class="space-y-4">
+    <h2 class="text-2xl font-bold flex items-center gap-2">Wave 2 <span class="badge badge-primary">parallel — 3 tickets, at the ask-first ceiling</span></h2>
+
+    <div class="card card-border bg-base-100 border-l-4 border-l-accent">
+      <div class="card-body">
+        <div class="flex flex-wrap items-center gap-2">
+          <h3 class="card-title">Ticket 4 — Cascade: diarization + per-speaker voice</h3>
+          <span class="badge badge-success badge-soft">right-sized · ~1.5–2 hrs</span>
+        </div>
+        <div class="flex flex-wrap gap-1 text-xs"><span class="badge badge-ghost">Depends on: Ticket 2, Ticket 3</span></div>
+        <div class="grid sm:grid-cols-2 gap-4 mt-2 text-sm">
+          <div>
+            <div class="font-semibold mb-1">Backend</div>
+            <p><code>diarize=true</code> + <code>detect_language=True</code> on Deepgram. Per-segment translation-direction resolution (of the 2 configured languages, detect which one, translate to the other — no manual toggle). Consistent speaker → ElevenLabs <code>voice_id</code> mapping. <code>speaker</code> threaded through all transcript/TTS messages.</p>
+          </div>
+          <div>
+            <div class="font-semibold mb-1">Frontend</div>
+            <p>Per-speaker color-coded badges in both transcript panes, matching each speaker's distinct TTS voice.</p>
+          </div>
+        </div>
+        <details class="collapse collapse-arrow bg-base-200 mt-2">
+          <summary class="collapse-title text-sm font-medium">Acceptance criteria &amp; open caveats</summary>
+          <div class="collapse-content text-sm space-y-2">
+            <ul class="list-disc list-inside space-y-1">
+              <li>Two people alternating in different languages each get a consistent speaker badge and correct translation direction, no manual toggle.</li>
+              <li>Each speaker is spoken back in a distinct, consistent TTS voice.</li>
+              <li>Cascade-only capability — a deliberately named asymmetry for the write-up.</li>
+            </ul>
+            <p class="text-base-content/70">Two caveats to verify while building, not yet resolved: whether Deepgram's <code>detect_language</code> can be constrained to the 2-language candidate set, and how a segment spanning a mid-utterance speaker change behaves.</p>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <div class="card card-border bg-base-100 border-l-4 border-l-accent">
+      <div class="card-body">
+        <div class="flex flex-wrap items-center gap-2">
+          <h3 class="card-title">Ticket 6 — Latency instrumentation, both modes</h3>
+          <span class="badge badge-success badge-soft">right-sized · ~2 hrs</span>
+        </div>
+        <div class="flex flex-wrap gap-1 text-xs"><span class="badge badge-ghost">Depends on: Ticket 1, Ticket 2, Ticket 3</span></div>
+        <div class="grid sm:grid-cols-2 gap-4 mt-2 text-sm">
+          <div>
+            <div class="font-semibold mb-1">Backend (Cascade only)</div>
+            <p>Timestamp capture at each stage (<code>speech_end</code> → translation first token → translation complete → TTS first byte → client-reported playback start). Clock-sync offset re-run every 30s and after reconnects.</p>
+          </div>
+          <div>
+            <div class="font-semibold mb-1">Frontend</div>
+            <p>Cascade: live per-stage running-total table vs. 2s target. Realtime: end-to-end number only (purely client-side — backend has no visibility once the ephemeral token is issued) vs. 1.5s target.</p>
+          </div>
+        </div>
+        <details class="collapse collapse-arrow bg-base-200 mt-2">
+          <summary class="collapse-title text-sm font-medium">Acceptance criteria &amp; API notes</summary>
+          <div class="collapse-content text-sm space-y-2">
+            <ul class="list-disc list-inside space-y-1">
+              <li>Cascade shows a live 5-stage latency breakdown per segment during the session.</li>
+              <li>Realtime shows end-to-end only — an intentional asymmetry, not a bug.</li>
+              <li>Clock offset recomputes every 30s, not just once.</li>
+              <li>Numbers are genuinely measured — a real network hiccup visibly inflates that segment's latency.</li>
+            </ul>
+            <p class="text-base-content/70"><strong>Contract:</strong> <code>latency</code> message stages: <code>speech_end</code> (0), <code>translation_first_token</code>, <code>translation_complete</code>, <code>tts_first_byte</code>, <code>playback_start</code> (the brief's actual benchmark number), each cumulative ms since <code>speech_end</code>. Realtime mode sends no <code>latency</code> message at all.</p>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <div class="card card-border bg-base-100 border-l-4 border-l-accent">
+      <div class="card-body">
+        <div class="flex flex-wrap items-center gap-2">
+          <h3 class="card-title">Ticket 7 — Error handling &amp; session resilience</h3>
+          <span class="badge badge-warning badge-soft">right-sized, merged · ~3–3.5 hrs</span>
+          <span class="badge badge-info badge-soft">includes retry/circuit-breaker tests</span>
+        </div>
+        <div class="flex flex-wrap gap-1 text-xs"><span class="badge badge-ghost">Depends on: Ticket 1, Ticket 2, Ticket 3</span></div>
+        <div class="grid sm:grid-cols-2 gap-4 mt-2 text-sm">
+          <div>
+            <div class="font-semibold mb-1">Backend</div>
+            <p>Bounded retries per failure mode (rate limit 2×, timeout 1×, empty translation 1×). 5-consecutive-failure circuit breaker → hard "unavailable" state. Backend↔provider reconnect (500ms→1s→2s backoff) without tearing down the browser↔backend socket; in-flight segment dropped+logged. Browser↔backend: short grace-window reconnect, else session ends. Memory hygiene: per-segment buffer release, WS backpressure.</p>
+          </div>
+          <div>
+            <div class="font-semibold mb-1">Frontend</div>
+            <p>Mic-denied blocking banner with working retry (not a reload). Non-blocking toast for rate-limit/timeout. Silent drop for empty results. Connection badge turns amber ("Reconnecting…") during a reconnect attempt.</p>
+          </div>
+        </div>
+        <details class="collapse collapse-arrow bg-base-200 mt-2">
+          <summary class="collapse-title text-sm font-medium">Why this merges the wayfinder's tickets 10 + 13</summary>
+          <div class="collapse-content text-sm">
+            <p>Ticket 13's own answer found 2 of its 3 sub-questions already solved by earlier decisions (clock drift reuses Ticket 6's resync design; audio playback drift is a non-issue given the segmented architecture) — the only genuinely new stability work is reconnection + memory hygiene, which explicitly reuses this ticket's circuit breaker. Splitting them would produce two overlapping small tickets over the same failure-handling surface.</p>
+          </div>
+        </details>
+        <details class="collapse collapse-arrow bg-base-200 mt-2">
+          <summary class="collapse-title text-sm font-medium">Acceptance criteria</summary>
+          <div class="collapse-content text-sm">
+            <ul class="list-disc list-inside space-y-1">
+              <li>No single provider failure ever ends the session — only that one segment.</li>
+              <li>5 consecutive failures trips the circuit breaker with an explicit "interpretation unavailable" state.</li>
+              <li>Denying mic permission shows a blocking banner with working retry.</li>
+              <li>Killing Deepgram/ElevenLabs mid-session shows amber "Reconnecting…" and recovers transparently.</li>
+              <li>A brief browser↔backend blip recovers; a longer one ends the session cleanly, not a hang.</li>
+              <li>No automatic runtime provider fallback exists — by design.</li>
+            </ul>
+          </div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ WAVE 3 ============ -->
+  <section id="wave-3" class="space-y-4">
+    <h2 class="text-2xl font-bold">Wave 3</h2>
+    <div class="card card-border bg-base-100 border-l-4 border-l-warning">
+      <div class="card-body">
+        <div class="flex flex-wrap items-center gap-2">
+          <h3 class="card-title">Ticket 5 — Cascade: LLM-hybrid segmentation upgrade</h3>
+          <span class="badge badge-success badge-soft">right-sized · ~2–2.5 hrs</span>
+          <span class="badge badge-info badge-soft">includes segmentation race test</span>
+        </div>
+        <div class="flex flex-wrap gap-1 text-xs"><span class="badge badge-ghost">Depends on: Ticket 2, Ticket 4</span></div>
+        <div class="grid sm:grid-cols-2 gap-4 mt-2 text-sm">
+          <div>
+            <div class="font-semibold mb-1">Backend</div>
+            <p>Async LLM clause-check side-channel races independently against Deepgram's <code>speech_final</code>/<code>UtteranceEnd</code> — whichever fires first wins, capture never pauses. Debounced to one check in flight per speaker (needs Ticket 4's speaker tracking). Configurable mode: <strong>hybrid race</strong> (default) vs. <strong>LLM-priority</strong> (Deepgram's <code>speech_final</code> ignored, <code>UtteranceEnd</code> stays as a hard ceiling so a segment can never hang).</p>
+          </div>
+          <div>
+            <div class="font-semibold mb-1">Frontend</div>
+            <p>Surfaces <code>segment_boundary</code>'s trigger reason for debugging; a dev-facing toggle/query-param for segmentation mode is enough (no polished settings UI needed).</p>
+          </div>
+        </div>
+        <details class="collapse collapse-arrow bg-base-200 mt-2">
+          <summary class="collapse-title text-sm font-medium">Acceptance criteria &amp; API notes</summary>
+          <div class="collapse-content text-sm space-y-2">
+            <ul class="list-disc list-inside space-y-1">
+              <li>A natural mid-thought pause isn't cut prematurely (<code>endpointing=500ms</code>, bumped from research's original 300ms).</li>
+              <li>A complete, grammatically finished clause gets translated and spoken before the speaker pauses, when the LLM check wins the race.</li>
+              <li>Worst case, the segment still completes via Deepgram's fallback — no segment ever hangs, in either mode.</li>
+              <li>Both segmentation modes are exercisable for Ticket 9's empirical A/B comparison.</li>
+            </ul>
+            <p class="text-base-content/70">Called out by the wayfinder as "the single most complex custom logic in the system" — kept as its own ticket with dedicated test coverage on purpose.</p>
+          </div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ WAVE 4 ============ -->
+  <section id="wave-4" class="space-y-4">
+    <h2 class="text-2xl font-bold">Wave 4</h2>
+    <div class="card card-border bg-base-100 border-l-4 border-l-success">
+      <div class="card-body">
+        <div class="flex flex-wrap items-center gap-2">
+          <h3 class="card-title">Ticket 8 — Quality validation suite</h3>
+          <span class="badge badge-success badge-soft">right-sized · ~2.5–3 hrs</span>
+        </div>
+        <div class="flex flex-wrap gap-1 text-xs"><span class="badge badge-ghost">Depends on: Tickets 1, 2, 3, 4, 5, 6, 7 — exercises the full app</span></div>
+        <div class="grid sm:grid-cols-2 gap-4 mt-2 text-sm">
+          <div>
+            <div class="font-semibold mb-1">Backend</div>
+            <p>Shared test dataset (~15–20 everyday items + longer multi-clause + multi-turn snippets, domain-agnostic), TTS-generated audio fixtures (EN/ES). WER via <code>jiwer</code>, asserted below threshold. LLM-as-judge translation-quality scorer explaining <em>what's</em> wrong, not just a score. Process-memory sampling (<code>psutil</code>) around a scripted 5-minute run.</p>
+          </div>
+          <div>
+            <div class="font-semibold mb-1">Frontend / test-infra</div>
+            <p>Playwright E2E with Chrome's fake-mic device flags, exercising the real capture→STT→translation→TTS path in both modes. Noise-rejection fixture asserting no spurious transcript. Supplementary manual-tier: a handful of real (non-TTS) recordings across varied mic conditions.</p>
+          </div>
+        </div>
+        <details class="collapse collapse-arrow bg-base-200 mt-2">
+          <summary class="collapse-title text-sm font-medium">Why this is vertical, not a horizontal "write tests" slice</summary>
+          <div class="collapse-content text-sm">
+            <p>Component-level tests (provider contracts, segmentation race, retry/circuit-breaker) are deliberately embedded in Tickets 2, 5, and 7 where that logic gets built. This ticket is scoped to <em>system-level</em> validation — it produces an actual data artifact (WER%, LLM-judge report) that Ticket 9 directly consumes.</p>
+          </div>
+        </details>
+        <details class="collapse collapse-arrow bg-base-200 mt-2">
+          <summary class="collapse-title text-sm font-medium">Acceptance criteria</summary>
+          <div class="collapse-content text-sm">
+            <ul class="list-disc list-inside space-y-1">
+              <li>WER regression test passes below threshold for both EN and ES, fails loudly on regression.</li>
+              <li>Playwright fake-mic E2E passes for both modes within a time budget, using the real (unmocked) path.</li>
+              <li>Noise-rejection fixture produces no spurious transcript.</li>
+              <li>LLM-as-judge produces an actionable per-item report for the same corpus through both modes.</li>
+              <li>Same dataset runs through both modes — apples-to-apples for Ticket 9.</li>
+              <li>Process-memory sample shows no unbounded growth across a simulated 5-minute run.</li>
+            </ul>
+          </div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ WAVE 5 ============ -->
+  <section id="wave-5" class="space-y-4">
+    <h2 class="text-2xl font-bold">Wave 5 — capstone</h2>
+    <div class="card card-border bg-base-100 border-l-4 border-l-neutral">
+      <div class="card-body">
+        <div class="flex flex-wrap items-center gap-2">
+          <h3 class="card-title">Ticket 9 — Comparison write-up (1–2 pages)</h3>
+          <span class="badge badge-success badge-soft">right-sized · ~1.5–2 hrs</span>
+        </div>
+        <div class="flex flex-wrap gap-1 text-xs"><span class="badge badge-ghost">Depends on: Ticket 6, Ticket 8 (practically, everything)</span></div>
+        <div class="text-sm mt-2">
+          <p>No new application code. Draws on Ticket 6's real latency numbers, Ticket 8's WER/LLM-judge output, hands-on controllability experience (Cascade's per-stage visibility vs. Realtime's end-to-end-only; diarization as Cascade-only), and current provider pricing for a cost-per-minute estimate. Gives <code>gpt-realtime-translate</code> real weight here specifically, per Ticket 1's explicit deferral.</p>
+        </div>
+        <details class="collapse collapse-arrow bg-base-200 mt-2">
+          <summary class="collapse-title text-sm font-medium">Acceptance criteria</summary>
+          <div class="collapse-content text-sm">
+            <ul class="list-disc list-inside space-y-1">
+              <li>Covers all five brief-named dimensions: latency, quality, cost, controllability, scenario-based recommendation.</li>
+              <li>Latency figures are the actual measured Ticket 6 numbers, not estimates.</li>
+              <li>Quality figures cite the actual Ticket 8 WER% and LLM-judge findings.</li>
+              <li>Explicitly names the diarization asymmetry and the latency-visibility asymmetry as concrete "more control" vs. "less control" instances.</li>
+              <li>README and AGENTS.md/CLAUDE.md finalized alongside this ticket, since the architecture is only complete by this point.</li>
+            </ul>
+          </div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CUT CANDIDATES ============ -->
+  <section id="cuts" class="space-y-3">
+    <h2 class="text-2xl font-bold">Cut candidates, ranked</h2>
+    <p class="text-base-content/70">If the ~21–24hr estimate needs to come back to the 15–20hr target, these are the most defensible cuts, in order — everything else maps directly to a numbered functional requirement or an explicit benchmark/code-quality line in the brief and shouldn't be cut.</p>
+    <div class="space-y-2">
+      <label class="flex items-start gap-3 p-3 rounded-box bg-base-200 cursor-pointer">
+        <input type="checkbox" class="checkbox checkbox-warning mt-1" name="cut" value="Cut Ticket 5's LLM-priority segmentation mode, keep hybrid-race only" data-cut-id="1">
+        <span class="text-sm"><span class="badge badge-sm badge-warning mr-1">1</span><strong>Drop Ticket 5's LLM-priority mode</strong> — keep hybrid-race only. The dual-mode toggle exists for empirical write-up comparison, not a hard functional requirement.</span>
+      </label>
+      <label class="flex items-start gap-3 p-3 rounded-box bg-base-200 cursor-pointer">
+        <input type="checkbox" class="checkbox checkbox-warning mt-1" name="cut" value="Cut Ticket 4 (diarization) entirely" data-cut-id="2">
+        <span class="text-sm"><span class="badge badge-sm badge-warning mr-1">2</span><strong>Drop Ticket 4 (diarization) entirely</strong> — it's an explicitly-flagged addition beyond the original single-direction design, not one of the brief's 8 functional requirements. The 5-minute stability demo would use one speaker/direction instead of true back-and-forth; worth naming as a scope call in the write-up if cut.</span>
+      </label>
+      <label class="flex items-start gap-3 p-3 rounded-box bg-base-200 cursor-pointer">
+        <input type="checkbox" class="checkbox checkbox-warning mt-1" name="cut" value="Drop Ticket 8's real-audio supplementary fixtures" data-cut-id="3">
+        <span class="text-sm"><span class="badge badge-sm badge-warning mr-1">3</span><strong>Drop Ticket 8's real-audio supplementary fixtures</strong> — already scoped as manual-tier, not blocking automated CI.</span>
+      </label>
+    </div>
+  </section>
+
+  <!-- ============ ASSUMPTIONS ============ -->
+  <section id="assumptions" class="space-y-3">
+    <h2 class="text-2xl font-bold">Assumptions made while slicing</h2>
+    <p class="text-base-content/70">Flagged explicitly, not silently decided — worth a look before builds start.</p>
+    <ol class="space-y-2 text-sm">
+      <li class="p-3 rounded-box bg-base-200"><strong>1. Realtime-mode transcript events</strong> (Ticket 3) — the wayfinder settled transport/model but never specified how live transcripts are obtained for plain <code>gpt-realtime</code>. Assumed standard <code>input_audio_transcription</code> + <code>response.audio_transcript.delta</code> — verify against current OpenAI docs before building.</li>
+      <li class="p-3 rounded-box bg-base-200"><strong>2. Segmentation-mode toggle UI</strong> (Ticket 5) — assumed a dev-facing toggle is sufficient, since its purpose is empirical A/B testing for the write-up, not an end-user feature.</li>
+      <li class="p-3 rounded-box bg-base-200"><strong>3. Cascade WebSocket endpoint path</strong> — not literally specified by the wayfinder (only "one WebSocket per session" is decided). Implementers pick a path (e.g. <code>/ws/cascade</code>) as an implementation detail.</li>
+      <li class="p-3 rounded-box bg-base-200"><strong>4. Ticket 1/2 "minimal UI" boundary</strong> — assumed both ship deliberately unstyled placeholder UI, fully replaced by Ticket 3. Means Tickets 1/2 alone don't yet satisfy the live-transcript/language-selector requirements in polished form — that's Ticket 3's job.</li>
+    </ol>
+  </section>
+
+  <!-- ============ DECISION ============ -->
+  <section id="decision" class="space-y-4">
+    <div class="divider"></div>
+    <h2 class="text-2xl font-bold">Your decision</h2>
+    <p class="text-base-content/70">Per the feature-factory process, this gate needs an explicit answer before any ticket gets built or published.</p>
+
+    <form id="decisionForm" class="card card-border bg-base-200" onsubmit="event.preventDefault(); submitDecision();">
+      <div class="card-body space-y-6">
+
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend text-base font-semibold">Approve the ticket breakdown?</legend>
+          <div class="flex flex-col gap-2">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="approval" value="Approve as drafted" class="radio radio-primary" checked>
+              <span>Approve as drafted — accept the ~21–24hr estimate, no cuts</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="approval" value="Approve with selected cuts applied" class="radio radio-primary">
+              <span>Approve with the cut candidates I checked above applied</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="approval" value="Request changes" class="radio radio-primary">
+              <span>Request changes — see notes below</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="approval" value="Reject" class="radio radio-primary">
+              <span>Reject — stop here</span>
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend text-base font-semibold">Does the granularity feel right?</legend>
+          <div class="flex flex-col gap-2">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="granularity" value="Right-sized" class="radio radio-secondary" checked>
+              <span>Right-sized — 9 tickets feels correct</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="granularity" value="Too coarse - some tickets should split" class="radio radio-secondary">
+              <span>Too coarse — some tickets should split further</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="granularity" value="Too fine - some tickets should merge" class="radio radio-secondary">
+              <span>Too fine — some tickets should merge</span>
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend text-base font-semibold">Notes for changes (optional)</legend>
+          <textarea id="notes" class="textarea w-full" rows="3" placeholder="e.g. split Ticket 2, or merge Ticket 4 into Ticket 5, or specific acceptance-criteria feedback..."></textarea>
+        </fieldset>
+
+        <div class="card-actions justify-end">
+          <span id="queuedHint" class="text-sm text-base-content/60 self-center hidden">Queued — press Send to Agent to deliver.</span>
+          <button type="submit" class="btn btn-primary">Queue my decision</button>
+        </div>
+      </div>
+    </form>
+  </section>
+
+</main>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.15.0/dist/mermaid.esm.min.mjs";
+  const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  const paint = document.createElement("canvas").getContext("2d");
+  function toRgba(color) {
+    paint.clearRect(0, 0, 1, 1);
+    paint.fillStyle = "#000";
+    paint.fillStyle = color;
+    paint.fillRect(0, 0, 1, 1);
+    return paint.getImageData(0, 0, 1, 1).data;
+  }
+  function compositeRgba(fg, bg) {
+    const fa = fg[3] / 255, ba = bg[3] / 255;
+    const a = fa + ba * (1 - fa);
+    if (a === 0) return [0, 0, 0, 0];
+    return [
+      (fg[0]*fa + bg[0]*ba*(1-fa)) / a,
+      (fg[1]*fa + bg[1]*ba*(1-fa)) / a,
+      (fg[2]*fa + bg[2]*ba*(1-fa)) / a,
+      a * 255,
+    ];
+  }
+  function pageIsDark() {
+    const root = document.documentElement;
+    const rootBg = toRgba(getComputedStyle(root).backgroundColor);
+    const bodyBg = document.body ? toRgba(getComputedStyle(document.body).backgroundColor) : [0,0,0,0];
+    const [r,g,b,a] = compositeRgba(bodyBg, rootBg);
+    if (a > 0) return (0.2126*r + 0.7152*g + 0.0722*b) / 255 < 0.5;
+    const cs = getComputedStyle(root).colorScheme;
+    if (cs.includes("dark") && !cs.includes("light")) return true;
+    if (cs.includes("light") && !cs.includes("dark")) return false;
+    return darkQuery.matches;
+  }
+  const diagrams = [...document.querySelectorAll(".mermaid")].map((el) => ({ el, src: el.textContent }));
+  let applied, rendering = false, queued = false;
+  function queueRender() { queued = true; if (!rendering) void render(); }
+  async function render() {
+    rendering = true;
+    try {
+      while (queued) {
+        queued = false;
+        const theme = pageIsDark() ? "dark" : "default";
+        if (theme === applied) continue;
+        mermaid.initialize({ startOnLoad: false, theme, securityLevel: "strict" });
+        for (const { el, src } of diagrams) { el.removeAttribute("data-processed"); el.textContent = src; }
+        try { await mermaid.run({ nodes: diagrams.map((d) => d.el) }); }
+        catch (e) { console.error("Mermaid render failed:", e); return; }
+        applied = theme;
+      }
+    } finally { rendering = false; if (queued) queueRender(); }
+  }
+  if (document.readyState === "complete") queueRender();
+  else window.addEventListener("load", queueRender, { once: true });
+  const themeObserver = new MutationObserver(queueRender);
+  for (const el of [document.documentElement, document.body]) {
+    if (!el) continue;
+    themeObserver.observe(el, { attributes: true, attributeFilter: ["data-theme", "class", "style"] });
+  }
+  document.addEventListener("change", queueRender, true);
+  document.addEventListener("transitionend", ({ propertyName }) => { if (propertyName === "background-color") queueRender(); }, true);
+  darkQuery.addEventListener("change", queueRender);
+</script>
+
+<script>
+  function submitDecision() {
+    const form = document.getElementById('decisionForm');
+    const approval = new FormData(form).get('approval');
+    const granularity = new FormData(form).get('granularity');
+    const notes = document.getElementById('notes').value.trim();
+    const cuts = [...document.querySelectorAll('input[name="cut"]:checked')].map(c => c.value);
+
+    let msg = `Step 9 gate decision: ${approval}. Granularity: ${granularity}.`;
+    if (cuts.length) msg += ` Selected cuts: ${cuts.join('; ')}.`;
+    if (notes) msg += ` Notes: ${notes}`;
+
+    window.lavish.queuePrompt(msg, {
+      tag: 'decision',
+      text: `${approval} — ${granularity}`,
+      element: form,
+      data: { approval, granularity, cuts, notes }
+    });
+
+    document.getElementById('queuedHint').classList.remove('hidden');
+  }
+</script>
+
+</body>
+</html>
