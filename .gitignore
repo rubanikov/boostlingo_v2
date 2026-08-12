@@ -1,0 +1,28 @@
+# Python / backend (uv)
+backend/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Ticket 8: TTS-generated audio fixtures (tests/fixtures/generate_audio_fixtures.py).
+# Regenerated on demand from interpreter_dataset.json, not hand-authored, not
+# meant to be committed as binary blobs.
+backend/tests/fixtures/audio/
+
+# Node / frontend
+frontend/node_modules/
+frontend/dist/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Editor
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
