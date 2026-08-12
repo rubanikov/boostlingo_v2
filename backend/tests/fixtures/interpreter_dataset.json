@@ -1,0 +1,324 @@
+{
+  "_comment": [
+    "Ticket 8's shared EN<->ES test corpus -- one dataset feeding three consumers:",
+    "the WER regression test (test_quality_wer.py, checks Deepgram's output against",
+    "each item's own `text`), the LLM-judge translation-quality test",
+    "(test_quality_llm_judge.py / a future corpus runner, checks a candidate",
+    "translation against `text` using `referenceTranslation` as a human sanity-check,",
+    "not as ground truth the judge is scored against -- see Ticket 8's issue 14",
+    "resolution for why: an LLM-judge needs no reference), and the audio fixture",
+    "generator (generate_audio_fixtures.py, TTS-synthesizes `text`).",
+    "Domain-agnostic everyday conversation only -- no assumed professional domain,",
+    "per issue 14's resolution.",
+    "",
+    "Every item has: id, category, sourceLang/targetLang (en/es, the other one of the",
+    "pair), text (source), referenceTranslation (hand-written, into targetLang).",
+    "`category` is one of: short (greetings/questions/requests/casual filler),",
+    "long (multi-clause, single sentence), multi_turn (a conversation snippet --",
+    "flattened here into one item per turn, tied together by conversationId/",
+    "turnIndex/speaker, so every consumer can iterate one flat `items` list instead",
+    "of special-casing conversations)."
+  ],
+  "items": [
+    {
+      "id": "short-en-01",
+      "category": "short",
+      "sourceLang": "en",
+      "targetLang": "es",
+      "text": "Hi, how are you doing today?",
+      "referenceTranslation": "Hola, ¿cómo estás hoy?"
+    },
+    {
+      "id": "short-en-02",
+      "category": "short",
+      "sourceLang": "en",
+      "targetLang": "es",
+      "text": "Good morning! Did you sleep well?",
+      "referenceTranslation": "¡Buenos días! ¿Dormiste bien?"
+    },
+    {
+      "id": "short-en-03",
+      "category": "short",
+      "sourceLang": "en",
+      "targetLang": "es",
+      "text": "Can you pass me the salt, please?",
+      "referenceTranslation": "¿Me puedes pasar la sal, por favor?"
+    },
+    {
+      "id": "short-en-04",
+      "category": "short",
+      "sourceLang": "en",
+      "targetLang": "es",
+      "text": "I'm sorry, I didn't catch that.",
+      "referenceTranslation": "Lo siento, no entendí eso."
+    },
+    {
+      "id": "short-en-05",
+      "category": "short",
+      "sourceLang": "en",
+      "targetLang": "es",
+      "text": "What time does the store close?",
+      "referenceTranslation": "¿A qué hora cierra la tienda?"
+    },
+    {
+      "id": "short-en-06",
+      "category": "short",
+      "sourceLang": "en",
+      "targetLang": "es",
+      "text": "Thanks so much, I really appreciate it.",
+      "referenceTranslation": "Muchas gracias, de verdad lo aprecio."
+    },
+    {
+      "id": "short-en-07",
+      "category": "short",
+      "sourceLang": "en",
+      "targetLang": "es",
+      "text": "Um, I think we should probably get going.",
+      "referenceTranslation": "Um, creo que probablemente deberíamos irnos."
+    },
+    {
+      "id": "short-en-08",
+      "category": "short",
+      "sourceLang": "en",
+      "targetLang": "es",
+      "text": "Do you know if it's supposed to rain later?",
+      "referenceTranslation": "¿Sabes si se supone que va a llover más tarde?"
+    },
+    {
+      "id": "short-en-09",
+      "category": "short",
+      "sourceLang": "en",
+      "targetLang": "es",
+      "text": "Nice to meet you, I've heard a lot about you.",
+      "referenceTranslation": "Mucho gusto, he oído mucho sobre ti."
+    },
+    {
+      "id": "short-en-10",
+      "category": "short",
+      "sourceLang": "en",
+      "targetLang": "es",
+      "text": "Could you say that again, a bit slower?",
+      "referenceTranslation": "¿Podrías decir eso otra vez, un poco más despacio?"
+    },
+    {
+      "id": "short-es-01",
+      "category": "short",
+      "sourceLang": "es",
+      "targetLang": "en",
+      "text": "Buenas tardes, ¿en qué puedo ayudarte?",
+      "referenceTranslation": "Good afternoon, how can I help you?"
+    },
+    {
+      "id": "short-es-02",
+      "category": "short",
+      "sourceLang": "es",
+      "targetLang": "en",
+      "text": "¿Cuánto cuesta esto, más o menos?",
+      "referenceTranslation": "How much does this cost, roughly?"
+    },
+    {
+      "id": "short-es-03",
+      "category": "short",
+      "sourceLang": "es",
+      "targetLang": "en",
+      "text": "No te preocupes, tenemos mucho tiempo.",
+      "referenceTranslation": "Don't worry, we have plenty of time."
+    },
+    {
+      "id": "short-es-04",
+      "category": "short",
+      "sourceLang": "es",
+      "targetLang": "en",
+      "text": "¿Te importaría esperar un momento?",
+      "referenceTranslation": "Would you mind waiting a moment?"
+    },
+    {
+      "id": "short-es-05",
+      "category": "short",
+      "sourceLang": "es",
+      "targetLang": "en",
+      "text": "Perdón por llegar tarde, había mucho tráfico.",
+      "referenceTranslation": "Sorry for being late, there was a lot of traffic."
+    },
+    {
+      "id": "short-es-06",
+      "category": "short",
+      "sourceLang": "es",
+      "targetLang": "en",
+      "text": "¿Quieres que te acompañe a la parada del autobús?",
+      "referenceTranslation": "Do you want me to walk you to the bus stop?"
+    },
+    {
+      "id": "short-es-07",
+      "category": "short",
+      "sourceLang": "es",
+      "targetLang": "en",
+      "text": "Vale, entonces nos vemos mañana a las nueve.",
+      "referenceTranslation": "Okay, so we'll see each other tomorrow at nine."
+    },
+    {
+      "id": "short-es-08",
+      "category": "short",
+      "sourceLang": "es",
+      "targetLang": "en",
+      "text": "¿Qué tal si pedimos pizza esta noche?",
+      "referenceTranslation": "How about we order pizza tonight?"
+    },
+    {
+      "id": "long-en-01",
+      "category": "long",
+      "sourceLang": "en",
+      "targetLang": "es",
+      "text": "I was going to call you earlier, but then my phone died, and by the time I found a charger, it was already pretty late, so I figured I'd just text you instead.",
+      "referenceTranslation": "Iba a llamarte antes, pero se me murió el teléfono, y para cuando encontré un cargador, ya era bastante tarde, así que decidí simplemente escribirte un mensaje."
+    },
+    {
+      "id": "long-es-01",
+      "category": "long",
+      "sourceLang": "es",
+      "targetLang": "en",
+      "text": "Quería decirte que, bueno, en realidad no sé cómo explicarlo, pero creo que deberíamos hablar de lo que pasó la semana pasada antes de que se nos olvide.",
+      "referenceTranslation": "I wanted to tell you that, well, I actually don't know how to explain it, but I think we should talk about what happened last week before we forget."
+    },
+    {
+      "id": "long-en-02",
+      "category": "long",
+      "sourceLang": "en",
+      "targetLang": "es",
+      "text": "So we drove all the way out to the coast, and the weather was great at first, but then it started pouring right when we got there, which was kind of a bummer, but we still had a good time.",
+      "referenceTranslation": "Así que manejamos hasta la costa, y al principio hacía buen tiempo, pero luego empezó a llover justo cuando llegamos, lo cual fue un poco decepcionante, pero aun así la pasamos bien."
+    },
+    {
+      "id": "conv-weekend-plans-t1",
+      "category": "multi_turn",
+      "conversationId": "conv-weekend-plans",
+      "turnIndex": 0,
+      "speaker": 0,
+      "sourceLang": "en",
+      "targetLang": "es",
+      "text": "Hey, do you have any plans for the weekend?",
+      "referenceTranslation": "Oye, ¿tienes planes para el fin de semana?"
+    },
+    {
+      "id": "conv-weekend-plans-t2",
+      "category": "multi_turn",
+      "conversationId": "conv-weekend-plans",
+      "turnIndex": 1,
+      "speaker": 1,
+      "sourceLang": "es",
+      "targetLang": "en",
+      "text": "Todavía no, ¿por qué? ¿Tienes algo en mente?",
+      "referenceTranslation": "Not yet, why? Do you have something in mind?"
+    },
+    {
+      "id": "conv-weekend-plans-t3",
+      "category": "multi_turn",
+      "conversationId": "conv-weekend-plans",
+      "turnIndex": 2,
+      "speaker": 0,
+      "sourceLang": "en",
+      "targetLang": "es",
+      "text": "I was thinking we could go hiking if the weather holds up.",
+      "referenceTranslation": "Estaba pensando que podríamos ir de excursión si el clima se mantiene bien."
+    },
+    {
+      "id": "conv-weekend-plans-t4",
+      "category": "multi_turn",
+      "conversationId": "conv-weekend-plans",
+      "turnIndex": 3,
+      "speaker": 1,
+      "sourceLang": "es",
+      "targetLang": "en",
+      "text": "Me encantaría, ¡avísame a qué hora!",
+      "referenceTranslation": "I'd love to, let me know what time!"
+    },
+    {
+      "id": "conv-directions-t1",
+      "category": "multi_turn",
+      "conversationId": "conv-directions",
+      "turnIndex": 0,
+      "speaker": 0,
+      "sourceLang": "es",
+      "targetLang": "en",
+      "text": "Disculpa, ¿sabes cómo llegar a la estación de tren desde aquí?",
+      "referenceTranslation": "Excuse me, do you know how to get to the train station from here?"
+    },
+    {
+      "id": "conv-directions-t2",
+      "category": "multi_turn",
+      "conversationId": "conv-directions",
+      "turnIndex": 1,
+      "speaker": 1,
+      "sourceLang": "en",
+      "targetLang": "es",
+      "text": "Sure, just go straight for two blocks and then turn left.",
+      "referenceTranslation": "Claro, sigue derecho dos cuadras y luego gira a la izquierda."
+    },
+    {
+      "id": "conv-directions-t3",
+      "category": "multi_turn",
+      "conversationId": "conv-directions",
+      "turnIndex": 2,
+      "speaker": 0,
+      "sourceLang": "es",
+      "targetLang": "en",
+      "text": "Perfecto, muchas gracias por la ayuda.",
+      "referenceTranslation": "Perfect, thank you so much for the help."
+    },
+    {
+      "id": "conv-directions-t4",
+      "category": "multi_turn",
+      "conversationId": "conv-directions",
+      "turnIndex": 3,
+      "speaker": 1,
+      "sourceLang": "en",
+      "targetLang": "es",
+      "text": "No problem, have a safe trip!",
+      "referenceTranslation": "No hay problema, ¡que tengas un buen viaje!"
+    },
+    {
+      "id": "conv-delayed-order-t1",
+      "category": "multi_turn",
+      "conversationId": "conv-delayed-order",
+      "turnIndex": 0,
+      "speaker": 0,
+      "sourceLang": "en",
+      "targetLang": "es",
+      "text": "Hi, I ordered something over a week ago and it still hasn't arrived.",
+      "referenceTranslation": "Hola, pedí algo hace más de una semana y todavía no ha llegado."
+    },
+    {
+      "id": "conv-delayed-order-t2",
+      "category": "multi_turn",
+      "conversationId": "conv-delayed-order",
+      "turnIndex": 1,
+      "speaker": 1,
+      "sourceLang": "es",
+      "targetLang": "en",
+      "text": "Lo siento mucho, déjame revisar el estado de tu pedido.",
+      "referenceTranslation": "I'm so sorry, let me check the status of your order."
+    },
+    {
+      "id": "conv-delayed-order-t3",
+      "category": "multi_turn",
+      "conversationId": "conv-delayed-order",
+      "turnIndex": 2,
+      "speaker": 0,
+      "sourceLang": "en",
+      "targetLang": "es",
+      "text": "Thanks, the order number is 48213.",
+      "referenceTranslation": "Gracias, el número de pedido es 48213."
+    },
+    {
+      "id": "conv-delayed-order-t4",
+      "category": "multi_turn",
+      "conversationId": "conv-delayed-order",
+      "turnIndex": 3,
+      "speaker": 1,
+      "sourceLang": "es",
+      "targetLang": "en",
+      "text": "Ya lo veo, parece que hubo un retraso, pero llegará mañana.",
+      "referenceTranslation": "I see it now, it looks like there was a delay, but it will arrive tomorrow."
+    }
+  ]
+}
