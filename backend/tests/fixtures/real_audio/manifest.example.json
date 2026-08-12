@@ -1,0 +1,21 @@
+{
+  "_comment": "Copy this file to manifest.json (gitignored, since it names real recordings of a real person) and add one entry per .wav you record. See run_real_audio_report.py's module docstring for the full walkthrough.",
+  "items": [
+    {
+      "id": "example-quiet-en",
+      "audioFile": "example-quiet-en.wav",
+      "sourceLang": "en",
+      "targetLang": "es",
+      "referenceText": "Replace this with exactly what you actually said, transcribed by hand.",
+      "conditions": "quiet room, laptop mic, ~30cm"
+    },
+    {
+      "id": "example-noisy-es",
+      "audioFile": "example-noisy-es.wav",
+      "sourceLang": "es",
+      "targetLang": "en",
+      "referenceText": "Sustituye esto por lo que realmente dijiste, transcrito a mano.",
+      "conditions": "some background noise (TV/music), phone mic, across the room"
+    }
+  ]
+}

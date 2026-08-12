@@ -20,18 +20,21 @@ this) — see `package.json`'s `test:e2e` script and `playwright.config.ts`.
 - The silence fixture (`fixtures/silence.wav`) flowing through that same
   real capture path without crashing anything.
 
-**Not yet meaningful, and the specs say so explicitly:**
+**Depends on what's configured when you run it — same specs either way:**
 
-- **No live backend/provider keys exist in this environment.** Both modes'
-  "connected" outcome (and everything downstream of it — an actual
-  transcript, translation, TTS) is untested here; only the graceful
-  *pre-connection* failure path is. The specs assert on `['Connected',
-  'Error']` so they'd keep passing unmodified against a live backend, but
-  today they only ever observe `'Error'`.
-- **The audio fixtures are placeholders** (`fixtures/placeholder-tone.wav`,
-  `fixtures/silence.wav`) — a synthesized tone and digital silence, not real
-  or TTS-generated speech. No test asserts specific transcript *words*
-  against them; that would be meaningless (and dishonest) against a tone.
+- **Live backend/provider keys.** Both modes' "connected" outcome (and
+  everything downstream of it — an actual transcript) only happens with a
+  real backend + real API keys reachable. The specs assert on `['Connected',
+  'Error']`, so they pass either way — they just don't *prove* much beyond
+  "didn't hang or throw" without live keys.
+- **The audio fixture.** `playwright.config.ts` uses
+  `e2e/fixtures/real-speech.wav` automatically if that file exists (checked
+  once, at config-load time), otherwise falls back to the synthesized
+  placeholder tone — see "Using a real speech recording" below for how to
+  add one. No test asserts *specific* transcript words against it (this
+  suite has no way to know what a given recording says); "some non-empty
+  live transcript text arrived" is what a fixture-agnostic test can
+  honestly claim.
 - **The noise-rejection claim ("silence never produces a spurious
   transcript") is fundamentally a backend/STT-provider (VAD/endpointing)
   behavior**, not client-side logic — the frontend has no VAD of its own; it
@@ -40,11 +43,11 @@ this) — see `package.json`'s `test:e2e` script and `playwright.config.ts`.
   (`noise-rejection.spec.ts`'s second test) self-skips via `test.skip(...)`
   with a message explaining this whenever a live backend isn't reachable,
   rather than asserting something this environment can't actually prove.
-- Two tests (one per mode) that assert real transcript words appear within a
-  time budget are written but `test.skip`'d outright — they need a real
-  speech fixture with known text plus a live backend to mean anything. See
-  the `TODO` comments in `realtime.spec.ts` / `cascade.spec.ts` for exactly
-  what to change to enable them.
+- Each mode's "transcript reflects real speech" test only runs at all when
+  `e2e/fixtures/real-speech.wav` exists (checked at collection time), and
+  within that, skips at runtime unless the session actually reaches
+  `'Connected'` — so it needs both a real fixture and a live backend to mean
+  anything, same as the bullet above.
 
 ## Commands
 
@@ -57,20 +60,32 @@ npx playwright test --project=cascade-fake-mic   # one project only
 npx playwright show-report        # open the last HTML report
 ```
 
-`npm run test:e2e` (and the commands above) start their own Vite dev server
-on a dedicated port (`playwright.config.ts`'s `webServer`) — no need to run
-`npm run dev` yourself first.
+`npm run test:e2e` (and the commands above) start both their own Vite dev
+server *and* the FastAPI backend (`playwright.config.ts`'s `webServer` array,
+`uv run uvicorn app.main:app` from `../backend`) — no need to start either
+yourself first. Set real API keys in `backend/.env` before running for a live
+result; see the root `README.md`.
 
-### Once real speech fixtures exist (backend's TTS-generation script, run with
-a live key)
+### Using a real speech recording
 
-1. Drop the generated `.wav` file(s) somewhere under `e2e/fixtures/` (or
-   point at wherever the backend script writes them).
-2. Update the `TONE_FIXTURE`/`SILENCE_FIXTURE` constants in
-   `playwright.config.ts` (or add new ones) to point at the real files.
-3. Un-skip the two `test.skip('transcript reflects real speech...', ...)`
-   tests in `realtime.spec.ts` / `cascade.spec.ts` and fill in the expected
-   words per their `TODO` comments.
+1. Record yourself (or someone else) speaking a short EN or ES sentence —
+   varied conditions (quiet vs. background noise, laptop mic vs. headset) are
+   more interesting than a clean studio take, since that's the whole point
+   of testing with a real voice instead of more TTS.
+2. Convert it to mono 16-bit PCM WAV at 16000Hz if it isn't already:
+
+   ```bash
+   ffmpeg -i your-recording.m4a -ar 16000 -ac 1 -sample_fmt s16 e2e/fixtures/real-speech.wav
+   ```
+
+   (Already have one from `backend/tests/fixtures/real_audio/` for the
+   backend's own real-audio report? Same format — just copy it here.)
+3. Run the suite again. `playwright.config.ts` picks up
+   `e2e/fixtures/real-speech.wav` automatically (checked once at startup —
+   restart `npm run test:e2e` if you add the file mid-session) and both
+   fake-mic projects switch to it, no other change needed. Each mode's
+   "transcript reflects real speech" test un-skips itself the moment the
+   file is present.
 
 ### Once a live backend + real API keys exist
 
@@ -92,10 +107,10 @@ involved, since neither is available in this environment):
   `noise-rejection-fake-mic` project.
 
 Regenerate with `node e2e/fixtures/generate-fixtures.mjs` from `frontend/`.
-These are explicitly not speech and are meant to be replaced by the
-backend's TTS-generated fixtures (see
-`.scratch/ai-interpreter-workbench/tickets/08-quality-validation-suite.md`)
-once those exist — see "Once real speech fixtures exist" above.
+These are explicitly not speech; `e2e/fixtures/real-speech.wav` (not
+generated, not committed — a real recording) takes over for both fake-mic
+projects automatically once it exists — see "Using a real speech recording"
+above.
 
 ## Environment quirk worth knowing
 

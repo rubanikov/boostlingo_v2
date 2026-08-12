@@ -10,9 +10,21 @@ __pycache__/
 # meant to be committed as binary blobs.
 backend/tests/fixtures/audio/
 
+# Real (non-TTS) recordings for run_real_audio_report.py: personal audio of
+# whoever recorded them, plus the manifest naming what they said. Keep
+# manifest.example.json tracked as the template; nothing else in this
+# directory belongs in the repo.
+backend/tests/fixtures/real_audio/*.wav
+backend/tests/fixtures/real_audio/manifest.json
+backend/tests/fixtures/real_audio_report.json
+
 # Node / frontend
 frontend/node_modules/
 frontend/dist/
+
+# Real (non-TTS) speech recording for the Playwright E2E harness -- personal
+# audio of whoever recorded it, same reasoning as backend/tests/fixtures/real_audio/.
+frontend/e2e/fixtures/real-speech.wav
 
 # Env / secrets
 .env
