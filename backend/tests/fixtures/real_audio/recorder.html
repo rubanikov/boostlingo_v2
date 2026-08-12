@@ -419,11 +419,18 @@ const grantAccessBtn = document.getElementById('grantAccessBtn');
 const folderStatus = document.getElementById('folderStatus');
 const accessGrantedLabel = document.getElementById('accessGrantedLabel');
 
+if (!window.showDirectoryPicker) {
+  grantAccessBtn.disabled = true;
+  grantAccessBtn.title = 'Not supported in this browser';
+  folderStatus.innerHTML =
+    '<span>This browser doesn\'t support the File System Access API (Chrome/Edge only — not Firefox or ' +
+    'Safari), so <strong>Grant repo access</strong> is unavailable here. That\'s fine: record normally, ' +
+    'then <strong>Save recording</strong> downloads the .wav file and shows a manifest snippet to paste in ' +
+    'by hand. Switch to Chrome or Edge if you want the folder auto-save instead.</span>';
+}
+
 grantAccessBtn.addEventListener('click', async () => {
-  if (!window.showDirectoryPicker) {
-    log('File System Access API not available in this browser — use the download fallback instead.');
-    return;
-  }
+  if (!window.showDirectoryPicker) return;
   try {
     dirHandle = await window.showDirectoryPicker();
     folderStatus.classList.add('hidden');
