@@ -19,6 +19,15 @@ compounding errors, not just each stage in isolation.
 
 ## Adding a recording
 
+**Easiest path**: open `tests/fixtures/real_audio/recorder.html` directly in
+a browser (Chrome/Edge -- it uses the File System Access API to save
+straight into place, degrading to plain downloads elsewhere). Pick a
+prompt, record, listen back, save -- it writes an already-correctly-
+formatted `.wav` and appends the manifest entry itself, no `ffmpeg` step.
+
+**Manual path**, if you'd rather record with something else (a phone voice
+memo, an existing recording, etc.):
+
 1. Record yourself (or someone else) speaking a short EN or ES sentence.
    Note down varied conditions on purpose -- quiet vs. some background
    noise, laptop mic vs. headset, close vs. across-the-room -- since that's

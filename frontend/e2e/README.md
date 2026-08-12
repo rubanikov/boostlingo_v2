@@ -68,6 +68,14 @@ result; see the root `README.md`.
 
 ### Using a real speech recording
 
+**Easiest path**: open `../backend/tests/fixtures/real_audio/recorder.html`
+directly in a browser, record a prompt, then click "Also set as E2E
+real-speech.wav" (needs the File System Access API — Chrome/Edge — and repo
+folder access granted in that page first). It writes an already-correct
+`e2e/fixtures/real-speech.wav` directly, no `ffmpeg` step.
+
+**Manual path**:
+
 1. Record yourself (or someone else) speaking a short EN or ES sentence —
    varied conditions (quiet vs. background noise, laptop mic vs. headset) are
    more interesting than a clean studio take, since that's the whole point
