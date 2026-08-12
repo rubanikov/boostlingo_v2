@@ -4,6 +4,9 @@
 provider decisions needed before implementation) is done; what remains
 ([Not yet specified](#not-yet-specified) below) is deliberately deferred, not unresolved.
 
+Mirrored to GitHub Issues: [rubanikov/boostlingo_v2#1](https://github.com/rubanikov/boostlingo_v2/issues/1)
+(map) and #2–#15 (tickets), each closed with its answer as a comment.
+
 ## Destination
 
 A working AI Interpreter Workbench (Python backend, TypeScript frontend) implementing
