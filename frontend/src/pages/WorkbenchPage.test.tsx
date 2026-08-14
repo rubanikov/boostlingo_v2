@@ -1,6 +1,8 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createAppRoutes } from './appRoutes';
 import {
   installFakeAudioApis,
   installMockGetUserMedia,
@@ -15,6 +17,14 @@ import {
 } from '../test/mockRealtimeApis';
 import { REALTIME_SESSION_ENDPOINT } from './realtimeConfig';
 import { WorkbenchPage } from './WorkbenchPage';
+
+function renderWorkbench() {
+  return render(
+    <MemoryRouter>
+      <WorkbenchPage />
+    </MemoryRouter>,
+  );
+}
 
 function latestSocket(): MockWebSocket {
   const socket = MockWebSocket.instances.at(-1);
@@ -50,7 +60,7 @@ describe('WorkbenchPage', () => {
   });
 
   it('renders idle with Cascade selected, English ↔ Spanish as the default language pair, and empty transcript panes', () => {
-    render(<WorkbenchPage />);
+    renderWorkbench();
 
     const tabs = screen.getAllByRole('tab');
     expect(tabs.map((tab) => tab.textContent)).toEqual(['Cascade', 'Realtime']);
@@ -68,14 +78,14 @@ describe('WorkbenchPage', () => {
   });
 
   it('does not reference WebSocket/RTCPeerConnection instances at idle — no transport has been created yet', () => {
-    render(<WorkbenchPage />);
+    renderWorkbench();
     expect(MockWebSocket.instances).toHaveLength(0);
     expect(MockRTCPeerConnection.instances).toHaveLength(0);
   });
 
   it('switches mode before a session starts: connecting after switching to Realtime uses fetch, not a WebSocket', async () => {
     const user = userEvent.setup();
-    render(<WorkbenchPage />);
+    renderWorkbench();
 
     await user.click(screen.getByRole('tab', { name: 'Realtime' }));
     expect(screen.getByRole('tab', { name: 'Realtime' })).toHaveAttribute('aria-selected', 'true');
@@ -88,7 +98,7 @@ describe('WorkbenchPage', () => {
 
   it('streams Cascade transcripts live, appended incrementally, and shows the Connected badge', async () => {
     const user = userEvent.setup();
-    render(<WorkbenchPage />);
+    renderWorkbench();
 
     const socket = await connectCascade(user);
 
@@ -104,7 +114,7 @@ describe('WorkbenchPage', () => {
 
   it('streams Realtime transcripts live over the oai-events data channel, source and target independently', async () => {
     const user = userEvent.setup();
-    render(<WorkbenchPage />);
+    renderWorkbench();
 
     await user.click(screen.getByRole('tab', { name: 'Realtime' }));
     await user.click(micButton());
@@ -130,7 +140,7 @@ describe('WorkbenchPage', () => {
 
   it('switches mode mid-session: tears down the live Cascade session, leaves Realtime idle, and does not auto-reconnect', async () => {
     const user = userEvent.setup();
-    render(<WorkbenchPage />);
+    renderWorkbench();
 
     const socket = await connectCascade(user);
 
@@ -148,7 +158,7 @@ describe('WorkbenchPage', () => {
       throw new DOMException('denied', 'NotAllowedError');
     });
     const user = userEvent.setup();
-    render(<WorkbenchPage />);
+    renderWorkbench();
 
     await user.click(micButton());
 
@@ -161,7 +171,7 @@ describe('WorkbenchPage', () => {
       throw new DOMException('denied', 'NotAllowedError');
     });
     const user = userEvent.setup();
-    render(<WorkbenchPage />);
+    renderWorkbench();
 
     await user.click(micButton());
     const banner = await screen.findByRole('alert');
@@ -180,7 +190,7 @@ describe('WorkbenchPage', () => {
   });
 
   it('drives the level meter bar width from the live mic level, starting at 0%', () => {
-    render(<WorkbenchPage />);
+    renderWorkbench();
     expect(screen.getByTestId('mic-level-bar')).toHaveStyle({ width: '0%' });
   });
 
@@ -188,7 +198,7 @@ describe('WorkbenchPage', () => {
     const user = userEvent.setup();
     const fetchMock = createRealtimeFetchRouter();
     vi.stubGlobal('fetch', fetchMock);
-    render(<WorkbenchPage />);
+    renderWorkbench();
 
     await user.click(screen.getByRole('tab', { name: 'Realtime' }));
     await user.click(micButton());
@@ -203,7 +213,7 @@ describe('WorkbenchPage', () => {
 
   it('mic button click while connected disconnects the active session', async () => {
     const user = userEvent.setup();
-    render(<WorkbenchPage />);
+    renderWorkbench();
 
     const socket = await connectCascade(user);
     await user.click(micButton());
@@ -215,7 +225,7 @@ describe('WorkbenchPage', () => {
   describe('Cascade diarization speaker badges (ticket 04)', () => {
     it('labels two alternating speakers with distinct, color-coded badges in both panes', async () => {
       const user = userEvent.setup();
-      render(<WorkbenchPage />);
+      renderWorkbench();
 
       const socket = await connectCascade(user);
 
@@ -257,7 +267,7 @@ describe('WorkbenchPage', () => {
 
     it('falls back to a plain, badge-free paragraph for a segment with no diarized speaker', async () => {
       const user = userEvent.setup();
-      render(<WorkbenchPage />);
+      renderWorkbench();
 
       const socket = await connectCascade(user);
 
@@ -269,7 +279,7 @@ describe('WorkbenchPage', () => {
 
     it('keeps a segment under its badge as interim text streams in incrementally', async () => {
       const user = userEvent.setup();
-      render(<WorkbenchPage />);
+      renderWorkbench();
 
       const socket = await connectCascade(user);
 
@@ -289,7 +299,7 @@ describe('WorkbenchPage', () => {
 
     it('never shows speaker badges in Realtime mode', async () => {
       const user = userEvent.setup();
-      render(<WorkbenchPage />);
+      renderWorkbench();
 
       await user.click(screen.getByRole('tab', { name: 'Realtime' }));
       await user.click(micButton());
@@ -312,7 +322,7 @@ describe('WorkbenchPage', () => {
   describe('LLM-hybrid segmentation trigger annotation (ticket 05)', () => {
     it('annotates a segment with its segment_boundary trigger once one arrives, in both panes', async () => {
       const user = userEvent.setup();
-      render(<WorkbenchPage />);
+      renderWorkbench();
 
       const socket = await connectCascade(user);
 
@@ -328,7 +338,7 @@ describe('WorkbenchPage', () => {
 
     it('shows a segment with no trigger yet — and a Deepgram-triggered one — without a misleading annotation', async () => {
       const user = userEvent.setup();
-      render(<WorkbenchPage />);
+      renderWorkbench();
 
       const socket = await connectCascade(user);
 
@@ -347,7 +357,7 @@ describe('WorkbenchPage', () => {
   describe('latency instrumentation (ticket 06)', () => {
     it('shows no latency strip or badge before a segment/turn has completed, in either mode', async () => {
       const user = userEvent.setup();
-      render(<WorkbenchPage />);
+      renderWorkbench();
 
       await connectCascade(user);
       expect(screen.queryByTestId('cascade-latency-strip')).not.toBeInTheDocument();
@@ -356,7 +366,7 @@ describe('WorkbenchPage', () => {
 
     it('renders the Cascade latency strip once a segment completes, with a badge per stage and the biggest jump flagged', async () => {
       const user = userEvent.setup();
-      render(<WorkbenchPage />);
+      renderWorkbench();
 
       const socket = await connectCascade(user);
 
@@ -387,7 +397,7 @@ describe('WorkbenchPage', () => {
 
     it('switches the Cascade latency strip to whichever segment most recently completed', async () => {
       const user = userEvent.setup();
-      render(<WorkbenchPage />);
+      renderWorkbench();
 
       const socket = await connectCascade(user);
 
@@ -401,7 +411,7 @@ describe('WorkbenchPage', () => {
 
     it('renders the Realtime latency badge once the turn completes, against the 1500ms target', async () => {
       const user = userEvent.setup();
-      render(<WorkbenchPage />);
+      renderWorkbench();
 
       await user.click(screen.getByRole('tab', { name: 'Realtime' }));
       await user.click(micButton());
@@ -427,12 +437,25 @@ describe('WorkbenchPage', () => {
 
       nowSpy.mockRestore();
     });
+
+    it('still renders the Cascade latency strip on / with the AppShell router in place', async () => {
+      const user = userEvent.setup();
+      const router = createMemoryRouter(createAppRoutes(), { initialEntries: ['/'] });
+      render(<RouterProvider router={router} />);
+
+      const socket = await connectCascade(user);
+      socket.emitMessage(JSON.stringify({ type: 'latency', segmentId: 's1', stage: 'playback_start', ms: 650 }));
+
+      expect(await screen.findByTestId('cascade-latency-strip')).toHaveTextContent('playback 650ms');
+      expect(screen.getByRole('tab', { name: 'Workbench' })).toHaveAttribute('aria-selected', 'true');
+      expect(screen.getByRole('tab', { name: 'Observability' })).toHaveAttribute('aria-selected', 'false');
+    });
   });
 
   describe('ticket 07: Cascade error handling & session resilience', () => {
     it('shows an amber Reconnecting badge when the Cascade WebSocket drops unexpectedly, then Connected again once resumed', async () => {
       const user = userEvent.setup();
-      render(<WorkbenchPage />);
+      renderWorkbench();
 
       const socket = await connectCascade(user);
       socket.emitMessage(JSON.stringify({ type: 'session_started', sessionId: 'sess-1' }));
@@ -459,7 +482,7 @@ describe('WorkbenchPage', () => {
 
     it('shows the blocking "Interpretation unavailable" state when the circuit breaker trips, with a way to start a fresh session', async () => {
       const user = userEvent.setup();
-      render(<WorkbenchPage />);
+      renderWorkbench();
 
       const socket = await connectCascade(user);
 
@@ -483,7 +506,7 @@ describe('WorkbenchPage', () => {
 
     it('shows a non-blocking toast for a retryable Cascade error without interrupting the transcript UI', async () => {
       const user = userEvent.setup();
-      render(<WorkbenchPage />);
+      renderWorkbench();
 
       const socket = await connectCascade(user);
       socket.emitMessage(JSON.stringify({ type: 'source_transcript', segmentId: 's1', text: 'Hello', isFinal: true }));

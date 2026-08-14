@@ -19,6 +19,8 @@ as any other provider (see `test_segmentation.py`, which instead drives
 all).
 """
 
+import os
+
 import pytest
 
 from app import orchestrator
@@ -31,6 +33,19 @@ class _NeverCompleteSegmentationChecker:
     async def is_complete_clause(self, text: str, language: str) -> bool:
         del text, language
         return False
+
+
+@pytest.fixture(autouse=True)
+def _clear_otel_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep the suite from inheriting a developer's OTel shell.
+
+    `init_telemetry` decides whether to install a TracerProvider / MeterProvider
+    from `OTEL_*` env vars. A leftover `OTEL_EXPORTER_OTLP_ENDPOINT` in the
+    process environment would otherwise make empty-env tests lie, and would
+    let the suite open outbound OTLP connections.
+    """
+    for key in [name for name in os.environ if name.startswith("OTEL_")]:
+        monkeypatch.delenv(key, raising=False)
 
 
 @pytest.fixture(autouse=True)

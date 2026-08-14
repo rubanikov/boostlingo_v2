@@ -1,8 +1,12 @@
 import { vi } from 'vitest';
-import { OPENAI_REALTIME_CALLS_ENDPOINT, REALTIME_SESSION_ENDPOINT } from '../pages/realtimeConfig';
+import {
+  OPENAI_REALTIME_CALLS_ENDPOINT,
+  REALTIME_SESSION_ENDPOINT,
+  TELEMETRY_REALTIME_TURN_ENDPOINT,
+} from '../pages/realtimeConfig';
 import { FakeAnalyserNode } from './mockAudioAnalysis';
 
-/** Minimal fetch Response stand-in — only the members useRealtimeSession reads. */
+/** Minimal fetch Response stand-in: only the members useRealtimeSession reads. */
 export interface FakeFetchResponse {
   ok: boolean;
   status: number;
@@ -39,16 +43,21 @@ export function textResponse(body: string, status = 200): FakeFetchResponse {
 export function createRealtimeFetchRouter(overrides?: {
   sessionResponse?: FakeFetchResponse;
   callsResponse?: FakeFetchResponse;
+  telemetryTurnResponse?: FakeFetchResponse;
 }) {
   const sessionResponse =
     overrides?.sessionResponse ??
     jsonResponse({ client_secret: 'ek_test_token', expires_at: 1893456000, model: 'gpt-realtime', voice: 'alloy' });
   const callsResponse = overrides?.callsResponse ?? textResponse('v=0\r\no=- fake-answer\r\n');
+  const telemetryTurnResponse = overrides?.telemetryTurnResponse;
 
   return vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input.toString();
     if (url === REALTIME_SESSION_ENDPOINT) return sessionResponse;
     if (url === OPENAI_REALTIME_CALLS_ENDPOINT) return callsResponse;
+    if (telemetryTurnResponse && url === TELEMETRY_REALTIME_TURN_ENDPOINT) {
+      return telemetryTurnResponse;
+    }
     throw new Error(`Unexpected fetch to ${url}`);
   });
 }

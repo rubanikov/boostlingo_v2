@@ -9,6 +9,7 @@ import {
   onSpeechStopped,
   type RealtimeLatencyState,
 } from './realtimeLatency';
+import { extractRealtimeTurnUsage, reportRealtimeTurn } from './realtimeTelemetry';
 import type { ConnectionStatus, SessionHandle, SessionLanguages } from './sessionHandle';
 
 export type { ConnectionStatus } from './sessionHandle';
@@ -21,12 +22,15 @@ interface RealtimeSessionResponse {
   expires_at: number;
   model: string;
   voice: string;
+  telemetry_token?: string | null;
+  telemetry_expires_at?: number | null;
+  trace_id?: string | null;
 }
 
 /**
- * One JSON event from the `oai-events` WebRTC data channel. Only the
- * transcript-delta events we handle below are typed further; every other
- * event type (session.*, response.*, ...) is ignored for this ticket.
+ * One JSON event from the `oai-events` WebRTC data channel. Transcript
+ * deltas and `response.done` (turn ingest) are handled below; everything
+ * else is ignored.
  */
 interface OaiEvent {
   type: string;
@@ -57,6 +61,15 @@ export function useRealtimeSession(): UseRealtimeSessionResult {
   const dataChannelRef = useRef<RTCDataChannel | null>(null);
   const levelAudioContextRef = useRef<AudioContext | null>(null);
   const levelMeterRef = useRef<MicLevelMeter | null>(null);
+  // Telemetry token is session-scoped and must not outlive the tab: a ref,
+  // never localStorage/sessionStorage. Opaque — we forward it, never parse it.
+  const telemetryTokenRef = useRef<string | null>(null);
+  const languagesRef = useRef<SessionLanguages | null>(null);
+  const modelRef = useRef<string | null>(null);
+  const turnIndexRef = useRef(0);
+  const turnSourceTextRef = useRef('');
+  const turnTargetTextRef = useRef('');
+  const latencyStateRef = useRef<RealtimeLatencyState>(EMPTY_REALTIME_LATENCY);
 
   const fail = useCallback((message: string) => {
     setStatus('error');
@@ -76,6 +89,7 @@ export function useRealtimeSession(): UseRealtimeSessionResult {
       // What the user said, as it's transcribed.
       case 'conversation.item.input_audio_transcription.delta':
         if (typeof message.delta === 'string') {
+          turnSourceTextRef.current += message.delta;
           setSourceText((text) => text + message.delta);
         }
         break;
@@ -83,19 +97,48 @@ export function useRealtimeSession(): UseRealtimeSessionResult {
       // end-to-end latency measurement (ticket 06). There is no backend
       // visibility in Realtime mode, so this and the transcript delta below
       // are measured entirely client-side from data-channel events.
-      case 'input_audio_buffer.speech_stopped':
-        setLatencyState((state) => onSpeechStopped(state, Date.now()));
+      case 'input_audio_buffer.speech_stopped': {
+        const next = onSpeechStopped(latencyStateRef.current, Date.now());
+        latencyStateRef.current = next;
+        setLatencyState(next);
         break;
+      }
       // What the model is saying back, as it's synthesized. Its first
       // occurrence after speech_stopped is our proxy for "the response has
       // started"; see realtimeLatency.ts for why this is an approximation,
       // not a precise playback-start timestamp.
-      case 'response.output_audio_transcript.delta':
+      case 'response.output_audio_transcript.delta': {
         if (typeof message.delta === 'string') {
+          turnTargetTextRef.current += message.delta;
           setTargetText((text) => text + message.delta);
         }
-        setLatencyState((state) => onResponseAudioTranscriptDelta(state, Date.now()));
+        const next = onResponseAudioTranscriptDelta(latencyStateRef.current, Date.now());
+        latencyStateRef.current = next;
+        setLatencyState(next);
         break;
+      }
+      // Turn settled: report once, using the latency timestamps above.
+      // Ingest failures must not touch setStatus/fail — WebRTC stays up.
+      case 'response.done': {
+        const latency = latencyStateRef.current;
+        reportRealtimeTurn(telemetryTokenRef.current, {
+          turnIndex: turnIndexRef.current,
+          speechStoppedAt: latency.speechStoppedAt,
+          endToEndMs: latency.endToEndMs,
+          sourceText: turnSourceTextRef.current || null,
+          targetText: turnTargetTextRef.current || null,
+          sourceLanguage: languagesRef.current?.sourceLanguage,
+          targetLanguage: languagesRef.current?.targetLanguage,
+          model: modelRef.current,
+          usage: extractRealtimeTurnUsage(message),
+        });
+        if (latency.speechStoppedAt !== null && latency.endToEndMs !== null) {
+          turnIndexRef.current += 1;
+        }
+        turnSourceTextRef.current = '';
+        turnTargetTextRef.current = '';
+        break;
+      }
       default:
         break;
     }
@@ -116,6 +159,7 @@ export function useRealtimeSession(): UseRealtimeSessionResult {
   // unmount cleanup effect below.
   const teardown = useCallback(() => {
     stopLevelMetering();
+    telemetryTokenRef.current = null;
     dataChannelRef.current = null;
     peerConnectionRef.current?.close();
     peerConnectionRef.current = null;
@@ -141,6 +185,13 @@ export function useRealtimeSession(): UseRealtimeSessionResult {
         setSourceText('');
         setTargetText('');
         setLatencyState(EMPTY_REALTIME_LATENCY);
+        telemetryTokenRef.current = null;
+        languagesRef.current = languages;
+        modelRef.current = null;
+        turnIndexRef.current = 0;
+        turnSourceTextRef.current = '';
+        turnTargetTextRef.current = '';
+        latencyStateRef.current = EMPTY_REALTIME_LATENCY;
 
         const stream = await requestMicStream(true, fail);
         if (!stream) {
@@ -170,6 +221,8 @@ export function useRealtimeSession(): UseRealtimeSessionResult {
             throw new Error(`Session request failed with status ${response.status}`);
           }
           session = await response.json();
+          telemetryTokenRef.current = session.telemetry_token ?? null;
+          modelRef.current = session.model;
         } catch {
           fail('Could not start a realtime session. Is the backend running?');
           stopLevelMetering();

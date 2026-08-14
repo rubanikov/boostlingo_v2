@@ -1,9 +1,25 @@
+import logging
+import os
+import time
+import uuid
+
 import httpx
 from fastapi import APIRouter, HTTPException
+from opentelemetry.trace import Status, StatusCode
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.config import settings
 from app.languages import SUPPORTED_LANGUAGES
+from app.observability.metrics import record_mint_failure
+from app.observability.spans import (
+    ATTR_MODE,
+    ATTR_SESSION_ID,
+    NAME_REALTIME_SESSION,
+    get_tracer,
+)
+from app.observability.telemetry_tokens import mint_telemetry_token
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/realtime", tags=["realtime"])
 
@@ -41,6 +57,27 @@ class RealtimeSessionResponse(BaseModel):
     )
     model: str = Field(description="The realtime model this token is bound to.")
     voice: str = Field(description="The voice this session will speak with.")
+    telemetry_token: str | None = Field(
+        default=None,
+        description=(
+            "Opaque HMAC token the browser forwards on turn ingest. "
+            "Null when OTLP is off."
+        ),
+    )
+    telemetry_expires_at: int | None = Field(
+        default=None,
+        description=(
+            "Unix timestamp (seconds) when telemetry_token expires. "
+            "Null when OTLP is off."
+        ),
+    )
+    trace_id: str | None = Field(
+        default=None,
+        description=(
+            "32-hex OTel trace id for this Realtime session. "
+            "Null when OTLP is off."
+        ),
+    )
 
 
 def _bad_upstream_response(status_code: int) -> HTTPException:
@@ -148,41 +185,74 @@ async def create_realtime_session(
         },
     }
 
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.post(
-                OPENAI_CLIENT_SECRETS_URL,
-                headers={
-                    "Authorization": f"Bearer {settings.openai_api_key}",
-                    "Content-Type": "application/json",
-                },
-                json=payload,
-                timeout=10.0,
-            )
-        except httpx.HTTPError as exc:
-            raise HTTPException(
-                status_code=502,
-                detail="Failed to reach OpenAI Realtime API.",
-            ) from exc
+    sid = uuid.uuid4().hex
+    telemetry_token: str | None = None
+    telemetry_expires_at: int | None = None
+    trace_id: str | None = None
 
-    if response.status_code >= 400:
-        raise _bad_upstream_response(response.status_code)
+    with get_tracer().start_as_current_span(NAME_REALTIME_SESSION) as session_span:
+        session_span.set_attribute(ATTR_MODE, "realtime")
+        session_span.set_attribute(ATTR_SESSION_ID, sid)
 
-    data = response.json()
-    session = data.get("session", {})
-    audio_output = session.get("audio", {}).get("output") or {}
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(
+                    OPENAI_CLIENT_SECRETS_URL,
+                    headers={
+                        "Authorization": f"Bearer {settings.openai_api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json=payload,
+                    timeout=10.0,
+                )
+            except httpx.HTTPError as exc:
+                session_span.set_status(Status(StatusCode.ERROR))
+                record_mint_failure(reason="unreachable")
+                raise HTTPException(
+                    status_code=502,
+                    detail="Failed to reach OpenAI Realtime API.",
+                ) from exc
 
-    client_secret = data.get("value")
-    expires_at = data.get("expires_at")
-    if client_secret is None or expires_at is None:
-        # A 2xx with an unexpected/missing-field body (a schema change, a
-        # proxy/intermediary quirk). Same clean 502 as the >=400 branch
-        # above, not an unhandled KeyError.
-        raise _bad_upstream_response(response.status_code)
+        if response.status_code >= 400:
+            session_span.set_status(Status(StatusCode.ERROR))
+            record_mint_failure(reason="upstream_status")
+            raise _bad_upstream_response(response.status_code)
+
+        data = response.json()
+        session = data.get("session", {})
+        audio_output = session.get("audio", {}).get("output") or {}
+
+        client_secret = data.get("value")
+        expires_at = data.get("expires_at")
+        if client_secret is None or expires_at is None:
+            # A 2xx with an unexpected/missing-field body (a schema change, a
+            # proxy/intermediary quirk). Same clean 502 as the >=400 branch
+            # above, not an unhandled KeyError.
+            session_span.set_status(Status(StatusCode.ERROR))
+            record_mint_failure(reason="malformed_response")
+            raise _bad_upstream_response(response.status_code)
+
+        if _otlp_configured():
+            try:
+                ctx = session_span.get_span_context()
+                tid = format(ctx.trace_id, "032x") if ctx.is_valid else uuid.uuid4().hex
+                exp = int(time.time()) + settings.telemetry_token_ttl_seconds
+                telemetry_token = mint_telemetry_token(sid=sid, tid=tid, exp=exp)
+                telemetry_expires_at = exp
+                trace_id = tid
+            except Exception:
+                logger.exception("failed to mint realtime telemetry token")
 
     return RealtimeSessionResponse(
         client_secret=client_secret,
         expires_at=expires_at,
         model=session.get("model", REALTIME_MODEL),
         voice=audio_output.get("voice", REALTIME_VOICE),
+        telemetry_token=telemetry_token,
+        telemetry_expires_at=telemetry_expires_at,
+        trace_id=trace_id,
     )
+
+
+def _otlp_configured() -> bool:
+    return bool(os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "").strip())

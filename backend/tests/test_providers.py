@@ -389,8 +389,9 @@ class _FakeChoice:
 
 
 class _FakeChunk:
-    def __init__(self, content: str | None) -> None:
+    def __init__(self, content: str | None, usage=None) -> None:
         self.choices = [_FakeChoice(content)] if content is not None else []
+        self.usage = usage
 
 
 class _FakeChatStream:
@@ -427,6 +428,37 @@ class TestOpenAITranslationProvider:
         ]
 
         assert deltas == ["Hola", " ", "mundo"]
+
+    @pytest.mark.asyncio
+    async def test_usage_only_chunk_is_exposed_as_last_usage(self, monkeypatch):
+        class _Usage:
+            prompt_tokens = 12
+            completion_tokens = 4
+
+        class _Stream:
+            def __aiter__(self):
+                return self._drain()
+
+            async def _drain(self):
+                yield _FakeChunk("Hola")
+                yield _FakeChunk(None, usage=_Usage())
+
+        provider = OpenAITranslationProvider(api_key="test-key")
+        create = AsyncMock(return_value=_Stream())
+        monkeypatch.setattr(provider._client.chat.completions, "create", create)
+
+        deltas = [
+            chunk
+            async for chunk in provider.translate("hello", source_lang="en", target_lang="es")
+        ]
+
+        assert deltas == ["Hola"]
+        assert provider.last_usage is not None
+        assert provider.last_usage.input_tokens == 12
+        assert provider.last_usage.output_tokens == 4
+        assert provider.last_usage.model == "gpt-4o-mini"
+        assert create.await_args.kwargs["stream"] is True
+        assert create.await_args.kwargs["stream_options"] == {"include_usage": True}
 
     @pytest.mark.asyncio
     async def test_rate_limit_maps_to_retryable_error(self, monkeypatch):

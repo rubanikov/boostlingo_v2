@@ -85,6 +85,10 @@ async def test_returns_ephemeral_token_and_expiry_to_caller(
     assert body["expires_at"] == 1_999_999_999
     assert body["model"] == REALTIME_MODEL
     assert body["voice"] == "alloy"
+    # OTEL_* is cleared by the suite fixture — observability off → nulls.
+    assert body["telemetry_token"] is None
+    assert body["telemetry_expires_at"] is None
+    assert body["trace_id"] is None
 
 
 async def test_never_leaks_the_real_api_key_into_the_response(
@@ -320,3 +324,117 @@ async def test_missing_server_api_key_fails_fast_without_calling_openai(
 
     assert response.status_code == 500
     assert captured == []
+
+
+async def test_session_mint_works_with_no_obs_session_cookie(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """AC16: adding observability must not gate mic-session mint."""
+    _mock_client_secrets(monkeypatch, _success_response)
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test"
+    ) as client:
+        response = await client.post("/api/realtime/session")
+
+    assert response.status_code == 200
+    assert "set-cookie" not in {k.lower() for k in response.headers}
+
+
+async def test_session_returns_telemetry_token_when_otlp_endpoint_is_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    frozen_now = 1_700_000_000
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:1/otel")
+    monkeypatch.setattr("app.api.realtime.time.time", lambda: frozen_now)
+    _mock_client_secrets(monkeypatch, _success_response)
+
+    from app.observability.telemetry_tokens import verify_telemetry_token
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test"
+    ) as client:
+        response = await client.post("/api/realtime/session")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["client_secret"] == "ek_test_ephemeral_token"
+    assert body["expires_at"] == 1_999_999_999
+    assert body["model"] == REALTIME_MODEL
+    assert body["voice"] == "alloy"
+    assert body["telemetry_token"]
+    assert body["telemetry_expires_at"] == frozen_now + 7200
+    assert body["trace_id"]
+    assert len(body["trace_id"]) == 32
+
+    claims = verify_telemetry_token(body["telemetry_token"], now=frozen_now)
+    assert claims is not None
+    assert claims.tid == body["trace_id"]
+    assert claims.exp == frozen_now + 7200
+    assert claims.sid
+
+
+async def test_mint_failure_ends_session_span_error_and_increments_metric(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from opentelemetry.sdk.metrics import MeterProvider
+    from opentelemetry.sdk.metrics.export import InMemoryMetricReader
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
+        InMemorySpanExporter,
+    )
+    from opentelemetry.trace import StatusCode
+
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:1/otel")
+
+    exporter = InMemorySpanExporter()
+    tracer_provider = TracerProvider()
+    tracer_provider.add_span_processor(SimpleSpanProcessor(exporter))
+    monkeypatch.setattr(
+        "app.observability.spans.trace.get_tracer",
+        tracer_provider.get_tracer,
+    )
+
+    reader = InMemoryMetricReader()
+    meter_provider = MeterProvider(metric_readers=[reader])
+    monkeypatch.setattr(
+        "app.observability.metrics.metrics.get_meter",
+        meter_provider.get_meter,
+    )
+
+    def _unauthorized(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            status_code=401,
+            json={"error": {"message": "Incorrect API key provided"}},
+            request=request,
+        )
+
+    _mock_client_secrets(monkeypatch, _unauthorized)
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test"
+    ) as client:
+        response = await client.post("/api/realtime/session")
+
+    assert response.status_code == 502
+
+    session_spans = [s for s in exporter.get_finished_spans() if s.name == "realtime.session"]
+    assert len(session_spans) == 1
+    assert session_spans[0].status.status_code == StatusCode.ERROR
+
+    metric_names: list[str] = []
+    points = 0
+    data = reader.get_metrics_data()
+    if data is not None:
+        for resource in data.resource_metrics:
+            for scope in resource.scope_metrics:
+                for metric in scope.metrics:
+                    metric_names.append(metric.name)
+                    if metric.name == "interpreter.realtime.mint.failures":
+                        points += sum(int(p.value) for p in metric.data.data_points)
+    assert "interpreter.realtime.mint.failures" in metric_names
+    assert points >= 1

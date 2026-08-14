@@ -99,6 +99,9 @@ from fastapi import WebSocket, WebSocketDisconnect
 
 from app.config import settings
 from app.languages import SUPPORTED_LANGUAGES
+from app.observability import metrics as obs_metrics
+from app.observability import spans as obs_spans
+from app.origins import is_allowed_origin
 from app.providers._resilience import retry_backoffs
 from app.providers.base import (
     AudioChunk,
@@ -194,6 +197,8 @@ class _CompletedSegment:
     text: str
     speaker: int | None
     detected_language: str | None
+    otel: obs_spans.SpanHandle | None = None
+    started_at: float = 0.0
 
 
 class _LatencyTracker:
@@ -369,6 +374,7 @@ class _DetachedSession:
     stt_task: "asyncio.Task[None]"
     pipeline_task: "asyncio.Task[None]"
     expiry_task: "asyncio.Task[None] | None" = field(default=None)
+    otel_context: obs_spans.SpanHandle | None = field(default=None)
 
 
 # Module-level registry of detached sessions: deliberately simple
@@ -390,7 +396,7 @@ async def run_cascade_session(websocket: WebSocket) -> None:
     # *browser*-originated cross-site abuse specifically, not all
     # non-browser clients.
     origin = websocket.headers.get("origin")
-    if origin is not None and origin not in settings.cors_origins:
+    if not is_allowed_origin(origin):
         logger.warning("rejecting WebSocket connect from disallowed origin %r", origin)
         await websocket.close(code=1008, reason="origin not allowed")
         return
@@ -478,6 +484,9 @@ async def _start_new_session(websocket: WebSocket, payload: dict) -> None:
     # `resume_session`. See the module docstring's Ticket 7 section.
     await outgoing.send_json({"type": "session_started", "sessionId": session_id})
 
+    session_otel = obs_spans.start_session_span(session_id, (source_lang, target_lang), segmentation_mode)
+    token = obs_spans.attach(session_otel)
+
     latency = _LatencyTracker()
     breaker = _CircuitBreaker()
     audio_queue: asyncio.Queue[bytes | object] = asyncio.Queue()
@@ -490,34 +499,39 @@ async def _start_new_session(websocket: WebSocket, payload: dict) -> None:
     )
     segmentation_checker = SegmentationChecker(settings.openai_api_key)
 
-    stt_task = asyncio.create_task(
-        _run_stt(
-            stt_provider,
-            audio_queue,
-            segment_queue,
-            outgoing,
-            latency,
-            source_lang,
-            target_lang,
-            breaker,
-            segmentation_checker,
-            segmentation_mode,
+    try:
+        stt_task = asyncio.create_task(
+            _run_stt(
+                stt_provider,
+                audio_queue,
+                segment_queue,
+                outgoing,
+                latency,
+                source_lang,
+                target_lang,
+                breaker,
+                segmentation_checker,
+                segmentation_mode,
+            )
         )
-    )
-    pipeline_task = asyncio.create_task(
-        _run_pipeline(
-            segment_queue,
-            translation_provider,
-            tts_provider,
-            outgoing,
-            latency,
-            source_lang,
-            target_lang,
-            breaker,
+        pipeline_task = asyncio.create_task(
+            _run_pipeline(
+                segment_queue,
+                translation_provider,
+                tts_provider,
+                outgoing,
+                latency,
+                source_lang,
+                target_lang,
+                breaker,
+            )
         )
-    )
 
-    await _serve_session(session_id, websocket, outgoing, audio_queue, latency, stt_task, pipeline_task)
+        await _serve_session(
+            session_id, websocket, outgoing, audio_queue, latency, stt_task, pipeline_task, session_otel
+        )
+    finally:
+        obs_spans.detach(token)
 
 
 async def _resume_session(websocket: WebSocket, payload: dict) -> None:
@@ -548,15 +562,20 @@ async def _resume_session(websocket: WebSocket, payload: dict) -> None:
 
     detached.outgoing.rebind(websocket)
     logger.info("session %s resumed", session_id)
-    await _serve_session(
-        session_id,
-        websocket,
-        detached.outgoing,
-        detached.audio_queue,
-        detached.latency,
-        detached.stt_task,
-        detached.pipeline_task,
-    )
+    token = obs_spans.attach(detached.otel_context)
+    try:
+        await _serve_session(
+            session_id,
+            websocket,
+            detached.outgoing,
+            detached.audio_queue,
+            detached.latency,
+            detached.stt_task,
+            detached.pipeline_task,
+            detached.otel_context,
+        )
+    finally:
+        obs_spans.detach(token)
 
 
 async def _serve_session(
@@ -567,6 +586,7 @@ async def _serve_session(
     latency: _LatencyTracker,
     stt_task: "asyncio.Task[None]",
     pipeline_task: "asyncio.Task[None]",
+    session_otel: obs_spans.SpanHandle | None = None,
 ) -> None:
     """Runs `_pump_client_messages` for one attached WebSocket (fresh or
     resumed) and decides what happens when it stops: a clean,
@@ -577,15 +597,20 @@ async def _serve_session(
         await _pump_client_messages(websocket, audio_queue, outgoing, latency)
     except WebSocketDisconnect:
         outgoing.detach()
-        await _detach_session(session_id, outgoing, audio_queue, latency, stt_task, pipeline_task)
+        await _detach_session(
+            session_id, outgoing, audio_queue, latency, stt_task, pipeline_task, session_otel
+        )
         return
-    await _teardown_session(audio_queue, stt_task, pipeline_task)
+    await _teardown_session(audio_queue, stt_task, pipeline_task, session_otel, end_reason="closed")
 
 
 async def _teardown_session(
     audio_queue: "asyncio.Queue[bytes | object]",
     stt_task: "asyncio.Task[None]",
     pipeline_task: "asyncio.Task[None]",
+    session_otel: obs_spans.SpanHandle | None = None,
+    *,
+    end_reason: str = "closed",
 ) -> None:
     audio_queue.put_nowait(_END_OF_AUDIO)
     with contextlib.suppress(Exception):
@@ -593,6 +618,9 @@ async def _teardown_session(
     pipeline_task.cancel()
     with contextlib.suppress(BaseException):
         await pipeline_task
+    obs_spans.end_session_span(
+        session_otel, end_reason=end_reason, error=end_reason == "grace_window_expired"
+    )
 
 
 async def _detach_session(
@@ -602,8 +630,11 @@ async def _detach_session(
     latency: _LatencyTracker,
     stt_task: "asyncio.Task[None]",
     pipeline_task: "asyncio.Task[None]",
+    session_otel: obs_spans.SpanHandle | None = None,
 ) -> None:
-    detached = _DetachedSession(session_id, outgoing, audio_queue, latency, stt_task, pipeline_task)
+    detached = _DetachedSession(
+        session_id, outgoing, audio_queue, latency, stt_task, pipeline_task, otel_context=session_otel
+    )
     detached.expiry_task = asyncio.create_task(_expire_after_grace_window(session_id))
     _detached_sessions[session_id] = detached
     logger.info("session %s detached, %.0fs grace window to resume", session_id, GRACE_WINDOW_S)
@@ -615,7 +646,13 @@ async def _expire_after_grace_window(session_id: str) -> None:
     if detached is None:
         return  # already reclaimed by a `resume_session`
     logger.info("session %s grace window expired, tearing down", session_id)
-    await _teardown_session(detached.audio_queue, detached.stt_task, detached.pipeline_task)
+    await _teardown_session(
+        detached.audio_queue,
+        detached.stt_task,
+        detached.pipeline_task,
+        detached.otel_context,
+        end_reason="grace_window_expired",
+    )
 
 
 async def _pump_client_messages(
@@ -709,6 +746,8 @@ async def _record_failure_and_maybe_trip(breaker: _CircuitBreaker, outgoing: _Ou
                 "retryable": False,
             }
         )
+        obs_spans.emit_circuit_open_span()
+        obs_metrics.record_error(provider="orchestrator", kind="circuit_open", retryable=False)
 
 
 async def _cut_segment(
@@ -720,6 +759,7 @@ async def _cut_segment(
     speaker: int | None,
     detected_language: str | None,
     trigger: str,
+    started_at: float,
 ) -> None:
     """Closes out the current in-progress segment for whichever mechanism
     won Ticket 5's segmentation race: `trigger` is one of
@@ -736,7 +776,19 @@ async def _cut_segment(
     await outgoing.send_json(
         {"type": "latency", "segmentId": segment_id, "stage": "speech_end", "ms": 0}
     )
-    segment_queue.put_nowait(_CompletedSegment(segment_id, buffer, speaker, detected_language))
+    segment_otel = obs_spans.SpanHandle()
+    try:
+        segment_otel = obs_spans.start_segment_span(segment_id, trigger, speaker, detected_language)
+        obs_spans.close_stt_span(segment_otel, buffer, speaker, detected_language)
+        obs_metrics.record_stage_duration("stt", max((time.perf_counter() - started_at) * 1000, 0))
+    except Exception:
+        logger.exception("segment telemetry failed; continuing without a span")
+        segment_otel = obs_spans.SpanHandle()
+    segment_queue.put_nowait(
+        _CompletedSegment(
+            segment_id, buffer, speaker, detected_language, otel=segment_otel, started_at=started_at
+        )
+    )
 
 
 async def _run_stt(
@@ -834,6 +886,7 @@ async def _run_stt(
     while True:
         buffer = ""
         segment_id = _new_segment_id()
+        segment_started_at = time.perf_counter()
         # Latest known speaker/detected_language for the segment in
         # progress: updated from every result (interim and final) so
         # preview messages reflect it too, carried into the
@@ -889,9 +942,11 @@ async def _run_stt(
                                 current_speaker,
                                 current_detected_language,
                                 "deepgram_utterance_end",
+                                segment_started_at,
                             )
                             buffer = ""
                             segment_id = _new_segment_id()
+                            segment_started_at = time.perf_counter()
                             current_speaker = None
                             current_detected_language = None
                         continue
@@ -960,9 +1015,11 @@ async def _run_stt(
                                 current_speaker,
                                 current_detected_language,
                                 "deepgram_speech_final",
+                                segment_started_at,
                             )
                         buffer = ""
                         segment_id = _new_segment_id()
+                        segment_started_at = time.perf_counter()
                         current_speaker = None
                         current_detected_language = None
 
@@ -987,9 +1044,11 @@ async def _run_stt(
                             current_speaker,
                             current_detected_language,
                             "llm",
+                            segment_started_at,
                         )
                         buffer = ""
                         segment_id = _new_segment_id()
+                        segment_started_at = time.perf_counter()
                         current_speaker = None
                         current_detected_language = None
         except ProviderError as exc:
@@ -1033,6 +1092,7 @@ async def _run_pipeline(
             # draining the queue so it can't grow unbounded while STT (a
             # separate task, unaware of the breaker) keeps producing.
             latency.discard(segment.segment_id)
+            obs_spans.end_segment_span(segment.otel)
             continue
         succeeded = await _process_segment(
             segment, translation_provider, tts_provider, outgoing, latency, source_lang, target_lang
@@ -1053,6 +1113,7 @@ async def _emit_latency(
     await outgoing.send_json(
         {"type": "latency", "segmentId": segment_id, "stage": stage, "ms": ms}
     )
+    obs_spans.add_current_span_event(stage)
 
 
 async def _run_translation_with_retry(
@@ -1089,56 +1150,87 @@ async def _run_translation_with_retry(
     while True:
         translated_text = ""
         first_delta = True
-        try:
-            async for chunk in translation_provider.translate(
-                segment.text, source_lang=from_lang, target_lang=to_lang
-            ):
-                if first_delta:
-                    first_delta = False
-                    await _emit_latency(
-                        outgoing, latency, segment.segment_id, "translation_first_token"
+        t0 = time.perf_counter()
+        with obs_spans.stage_span(obs_spans.NAME_LLM, parent=segment.otel, attempt=attempt) as span:
+            try:
+                async for chunk in translation_provider.translate(
+                    segment.text, source_lang=from_lang, target_lang=to_lang
+                ):
+                    if first_delta:
+                        first_delta = False
+                        await _emit_latency(
+                            outgoing, latency, segment.segment_id, "translation_first_token"
+                        )
+                    translated_text += chunk
+                    await outgoing.send_json(
+                        {
+                            "type": "target_transcript",
+                            "segmentId": segment.segment_id,
+                            "text": translated_text,
+                            "isFinal": False,
+                            "speaker": segment.speaker,
+                        }
                     )
-                translated_text += chunk
-                await outgoing.send_json(
-                    {
-                        "type": "target_transcript",
-                        "segmentId": segment.segment_id,
-                        "text": translated_text,
-                        "isFinal": False,
-                        "speaker": segment.speaker,
-                    }
+                    await tts_input.put(TTSText(chunk))
+                if not translated_text:
+                    raise ProviderError(
+                        ProviderErrorKind.EMPTY_RESULT,
+                        "translation",
+                        "translation produced no output for non-empty source text",
+                        retryable=True,
+                    )
+                await _emit_latency(outgoing, latency, segment.segment_id, "translation_complete")
+                usage = getattr(translation_provider, "last_usage", None)
+                obs_spans.apply_llm_generation(
+                    span, source_text=segment.text, translated_text=translated_text, usage=usage
                 )
-                await tts_input.put(TTSText(chunk))
-            if not translated_text:
-                raise ProviderError(
-                    ProviderErrorKind.EMPTY_RESULT,
-                    "translation",
-                    "translation produced no output for non-empty source text",
-                    retryable=True,
+                obs_metrics.record_stage_duration(
+                    "translate", (time.perf_counter() - t0) * 1000
                 )
-            await _emit_latency(outgoing, latency, segment.segment_id, "translation_complete")
-            return translated_text, True
-        except ProviderError as exc:
-            if not first_delta:
-                logger.warning(
-                    "dropping segment %s: translation failed mid-stream (%s), not retrying "
-                    "(TTS already received part of this attempt's output)",
-                    segment.segment_id,
-                    exc.kind.name,
+                if usage is not None:
+                    model = getattr(usage, "model", "gpt-4o-mini")
+                    obs_metrics.record_llm_tokens(
+                        "input", int(getattr(usage, "input_tokens", 0) or 0), model=model
+                    )
+                    obs_metrics.record_llm_tokens(
+                        "output", int(getattr(usage, "output_tokens", 0) or 0), model=model
+                    )
+                    cost = obs_spans.llm_cost_usd(
+                        model,
+                        int(getattr(usage, "input_tokens", 0) or 0),
+                        int(getattr(usage, "output_tokens", 0) or 0),
+                    )
+                    if cost is not None:
+                        obs_metrics.record_llm_cost(cost, model=model)
+                return translated_text, True
+            except ProviderError as exc:
+                obs_spans.apply_llm_generation(
+                    span, source_text=segment.text, translated_text=translated_text, usage=None
                 )
-                await _send_error(outgoing, exc)
-                return "", False
-            delays = retry_backoffs(exc)
-            if attempt >= len(delays):
-                if exc.kind is ProviderErrorKind.EMPTY_RESULT:
+                obs_spans.mark_error(span, exc)
+                obs_metrics.record_stage_duration(
+                    "translate", (time.perf_counter() - t0) * 1000
+                )
+                if not first_delta:
                     logger.warning(
-                        "dropping segment %s: translation empty result, retries exhausted",
+                        "dropping segment %s: translation failed mid-stream (%s), not retrying "
+                        "(TTS already received part of this attempt's output)",
                         segment.segment_id,
+                        exc.kind.name,
                     )
-                await _send_error(outgoing, exc)
-                return "", False
-            await asyncio.sleep(delays[attempt])
-            attempt += 1
+                    await _send_error(outgoing, exc, stage_span=span)
+                    return "", False
+                delays = retry_backoffs(exc)
+                if attempt >= len(delays):
+                    if exc.kind is ProviderErrorKind.EMPTY_RESULT:
+                        logger.warning(
+                            "dropping segment %s: translation empty result, retries exhausted",
+                            segment.segment_id,
+                        )
+                    await _send_error(outgoing, exc, stage_span=span)
+                    return "", False
+                await asyncio.sleep(delays[attempt])
+                attempt += 1
 
 
 async def _run_tts_with_retry(
@@ -1164,25 +1256,34 @@ async def _run_tts_with_retry(
     attempt = 0
     while True:
         first_chunk = True
-        try:
-            async for audio in tts_provider.synthesize(input_events, voice=voice):
-                if first_chunk:
-                    first_chunk = False
-                    await _emit_latency(outgoing, latency, segment.segment_id, "tts_first_byte")
-                await outgoing.send_audio(
-                    segment_id=segment.segment_id,
-                    sample_rate=TTS_SAMPLE_RATE,
-                    audio=audio,
-                    speaker=segment.speaker,
-                )
-            return True
-        except ProviderError as exc:
-            delays = retry_backoffs(exc)
-            if attempt >= len(delays):
-                await _send_error(outgoing, exc)
-                return False
-            await asyncio.sleep(delays[attempt])
-            attempt += 1
+        audio_bytes = 0
+        t0 = time.perf_counter()
+        with obs_spans.stage_span(obs_spans.NAME_TTS, parent=segment.otel, attempt=attempt) as span:
+            try:
+                async for audio in tts_provider.synthesize(input_events, voice=voice):
+                    if first_chunk:
+                        first_chunk = False
+                        await _emit_latency(outgoing, latency, segment.segment_id, "tts_first_byte")
+                    audio_bytes += len(audio)
+                    await outgoing.send_audio(
+                        segment_id=segment.segment_id,
+                        sample_rate=TTS_SAMPLE_RATE,
+                        audio=audio,
+                        speaker=segment.speaker,
+                    )
+                obs_spans.apply_tts_attributes(span, voice=voice, audio_bytes=audio_bytes)
+                obs_metrics.record_stage_duration("tts", (time.perf_counter() - t0) * 1000)
+                return True
+            except ProviderError as exc:
+                obs_spans.apply_tts_attributes(span, voice=voice, audio_bytes=audio_bytes)
+                obs_spans.mark_error(span, exc)
+                obs_metrics.record_stage_duration("tts", (time.perf_counter() - t0) * 1000)
+                delays = retry_backoffs(exc)
+                if attempt >= len(delays):
+                    await _send_error(outgoing, exc, stage_span=span)
+                    return False
+                await asyncio.sleep(delays[attempt])
+                attempt += 1
 
 
 async def _process_segment(
@@ -1201,6 +1302,7 @@ async def _process_segment(
         segment.detected_language, configured_source, configured_target
     )
     voice = _voice_for_speaker(segment.speaker)
+    obs_spans.set_translation_direction(segment.otel, from_lang, to_lang)
 
     tts_input: asyncio.Queue[TTSText | TTSFlush] = asyncio.Queue()
 
@@ -1215,30 +1317,35 @@ async def _process_segment(
         _run_tts_with_retry(tts_provider, tts_input_iter(), voice, segment, outgoing, latency)
     )
 
-    translated_text, translation_ok = await _run_translation_with_retry(
-        translation_provider, segment, from_lang, to_lang, tts_input, outgoing, latency
-    )
-
-    if translation_ok:
-        await outgoing.send_json(
-            {
-                "type": "target_transcript",
-                "segmentId": segment.segment_id,
-                "text": translated_text,
-                "isFinal": True,
-                "speaker": segment.speaker,
-            }
+    try:
+        translated_text, translation_ok = await _run_translation_with_retry(
+            translation_provider, segment, from_lang, to_lang, tts_input, outgoing, latency
         )
-    # Unblocks the TTS task regardless of outcome: it's waiting on
-    # `tts_input` and would hang forever without a flush, whether
-    # translation produced anything or not.
-    await tts_input.put(TTSFlush())
-    tts_ok = await audio_task
 
-    return translation_ok and tts_ok
+        if translation_ok:
+            await outgoing.send_json(
+                {
+                    "type": "target_transcript",
+                    "segmentId": segment.segment_id,
+                    "text": translated_text,
+                    "isFinal": True,
+                    "speaker": segment.speaker,
+                }
+            )
+        # Unblocks the TTS task regardless of outcome: it's waiting on
+        # `tts_input` and would hang forever without a flush, whether
+        # translation produced anything or not.
+        await tts_input.put(TTSFlush())
+        tts_ok = await audio_task
+        return translation_ok and tts_ok
+    finally:
+        obs_metrics.record_turn_duration(max((time.perf_counter() - segment.started_at) * 1000, 0))
+        obs_spans.end_segment_span(segment.otel)
 
 
-async def _send_error(outgoing: _OutgoingSocket, exc: ProviderError) -> None:
+async def _send_error(
+    outgoing: _OutgoingSocket, exc: ProviderError, *, stage_span: object | None = None
+) -> None:
     await outgoing.send_json(
         {
             "type": "error",
@@ -1247,4 +1354,9 @@ async def _send_error(outgoing: _OutgoingSocket, exc: ProviderError) -> None:
             "message": str(exc),
             "retryable": exc.retryable,
         }
+    )
+    if stage_span is None:
+        obs_spans.emit_provider_error_span(exc)
+    obs_metrics.record_error(
+        provider=exc.provider, kind=exc.kind.name, retryable=exc.retryable
     )
