@@ -7,6 +7,10 @@ export const API_BASE_URL: string =
 
 export const REALTIME_SESSION_ENDPOINT = `${API_BASE_URL}/api/realtime/session`;
 
+// Client-reported Realtime turns. Auth is the telemetry token from the
+// session mint, not the operator cookie — see realtimeTelemetry.ts.
+export const TELEMETRY_REALTIME_TURN_ENDPOINT = `${API_BASE_URL}/api/telemetry/realtime/turn`;
+
 // OpenAI's WebRTC signaling endpoint. The browser posts its SDP offer here
 // directly, authenticated with the short-lived ephemeral token minted by our
 // backend: the real OPENAI_API_KEY never reaches the browser.

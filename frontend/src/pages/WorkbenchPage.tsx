@@ -285,7 +285,7 @@ export function WorkbenchPage() {
   const micBadge = MIC_BADGE[session.status];
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-4 space-y-4">
+    <div className="space-y-4">
       <div className="navbar bg-base-200 rounded-box">
         <div className="navbar-start gap-3">
           <div role="tablist" className="tabs tabs-box tabs-sm">

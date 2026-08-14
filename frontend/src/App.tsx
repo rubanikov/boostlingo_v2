@@ -1,7 +1,10 @@
-import { WorkbenchPage } from './pages/WorkbenchPage';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { createAppRoutes } from './pages/appRoutes';
+
+const router = createBrowserRouter(createAppRoutes());
 
 function App() {
-  return <WorkbenchPage />;
+  return <RouterProvider router={router} />;
 }
 
 export default App;

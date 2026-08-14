@@ -18,5 +18,16 @@ class Settings(BaseSettings):
     elevenlabs_voice_id_speaker_b: str = "ErXwobaYiN019PkySvjV"
     cors_origins: list[str] = ["http://localhost:5173"]
 
+    # Observability: all default off, so an empty .env changes nothing.
+    # OTel itself is configured via OTEL_* environment variables, not here.
+    observability_ui_token: str = ""
+    langfuse_host: str = ""
+    langfuse_public_key: str = ""
+    langfuse_secret_key: str = ""
+    observability_max_span_text_chars: int = 8000
+    telemetry_token_ttl_seconds: int = 7200
+    telemetry_ingest_max_bytes: int = 16384
+    telemetry_ingest_rate_per_minute: int = 60
+
 
 settings = Settings()

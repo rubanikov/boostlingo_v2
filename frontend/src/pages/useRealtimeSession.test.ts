@@ -7,10 +7,11 @@ import {
   createRealtimeFetchRouter,
   installFakeAudioApis,
   installMockRTCPeerConnection,
+  jsonResponse,
   textResponse,
 } from '../test/mockRealtimeApis';
 import { installManualAnimationFrame } from '../test/mockAudioAnalysis';
-import { OPENAI_REALTIME_CALLS_ENDPOINT, REALTIME_SESSION_ENDPOINT } from './realtimeConfig';
+import { OPENAI_REALTIME_CALLS_ENDPOINT, REALTIME_SESSION_ENDPOINT, TELEMETRY_REALTIME_TURN_ENDPOINT } from './realtimeConfig';
 import { useRealtimeSession } from './useRealtimeSession';
 
 const LANGUAGES = { sourceLanguage: 'en', targetLanguage: 'es' };
@@ -358,5 +359,89 @@ describe('useRealtimeSession', () => {
     expect(result.current.status).toBe('idle');
     expect(result.current.errorMessage).toBeNull();
     expect(result.current.micLevel).toBe(0);
+  });
+
+  it('leaves status connected and the peer connection open when turn ingest returns 401', async () => {
+    const { stream } = createMockMicStream();
+    stubMediaDevices(vi.fn().mockResolvedValue(stream));
+    const fetchMock = stubHappyPathFetch({
+      sessionResponse: jsonResponse({
+        client_secret: 'ek_test_token',
+        expires_at: 1893456000,
+        model: 'gpt-realtime',
+        voice: 'alloy',
+        telemetry_token: 'tok_test',
+        telemetry_expires_at: 1893463200,
+        trace_id: '0af7651916cd43dd8448eb211c80319c',
+      }),
+      telemetryTurnResponse: jsonResponse({ detail: 'Invalid or expired telemetry token.' }, 401),
+    });
+    installMockRTCPeerConnection();
+
+    const { result } = renderHook(() => useRealtimeSession());
+
+    act(() => {
+      result.current.connect(LANGUAGES);
+    });
+    await waitFor(() => expect(result.current.status).toBe('connected'));
+
+    const pc = MockRTCPeerConnection.instances[0];
+    const dataChannel = pc.dataChannel;
+    if (!dataChannel) throw new Error('expected a data channel to have been created');
+
+    const nowSpy = vi.spyOn(Date, 'now');
+    nowSpy.mockReturnValueOnce(1_000);
+    act(() => {
+      dataChannel.emitMessage(
+        JSON.stringify({ type: 'conversation.item.input_audio_transcription.delta', delta: 'Hello' }),
+      );
+      dataChannel.emitMessage(JSON.stringify({ type: 'input_audio_buffer.speech_stopped' }));
+    });
+    nowSpy.mockReturnValueOnce(1_420);
+    act(() => {
+      dataChannel.emitMessage(JSON.stringify({ type: 'response.output_audio_transcript.delta', delta: 'Hola' }));
+    });
+    act(() => {
+      dataChannel.emitMessage(
+        JSON.stringify({
+          type: 'response.done',
+          response: { usage: { input_tokens: 320, output_tokens: 210 } },
+        }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.some(([url]) => url === TELEMETRY_REALTIME_TURN_ENDPOINT)).toBe(true);
+    });
+
+    expect(result.current.status).toBe('connected');
+    expect(result.current.errorMessage).toBeNull();
+    expect(pc.close).not.toHaveBeenCalled();
+    // No telemetry-token re-mint: session is minted once, ingest 401 is dropped.
+    expect(fetchMock.mock.calls.filter(([url]) => url === REALTIME_SESSION_ENDPOINT)).toHaveLength(1);
+
+    const ingestCall = fetchMock.mock.calls.find(([url]) => url === TELEMETRY_REALTIME_TURN_ENDPOINT);
+    expect(ingestCall?.[1]).toMatchObject({
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer tok_test',
+        'Content-Type': 'application/json',
+      },
+      credentials: 'same-origin',
+    });
+    expect(JSON.parse(ingestCall?.[1]?.body as string)).toEqual({
+      turnIndex: 0,
+      startedAt: '1970-01-01T00:00:01.000Z',
+      endedAt: '1970-01-01T00:00:01.420Z',
+      latencyMs: 420,
+      sourceText: 'Hello',
+      targetText: 'Hola',
+      sourceLanguage: 'en',
+      targetLanguage: 'es',
+      model: 'gpt-realtime',
+      usage: { inputTokens: 320, outputTokens: 210 },
+    });
+
+    nowSpy.mockRestore();
   });
 });

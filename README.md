@@ -49,7 +49,9 @@ COMPARISON.md §1 for why that matters for latency instrumentation).
   - `ELEVENLABS_VOICE_ID`: optional, defaults to a premade ElevenLabs voice ("Rachel")
     if unset.
 
-These are exactly the variables in `backend/.env.example`.
+These are exactly the provider-key variables in `backend/.env.example`. Optional
+observability variables live in the same file, commented out; leaving them unset
+is the default and changes nothing about audio or session behaviour.
 
 ## Setup
 
@@ -103,11 +105,9 @@ cd backend
 uv run pytest -v
 ```
 
-Verified in this repo: **78 passed, 33 skipped**. The skipped tests are the ones that need
-a live provider key (WER regression against real Deepgram, the LLM-judge plumbing tests
-that don't inject a fake client, etc.). They self-skip with a message explaining exactly
-which env var to set, rather than failing. See [COMPARISON.md](COMPARISON.md) §2 for the
-exact commands to run the quality-validation suite for real.
+Verified in this repo: **223 passed, 1 skipped**. Tests that need a live
+provider key self-skip with a message naming the env var, rather than failing.
+See [COMPARISON.md](COMPARISON.md) §2 for the quality-validation suite.
 
 ### Frontend (Vitest, unit/component)
 
@@ -116,7 +116,7 @@ cd frontend
 npm test
 ```
 
-Verified in this repo: **13 test files, 144 passed**.
+Verified in this repo: **18 test files, 183 passed**.
 
 ### Frontend (Playwright: E2E, fake-mic)
 
@@ -130,6 +130,79 @@ Drives the real capture → session-negotiation path in both modes using Chrome'
 `--use-fake-device-for-media-stream` / `--use-file-for-fake-audio-capture` flags. See
 `frontend/e2e/README.md` for exactly what's real vs. still placeholder in this harness
 without a live backend + real speech fixtures.
+
+## Observability (optional)
+
+Telemetry is off unless you set `OTEL_EXPORTER_OTLP_ENDPOINT`. With an empty
+`.env`, the backend installs no OpenTelemetry TracerProvider or MeterProvider
+and opens no outbound OTLP connection. Cascade and Realtime sessions still
+run. You do not need Docker to run the app.
+
+The operator UI is at `/observability`. Without `OBSERVABILITY_UI_TOKEN` that
+page shows a disabled state. With the token set, operators log in; the SPA
+never talks to Langfuse. The backend maps Metrics API v2 and Observations
+API v2 onto owned JSON under `/api/observability/*`.
+
+### Environment
+
+Copy the commented block in `backend/.env.example`. The names that matter:
+
+| Variable | Role |
+|---|---|
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Traces. Example for local Langfuse: `http://localhost:3000/api/public/otel`. Empty = no tracer. |
+| `OTEL_EXPORTER_OTLP_PROTOCOL` | Must be `http/protobuf`. Langfuse does not accept gRPC. |
+| `OTEL_EXPORTER_OTLP_HEADERS` | `Authorization=Basic <base64 of pk-lf-...:sk-lf-...>` **and** `x-langfuse-ingestion-version=4`. Without the ingestion-version header, OTLP data can lag the UI by up to ~10 minutes. |
+| `OTEL_SERVICE_NAME` | `ai-interpreter-workbench-backend` |
+| `OTEL_TRACES_SAMPLER` | `always_on` (100% sampling when a provider is installed) |
+| `OTEL_BSP_MAX_QUEUE_SIZE` / `OTEL_BSP_SCHEDULE_DELAY` / `OTEL_BSP_EXPORT_TIMEOUT` | BatchSpanProcessor bounds (2048 / 1000ms / 5000ms). A dead collector fills the queue and drops spans instead of blocking audio. |
+| `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` | Optional, **separate** from the traces endpoint. Langfuse's OTLP ingest is traces-only; leave this empty unless you have a collector that wants metrics. |
+| `OBSERVABILITY_UI_TOKEN` | Operator login for `/observability`. Unset = that UI is disabled. |
+| `LANGFUSE_HOST` / `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` | Backend-only reads for the dashboard. Never sent to the browser. |
+
+Span text is truncated at `OBSERVABILITY_MAX_SPAN_TEXT_CHARS` (default 8000).
+Realtime ingest uses a 2-hour HMAC token (`TELEMETRY_TOKEN_TTL_SECONDS`), a
+16 KiB body cap, and 60 requests/minute per session id. Those three have
+working defaults; they are commented in `.env.example`.
+
+**Full text is stored in Langfuse.** Source utterances, translations, prompts, completions, and error strings are span attributes by design. There is no kill-switch and no PII redaction. Audio bytes are never attached to a span.
+
+**Realtime latency is client-reported.** `realtime.turn` timings come from the browser's `Date.now()`, not from the backend. Do not compare them to Cascade's server-measured stage latencies as if they were the same clock.
+
+### Local Langfuse via Compose
+
+`docker-compose.yml` at the repo root is an optional Langfuse v4 stack
+(`langfuse/langfuse:4`, `langfuse/langfuse-worker:4`, `postgres:17-alpine`,
+`clickhouse/clickhouse-server:25.3-alpine`, `redis:7-alpine`, `minio/minio:latest`).
+The workbench process is not in that file.
+
+Before the first start, replace the `# CHANGEME` values for `ENCRYPTION_KEY`
+(`openssl rand -hex 32`), `SALT`, and `NEXTAUTH_SECRET`. Then:
+
+```bash
+docker compose up -d
+```
+
+Langfuse UI: `http://localhost:3000`. Worker is bound to `127.0.0.1:3030`;
+Postgres `127.0.0.1:5432`; ClickHouse `127.0.0.1:8123` / `9000`; Redis
+`127.0.0.1:6379`; MinIO S3 API `9090` (console `127.0.0.1:9091`). Record the
+resolved image digests on first bring-up. The `:4` tags are major-floating
+pins, matching Langfuse's own compose file.
+
+### Alert thresholds
+
+No paging code ships in this repo. Use these as starting points in Langfuse's
+own alerts or as PromQL against an OTLP metrics collector, whichever you have:
+
+- **p95 stage latency:** `interpreter.stage.duration` (ms, attribute `stage` =
+  `stt` / `translate` / `tts`). Alert if p95 for any stage stays above 2000ms
+  for 5 minutes.
+- **Error rate:** `interpreter.errors` over completed turns. Alert if the rate
+  stays above 1% for 5 minutes.
+- **Mint failures:** `interpreter.realtime.mint.failures`. Alert if more than
+  3 failures land in 5 minutes (`POST /api/realtime/session` could not mint an
+  OpenAI ephemeral token).
+
+Tune the numbers to the demo; they are not SLOs.
 
 ## Provider abstractions
 
@@ -146,7 +219,7 @@ downstream of the `Protocol` needs to change. Realtime mode has no equivalent sw
 |---|---|
 | Backend app code | `backend/app/` (`api/` routes, `providers/` vendor boundaries, `orchestrator.py` for Cascade's pipeline, `quality/` for Ticket 8's LLM-judge) |
 | Backend tests | `backend/tests/` (pytest); shared quality dataset + fixture/report scripts at `backend/tests/fixtures/` |
-| Frontend app code | `frontend/src/pages/` (one page per mode, plus shared session/latency/audio logic) |
+| Frontend app code | `frontend/src/pages/` (unified workbench, `/observability` dashboard, shared session/latency/audio logic) |
 | Frontend tests | co-located `*.test.ts(x)` (Vitest) + `frontend/e2e/` (Playwright) |
 | Comparison write-up | [COMPARISON.md](COMPARISON.md) |
 | Agent-usage notes | [AGENTS.md](AGENTS.md) |

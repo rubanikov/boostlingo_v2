@@ -112,12 +112,10 @@ export default defineConfig({
       },
     },
     {
-      name: 'noise-rejection-fake-mic',
-      testMatch: /noise-rejection\.spec\.ts/,
+      name: 'observability',
+      testMatch: /observability\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
-        permissions: ['microphone'],
-        launchOptions: { args: fakeMicArgs(SILENCE_FIXTURE) },
       },
     },
   ],

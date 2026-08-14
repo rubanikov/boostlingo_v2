@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Observability Wireframe</title>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.10.2/dist/full.min.css" rel="stylesheet" type="text/css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .state-panel { display: none; }
+    .state-panel.active { display: block; }
+    
+    /* Low-fi sketch styles */
+    .sketch-box {
+      border: 2px dashed #666;
+      background-color: rgba(255, 255, 255, 0.02);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #888;
+      font-family: monospace;
+    }
+    
+    .waterfall-bar {
+      height: 1.5rem;
+      background-color: #4b5563;
+      border-radius: 0.25rem;
+      position: relative;
+    }
+  </style>
+</head>
+<body class="bg-base-300 min-h-screen font-sans text-base-content">
+
+  <!-- Wireframe Controller (Not part of actual UI) -->
+  <div class="bg-neutral text-neutral-content p-4 mb-8 sticky top-0 z-50 shadow-lg">
+    <div class="container mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="font-bold text-lg">Wireframe States:</div>
+      <div class="flex flex-wrap gap-2">
+        <button class="btn btn-sm btn-outline" onclick="showState('state-dashboard')">Dashboard</button>
+        <button class="btn btn-sm btn-outline" onclick="showState('state-detail')">Trace Detail</button>
+        <button class="btn btn-sm btn-outline" onclick="showState('state-login')">Login</button>
+        <button class="btn btn-sm btn-outline" onclick="showState('state-unset')">Disabled (No Token)</button>
+        <button class="btn btn-sm btn-outline" onclick="showState('state-down')">Langfuse Down</button>
+        <button class="btn btn-sm btn-outline" onclick="showState('state-expired')">Cookie Expired</button>
+        <button class="btn btn-sm btn-outline" onclick="showState('state-loading')">Loading</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main App Shell -->
+  <div class="container mx-auto max-w-6xl bg-base-100 rounded-xl shadow-xl overflow-hidden min-h-[800px] flex flex-col border border-base-200">
+    
+    <!-- App Header -->
+    <header class="navbar bg-base-200 border-b border-base-300 px-6">
+      <div class="flex-1">
+        <a class="text-xl font-bold">AI Interpreter Workbench</a>
+      </div>
+      <div class="flex-none gap-4">
+        <!-- Latency Badges (Unchanged as per requirements) -->
+        <div class="badge badge-success gap-2">
+          <span class="w-2 h-2 rounded-full bg-current"></span>
+          Cascade: 120ms
+        </div>
+        <div class="badge badge-info gap-2">
+          <span class="w-2 h-2 rounded-full bg-current"></span>
+          Realtime: 250ms
+        </div>
+      </div>
+    </header>
+
+    <!-- App Navigation -->
+    <div class="bg-base-200 px-6 pt-2 border-b border-base-300">
+      <div class="tabs tabs-lifted">
+        <a class="tab">Workbench</a>
+        <a class="tab tab-active">Observability</a>
+      </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 p-6 relative">
+      
+      <!-- STATE: Dashboard -->
+      <div id="state-dashboard" class="state-panel active space-y-6">
+        <div class="flex justify-between items-center">
+          <h1 class="text-2xl font-bold">Observability Dashboard</h1>
+          <div class="flex gap-2">
+            <select class="select select-bordered select-sm">
+              <option>Last 1 Hour</option>
+              <option>Last 24 Hours</option>
+              <option>Last 7 Days</option>
+            </select>
+            <button class="btn btn-sm btn-outline btn-error">Logout</button>
+          </div>
+        </div>
+
+        <!-- Summary Charts Strip -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="card bg-base-200 border border-base-300">
+            <div class="card-body p-4">
+              <h3 class="card-title text-sm text-base-content/70">Latency (p50 / p95)</h3>
+              <div class="text-2xl font-bold">145ms <span class="text-lg font-normal text-base-content/50">/ 320ms</span></div>
+              <div class="sketch-box h-12 mt-2 text-xs">Sparkline Chart</div>
+            </div>
+          </div>
+          <div class="card bg-base-200 border border-base-300">
+            <div class="card-body p-4">
+              <h3 class="card-title text-sm text-base-content/70">Error Rate</h3>
+              <div class="text-2xl font-bold text-success">0.2%</div>
+              <div class="sketch-box h-12 mt-2 text-xs">Sparkline Chart</div>
+            </div>
+          </div>
+          <div class="card bg-base-200 border border-base-300">
+            <div class="card-body p-4">
+              <h3 class="card-title text-sm text-base-content/70">Cost & Tokens</h3>
+              <div class="text-2xl font-bold">$1.42</div>
+              <div class="text-sm text-base-content/70">142k tokens</div>
+            </div>
+          </div>
+          <div class="card bg-base-200 border border-base-300">
+            <div class="card-body p-4">
+              <h3 class="card-title text-sm text-base-content/70">Sessions</h3>
+              <div class="flex justify-between items-end h-full">
+                <div>
+                  <div class="text-xl font-bold text-info">42 Realtime</div>
+                  <div class="text-xl font-bold text-success">18 Cascade</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Trace List -->
+        <div class="card bg-base-200 border border-base-300">
+          <div class="card-body p-0">
+            <div class="p-4 border-b border-base-300 flex justify-between items-center bg-base-200/50">
+              <h2 class="card-title text-lg">Recent Traces</h2>
+              <div class="flex gap-2">
+                <select class="select select-bordered select-sm">
+                  <option>All Modes</option>
+                  <option>Realtime</option>
+                  <option>Cascade</option>
+                </select>
+                <select class="select select-bordered select-sm">
+                  <option>All Status</option>
+                  <option>Errors Only</option>
+                </select>
+              </div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="table table-zebra w-full">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Mode</th>
+                    <th>Trace ID</th>
+                    <th>Latency</th>
+                    <th>Tokens</th>
+                    <th>Cost</th>
+                    <th>Status</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr class="hover cursor-pointer" onclick="showState('state-detail')">
+                    <td class="text-base-content/70">10:42:15 AM</td>
+                    <td><div class="badge badge-info badge-sm">Realtime</div></td>
+                    <td class="font-mono text-xs">tr_8f92a...</td>
+                    <td>1.2s</td>
+                    <td>4,250</td>
+                    <td>$0.04</td>
+                    <td><div class="badge badge-success badge-sm">Success</div></td>
+                    <td><button class="btn btn-xs btn-ghost">View &rarr;</button></td>
+                  </tr>
+                  <tr class="hover cursor-pointer" onclick="showState('state-detail')">
+                    <td class="text-base-content/70">10:40:05 AM</td>
+                    <td><div class="badge badge-success badge-sm">Cascade</div></td>
+                    <td class="font-mono text-xs">tr_2b19c...</td>
+                    <td>850ms</td>
+                    <td>1,120</td>
+                    <td>$0.01</td>
+                    <td><div class="badge badge-success badge-sm">Success</div></td>
+                    <td><button class="btn btn-xs btn-ghost">View &rarr;</button></td>
+                  </tr>
+                  <tr class="hover cursor-pointer" onclick="showState('state-detail')">
+                    <td class="text-base-content/70">10:35:22 AM</td>
+                    <td><div class="badge badge-info badge-sm">Realtime</div></td>
+                    <td class="font-mono text-xs">tr_5c77d...</td>
+                    <td>5.4s</td>
+                    <td>8,900</td>
+                    <td>$0.09</td>
+                    <td><div class="badge badge-error badge-sm">Error</div></td>
+                    <td><button class="btn btn-xs btn-ghost">View &rarr;</button></td>
+                  </tr>
+                  <!-- More rows... -->
+                </tbody>
+              </table>
+            </div>
+            <div class="p-4 border-t border-base-300 flex justify-center">
+              <div class="join">
+                <button class="join-item btn btn-sm">«</button>
+                <button class="join-item btn btn-sm">Page 1</button>
+                <button class="join-item btn btn-sm">»</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STATE: Trace Detail -->
+      <div id="state-detail" class="state-panel space-y-6">
+        <div class="flex items-center gap-4">
+          <button class="btn btn-sm btn-ghost" onclick="showState('state-dashboard')">&larr; Back to Dashboard</button>
+          <div class="divider divider-horizontal mx-0"></div>
+          <h1 class="text-xl font-bold font-mono">Trace: tr_8f92a4b1</h1>
+          <div class="badge badge-info">Realtime</div>
+          <div class="badge badge-success">Success</div>
+          <div class="flex-1"></div>
+          <button class="btn btn-sm btn-outline btn-error">Logout</button>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Left Column: Waterfall -->
+          <div class="lg:col-span-2 space-y-6">
+            <div class="card bg-base-200 border border-base-300">
+              <div class="card-body p-4">
+                <h2 class="card-title text-lg mb-4">Span Waterfall</h2>
+                
+                <!-- Waterfall Timeline -->
+                <div class="space-y-3 font-mono text-sm">
+                  <!-- Timeline Header -->
+                  <div class="flex border-b border-base-300 pb-2 text-base-content/50">
+                    <div class="w-1/3">Span Name</div>
+                    <div class="w-2/3 relative">
+                      <div class="absolute left-0">0ms</div>
+                      <div class="absolute left-1/2 -translate-x-1/2">600ms</div>
+                      <div class="absolute right-0">1200ms</div>
+                    </div>
+                  </div>
+                  
+                  <!-- Span 1 -->
+                  <div class="flex items-center group cursor-pointer hover:bg-base-300 p-1 rounded">
+                    <div class="w-1/3 truncate pr-2" title="session_start">session_start</div>
+                    <div class="w-2/3 relative h-6">
+                      <div class="waterfall-bar absolute left-0 w-[5%] bg-primary"></div>
+                    </div>
+                  </div>
+                  
+                  <!-- Span 2 -->
+                  <div class="flex items-center group cursor-pointer hover:bg-base-300 p-1 rounded bg-base-300/50">
+                    <div class="w-1/3 pl-4 truncate pr-2" title="llm_generation">↳ llm_generation</div>
+                    <div class="w-2/3 relative h-6">
+                      <div class="waterfall-bar absolute left-[5%] w-[80%] bg-secondary"></div>
+                    </div>
+                  </div>
+                  
+                  <!-- Span 3 -->
+                  <div class="flex items-center group cursor-pointer hover:bg-base-300 p-1 rounded">
+                    <div class="w-1/3 pl-8 truncate pr-2" title="tool_call_weather">↳ tool_call_weather</div>
+                    <div class="w-2/3 relative h-6">
+                      <div class="waterfall-bar absolute left-[20%] w-[15%] bg-accent"></div>
+                    </div>
+                  </div>
+                  
+                  <!-- Span 4 -->
+                  <div class="flex items-center group cursor-pointer hover:bg-base-300 p-1 rounded">
+                    <div class="w-1/3 pl-4 truncate pr-2" title="tts_synthesis">↳ tts_synthesis</div>
+                    <div class="w-2/3 relative h-6">
+                      <div class="waterfall-bar absolute left-[85%] w-[15%] bg-info"></div>
+                    </div>
+                  </div>
+                </div>
+                
+              </div>
+            </div>
+
+            <!-- Span Details (Appears when clicking a span) -->
+            <div class="card bg-base-200 border border-base-300">
+              <div class="card-body p-4">
+                <div class="flex justify-between items-center mb-4">
+                  <h2 class="card-title text-lg">Span: llm_generation</h2>
+                  <div class="text-sm text-base-content/70">Duration: 960ms</div>
+                </div>
+                
+                <div class="tabs tabs-boxed mb-4">
+                  <a class="tab tab-active">Prompt</a>
+                  <a class="tab">Completion</a>
+                  <a class="tab">Metadata</a>
+                </div>
+                
+                <div class="bg-base-300 p-4 rounded-lg font-mono text-sm overflow-auto max-h-64 whitespace-pre-wrap">
+[System]
+You are a helpful AI assistant.
+
+[User]
+What is the weather in Tokyo?
+
+[Assistant]
+Let me check that for you.
+<tool_call name="weather" args="{'location': 'Tokyo'}">
+                </div>
+                <!-- Note about truncation -->
+                <div class="text-xs text-base-content/50 mt-2 italic">Note: Oversized span text is truncated to preserve UI performance.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column: Metadata -->
+          <div class="space-y-6">
+            <div class="card bg-base-200 border border-base-300">
+              <div class="card-body p-4">
+                <h2 class="card-title text-lg mb-4">Trace Details</h2>
+                
+                <dl class="space-y-4 text-sm">
+                  <div>
+                    <dt class="text-base-content/70">Timestamp</dt>
+                    <dd class="font-medium">Aug 13, 2026 10:42:15 AM</dd>
+                  </div>
+                  <div>
+                    <dt class="text-base-content/70">Total Latency</dt>
+                    <dd class="font-medium">1.2s</dd>
+                  </div>
+                  <div class="divider my-1"></div>
+                  <div>
+                    <dt class="text-base-content/70">Total Tokens</dt>
+                    <dd class="font-medium">4,250</dd>
+                    <dd class="text-xs text-base-content/50 mt-1">Prompt: 3,800 | Completion: 450</dd>
+                  </div>
+                  <div>
+                    <dt class="text-base-content/70">Estimated Cost</dt>
+                    <dd class="font-medium">$0.042</dd>
+                  </div>
+                  <div class="divider my-1"></div>
+                  <div>
+                    <dt class="text-base-content/70">Model</dt>
+                    <dd class="font-medium">gpt-4o-realtime-preview</dd>
+                  </div>
+                  <div>
+                    <dt class="text-base-content/70">Session ID</dt>
+                    <dd class="font-mono text-xs">sess_99a8b7c6</dd>
+                  </div>
+                </dl>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STATE: Login -->
+      <div id="state-login" class="state-panel h-full">
+        <div class="flex items-center justify-center h-[600px]">
+          <div class="card w-96 bg-base-200 border border-base-300 shadow-xl">
+            <div class="card-body">
+              <h2 class="card-title justify-center mb-2">Observability Access</h2>
+              <p class="text-center text-sm text-base-content/70 mb-6">Enter the operator token to view telemetry data.</p>
+              
+              <form onsubmit="event.preventDefault(); showState('state-dashboard');">
+                <div class="form-control w-full mb-4">
+                  <label class="label">
+                    <span class="label-text">Operator Token</span>
+                  </label>
+                  <input type="password" placeholder="••••••••••••" class="input input-bordered w-full" />
+                </div>
+                <button class="btn btn-primary w-full">Access Dashboard</button>
+              </form>
+              
+              <div class="text-xs text-center text-base-content/50 mt-4">
+                Session valid for 2 hours.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STATE: Disabled (No Token) -->
+      <div id="state-unset" class="state-panel h-full">
+        <div class="flex items-center justify-center h-[600px]">
+          <div class="text-center max-w-md">
+            <div class="text-6xl mb-4 opacity-50">🔒</div>
+            <h2 class="text-2xl font-bold mb-2">Observability Disabled</h2>
+            <p class="text-base-content/70">
+              The observability dashboard is not enabled in this environment. 
+              To enable it, the administrator must set the <code>OBSERVABILITY_UI_TOKEN</code> environment variable.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- STATE: Langfuse Down -->
+      <div id="state-down" class="state-panel h-full">
+        <div class="flex justify-end mb-4">
+          <button class="btn btn-sm btn-outline btn-error">Logout</button>
+        </div>
+        <div class="flex items-center justify-center h-[500px]">
+          <div class="text-center max-w-md">
+            <div class="text-6xl mb-4 opacity-50">🔌</div>
+            <h2 class="text-2xl font-bold mb-2 text-warning">Telemetry Backend Unreachable</h2>
+            <p class="text-base-content/70 mb-6">
+              The dashboard is authenticated, but the Langfuse backend proxy is currently not responding. 
+              Live sessions may still be functioning, but historical traces cannot be loaded.
+            </p>
+            <button class="btn btn-outline" onclick="showState('state-loading')">Retry Connection</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- STATE: Cookie Expired -->
+      <div id="state-expired" class="state-panel h-full">
+        <div class="flex items-center justify-center h-[600px]">
+          <div class="card w-96 bg-base-200 border border-error/50 shadow-xl">
+            <div class="card-body">
+              <div class="text-center text-error mb-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-10 w-10 mx-auto" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+              </div>
+              <h2 class="card-title justify-center mb-2">Session Expired</h2>
+              <p class="text-center text-sm text-base-content/70 mb-6">Your 2-hour operator session has expired. Please log in again.</p>
+              
+              <button class="btn btn-primary w-full" onclick="showState('state-login')">Return to Login</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STATE: Loading -->
+      <div id="state-loading" class="state-panel h-full">
+        <div class="flex items-center justify-center h-[600px]">
+          <div class="flex flex-col items-center gap-4">
+            <span class="loading loading-spinner loading-lg text-primary"></span>
+            <p class="text-base-content/70">Loading telemetry data...</p>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script>
+    function showState(stateId) {
+      document.querySelectorAll('.state-panel').forEach(el => el.classList.remove('active'));
+      document.getElementById(stateId).classList.add('active');
+    }
+  </script>
+</body>
+</html>
