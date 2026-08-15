@@ -47,13 +47,16 @@
   <header class="space-y-2">
     <h1 class="text-2xl font-bold">Real Speech Recorder</h1>
     <p class="text-sm text-base-content/70">
-      Records real (non-TTS) speech for
-      <code>backend/tests/fixtures/real_audio/</code> and
-      <code>frontend/e2e/fixtures/real-speech.wav</code> — see
-      <code>run_real_audio_report.py</code> and <code>frontend/e2e/README.md</code>.
-      Pick a prompt on the left, record it, listen back, then save. Output is
-      already the exact format the pipeline expects (mono 16-bit PCM WAV,
-      16000Hz) — no <code>ffmpeg</code> conversion needed.
+      Records real (non-TTS) speech. Two prompt sets, picked with the toggle
+      on the left: <strong>Real audio</strong> (10 items →
+      <code>backend/tests/fixtures/real_audio/</code>, for
+      <code>run_real_audio_report.py</code>) and <strong>Realtime quality
+      corpus</strong> (all 33 <code>interpreter_dataset.json</code> items →
+      <code>backend/tests/fixtures/realtime_quality/</code>, for the
+      Realtime-mode LLM-judge run; see <code>SCRIPT.md</code> there). Pick a
+      prompt, record it, listen back, then save. Output is already the exact
+      format the pipeline expects (mono 16-bit PCM WAV, 16000Hz) — no
+      <code>ffmpeg</code> conversion needed.
     </p>
     <div id="fileProtocolNotice" role="status" class="hidden alert alert-info alert-soft text-sm">
       <span>
@@ -84,7 +87,12 @@
 
     <!-- Prompt list -->
     <section class="space-y-2">
-      <h2 class="text-xs uppercase tracking-wide text-base-content/50">Prompts</h2>
+      <div role="tablist" class="tabs tabs-box tabs-sm w-full" id="promptSetTabs"></div>
+      <div class="flex items-center justify-between">
+        <h2 class="text-xs uppercase tracking-wide text-base-content/50">Prompts</h2>
+        <span id="progressLabel" class="badge badge-ghost badge-sm"></span>
+      </div>
+      <p id="promptSetHint" class="text-xs text-base-content/60"></p>
       <div id="promptList" class="space-y-2 max-h-[70vh] overflow-y-auto pr-1"></div>
     </section>
 
@@ -139,12 +147,21 @@
 
 <script>
 // ---- Prompts -------------------------------------------------------------
-// A curated subset mirroring backend/tests/fixtures/interpreter_dataset.json's
+// Two prompt sets, both hand-embedded rather than fetched, since this file
+// is meant to be opened directly (file://), where fetch() against a local
+// JSON file is blocked by the browser regardless of this project.
+//
+// REAL_AUDIO_PROMPTS: a curated subset mirroring interpreter_dataset.json's
 // own style/categories (short conversational, one long multi-clause, a
-// multi-turn snippet, EN and ES) — hand-embedded rather than fetched, since
-// this file is meant to be opened directly (file://), where fetch() against
-// a local JSON file is blocked by the browser regardless of this project.
-const PROMPTS = [
+// multi-turn snippet, EN and ES), for run_real_audio_report.py.
+//
+// REALTIME_QUALITY_PROMPTS: every item of interpreter_dataset.json verbatim
+// (same ids, so the Realtime quality report can join back to the dataset's
+// referenceTranslation), for the Realtime-mode LLM-judge run that
+// COMPARISON.md section 2 lists as "not run": each clip is played into a live
+// Realtime session and the model's output transcript is judged. Keep this
+// list in sync with the dataset if it changes.
+const REAL_AUDIO_PROMPTS = [
   { id: 'real-short-en-01', sourceLang: 'en', targetLang: 'es', text: 'Hi, how are you doing today?' },
   { id: 'real-short-en-02', sourceLang: 'en', targetLang: 'es', text: 'Can you pass me the salt, please?' },
   { id: 'real-short-en-03', sourceLang: 'en', targetLang: 'es', text: "Do you know if it's supposed to rain later?" },
@@ -171,6 +188,78 @@ const PROMPTS = [
   { id: 'real-conv-01-t1', sourceLang: 'en', targetLang: 'es', text: 'Hey, do you have any plans for the weekend?' },
   { id: 'real-conv-01-t2', sourceLang: 'es', targetLang: 'en', text: 'Todavía no, ¿por qué? ¿Tienes algo en mente?' },
 ];
+
+const REALTIME_QUALITY_PROMPTS = [
+  { id: 'short-en-01', sourceLang: 'en', targetLang: 'es', text: 'Hi, how are you doing today?', referenceTranslation: 'Hola, ¿cómo estás hoy?' },
+  { id: 'short-en-02', sourceLang: 'en', targetLang: 'es', text: 'Good morning! Did you sleep well?', referenceTranslation: '¡Buenos días! ¿Dormiste bien?' },
+  { id: 'short-en-03', sourceLang: 'en', targetLang: 'es', text: 'Can you pass me the salt, please?', referenceTranslation: '¿Me puedes pasar la sal, por favor?' },
+  { id: 'short-en-04', sourceLang: 'en', targetLang: 'es', text: "I'm sorry, I didn't catch that.", referenceTranslation: 'Lo siento, no entendí eso.' },
+  { id: 'short-en-05', sourceLang: 'en', targetLang: 'es', text: 'What time does the store close?', referenceTranslation: '¿A qué hora cierra la tienda?' },
+  { id: 'short-en-06', sourceLang: 'en', targetLang: 'es', text: 'Thanks so much, I really appreciate it.', referenceTranslation: 'Muchas gracias, de verdad lo aprecio.' },
+  { id: 'short-en-07', sourceLang: 'en', targetLang: 'es', text: 'Um, I think we should probably get going.', referenceTranslation: 'Um, creo que probablemente deberíamos irnos.' },
+  { id: 'short-en-08', sourceLang: 'en', targetLang: 'es', text: "Do you know if it's supposed to rain later?", referenceTranslation: '¿Sabes si se supone que va a llover más tarde?' },
+  { id: 'short-en-09', sourceLang: 'en', targetLang: 'es', text: "Nice to meet you, I've heard a lot about you.", referenceTranslation: 'Mucho gusto, he oído mucho sobre ti.' },
+  { id: 'short-en-10', sourceLang: 'en', targetLang: 'es', text: 'Could you say that again, a bit slower?', referenceTranslation: '¿Podrías decir eso otra vez, un poco más despacio?' },
+  { id: 'short-es-01', sourceLang: 'es', targetLang: 'en', text: 'Buenas tardes, ¿en qué puedo ayudarte?', referenceTranslation: 'Good afternoon, how can I help you?' },
+  { id: 'short-es-02', sourceLang: 'es', targetLang: 'en', text: '¿Cuánto cuesta esto, más o menos?', referenceTranslation: 'How much does this cost, roughly?' },
+  { id: 'short-es-03', sourceLang: 'es', targetLang: 'en', text: 'No te preocupes, tenemos mucho tiempo.', referenceTranslation: "Don't worry, we have plenty of time." },
+  { id: 'short-es-04', sourceLang: 'es', targetLang: 'en', text: '¿Te importaría esperar un momento?', referenceTranslation: 'Would you mind waiting a moment?' },
+  { id: 'short-es-05', sourceLang: 'es', targetLang: 'en', text: 'Perdón por llegar tarde, había mucho tráfico.', referenceTranslation: 'Sorry for being late, there was a lot of traffic.' },
+  { id: 'short-es-06', sourceLang: 'es', targetLang: 'en', text: '¿Quieres que te acompañe a la parada del autobús?', referenceTranslation: 'Do you want me to walk you to the bus stop?' },
+  { id: 'short-es-07', sourceLang: 'es', targetLang: 'en', text: 'Vale, entonces nos vemos mañana a las nueve.', referenceTranslation: "Okay, so we'll see each other tomorrow at nine." },
+  { id: 'short-es-08', sourceLang: 'es', targetLang: 'en', text: '¿Qué tal si pedimos pizza esta noche?', referenceTranslation: 'How about we order pizza tonight?' },
+  {
+    id: 'long-en-01', sourceLang: 'en', targetLang: 'es',
+    text: "I was going to call you earlier, but then my phone died, and by the time I found a charger, it was already pretty late, so I figured I'd just text you instead.",
+    referenceTranslation: 'Iba a llamarte antes, pero se me murió el teléfono, y para cuando encontré un cargador, ya era bastante tarde, así que decidí simplemente escribirte un mensaje.',
+  },
+  {
+    id: 'long-es-01', sourceLang: 'es', targetLang: 'en',
+    text: 'Quería decirte que, bueno, en realidad no sé cómo explicarlo, pero creo que deberíamos hablar de lo que pasó la semana pasada antes de que se nos olvide.',
+    referenceTranslation: "I wanted to tell you that, well, I actually don't know how to explain it, but I think we should talk about what happened last week before we forget.",
+  },
+  {
+    id: 'long-en-02', sourceLang: 'en', targetLang: 'es',
+    text: 'So we drove all the way out to the coast, and the weather was great at first, but then it started pouring right when we got there, which was kind of a bummer, but we still had a good time.',
+    referenceTranslation: 'Así que manejamos hasta la costa, y al principio hacía buen tiempo, pero luego empezó a llover justo cuando llegamos, lo cual fue un poco decepcionante, pero aun así la pasamos bien.',
+  },
+  { id: 'conv-weekend-plans-t1', sourceLang: 'en', targetLang: 'es', text: 'Hey, do you have any plans for the weekend?', referenceTranslation: 'Oye, ¿tienes planes para el fin de semana?' },
+  { id: 'conv-weekend-plans-t2', sourceLang: 'es', targetLang: 'en', text: 'Todavía no, ¿por qué? ¿Tienes algo en mente?', referenceTranslation: 'Not yet, why? Do you have something in mind?' },
+  { id: 'conv-weekend-plans-t3', sourceLang: 'en', targetLang: 'es', text: 'I was thinking we could go hiking if the weather holds up.', referenceTranslation: 'Estaba pensando que podríamos ir de excursión si el clima se mantiene bien.' },
+  { id: 'conv-weekend-plans-t4', sourceLang: 'es', targetLang: 'en', text: 'Me encantaría, ¡avísame a qué hora!', referenceTranslation: "I'd love to, let me know what time!" },
+  { id: 'conv-directions-t1', sourceLang: 'es', targetLang: 'en', text: 'Disculpa, ¿sabes cómo llegar a la estación de tren desde aquí?', referenceTranslation: 'Excuse me, do you know how to get to the train station from here?' },
+  { id: 'conv-directions-t2', sourceLang: 'en', targetLang: 'es', text: 'Sure, just go straight for two blocks and then turn left.', referenceTranslation: 'Claro, sigue derecho dos cuadras y luego gira a la izquierda.' },
+  { id: 'conv-directions-t3', sourceLang: 'es', targetLang: 'en', text: 'Perfecto, muchas gracias por la ayuda.', referenceTranslation: 'Perfect, thank you so much for the help.' },
+  { id: 'conv-directions-t4', sourceLang: 'en', targetLang: 'es', text: 'No problem, have a safe trip!', referenceTranslation: 'No hay problema, ¡que tengas un buen viaje!' },
+  { id: 'conv-delayed-order-t1', sourceLang: 'en', targetLang: 'es', text: "Hi, I ordered something over a week ago and it still hasn't arrived.", referenceTranslation: 'Hola, pedí algo hace más de una semana y todavía no ha llegado.' },
+  { id: 'conv-delayed-order-t2', sourceLang: 'es', targetLang: 'en', text: 'Lo siento mucho, déjame revisar el estado de tu pedido.', referenceTranslation: "I'm so sorry, let me check the status of your order." },
+  { id: 'conv-delayed-order-t3', sourceLang: 'en', targetLang: 'es', text: 'Thanks, the order number is four eight two one three.', referenceTranslation: 'Gracias, el número de pedido es 48213.' },
+  { id: 'conv-delayed-order-t4', sourceLang: 'es', targetLang: 'en', text: 'Ya lo veo, parece que hubo un retraso, pero llegará mañana.', referenceTranslation: 'I see it now, it looks like there was a delay, but it will arrive tomorrow.' },
+];
+
+// Which set is active decides both the prompt list and where "Save
+// recording" writes (`dir` is relative to the granted repo root).
+const PROMPT_SETS = {
+  real_audio: {
+    label: 'Real audio (10)',
+    hint: 'Feeds run_real_audio_report.py: a real-voice WER/judge check on the Cascade pipeline.',
+    dir: ['backend', 'tests', 'fixtures', 'real_audio'],
+    prompts: REAL_AUDIO_PROMPTS,
+  },
+  realtime_quality: {
+    label: 'Realtime quality corpus (33)',
+    hint: 'One clip per interpreter_dataset.json item. Played into a live Realtime session; the model\'s spoken translation is judged. Read each line naturally, ~half a second of silence before and after.',
+    dir: ['backend', 'tests', 'fixtures', 'realtime_quality'],
+    prompts: REALTIME_QUALITY_PROMPTS,
+  },
+};
+let activeSetKey = 'real_audio';
+// ids already present in the active set's manifest.json (populated once
+// folder access is granted, so the list can show what's left to record).
+let recordedIds = new Set();
+// Granted repo-root directory handle (File System Access API), or null.
+// Declared up here because the prompt list reads it at first render.
+let dirHandle = null;
 
 // ---- WAV encoding (mono 16-bit PCM, 16000Hz) ------------------------------
 // Matches SAMPLE_RATE in backend/app/providers/deepgram_stt.py and
@@ -241,23 +330,86 @@ if (!navigator.mediaDevices?.getUserMedia) {
 // ---- Prompt list UI --------------------------------------------------------
 let activePrompt = null;
 const promptListEl = document.getElementById('promptList');
+const promptSetTabs = document.getElementById('promptSetTabs');
+const promptSetHint = document.getElementById('promptSetHint');
+const progressLabel = document.getElementById('progressLabel');
 const activePromptMeta = document.getElementById('activePromptMeta');
 const activePromptText = document.getElementById('activePromptText');
 const recordBtn = document.getElementById('recordBtn');
 
-PROMPTS.forEach((p) => {
-  const card = document.createElement('button');
-  card.type = 'button';
-  card.className = 'card card-border bg-base-100 w-full text-left cursor-pointer hover:border-primary';
-  card.dataset.id = p.id;
-  card.innerHTML = `
-    <div class="card-body p-3">
-      <span class="badge badge-xs badge-ghost">${p.sourceLang} → ${p.targetLang}</span>
-      <p class="text-sm mt-1">${p.text}</p>
-    </div>`;
-  card.addEventListener('click', () => selectPrompt(p));
-  promptListEl.appendChild(card);
+function activeSet() {
+  return PROMPT_SETS[activeSetKey];
+}
+
+Object.entries(PROMPT_SETS).forEach(([key, set]) => {
+  const tab = document.createElement('button');
+  tab.type = 'button';
+  tab.role = 'tab';
+  tab.className = 'tab';
+  tab.dataset.key = key;
+  tab.textContent = set.label;
+  tab.addEventListener('click', () => switchPromptSet(key));
+  promptSetTabs.appendChild(tab);
 });
+
+function renderPromptList() {
+  const set = activeSet();
+  promptSetHint.textContent = set.hint;
+  [...promptSetTabs.children].forEach((el) => el.classList.toggle('tab-active', el.dataset.key === activeSetKey));
+  promptListEl.replaceChildren();
+  set.prompts.forEach((p) => {
+    const done = recordedIds.has(p.id);
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className =
+      'card card-border bg-base-100 w-full text-left cursor-pointer hover:border-primary' +
+      (done ? ' opacity-60' : '');
+    card.dataset.id = p.id;
+    card.innerHTML = `
+      <div class="card-body p-3">
+        <div class="flex items-center gap-2">
+          <span class="badge badge-xs badge-ghost">${p.sourceLang} → ${p.targetLang}</span>
+          ${done ? '<span class="badge badge-xs badge-success badge-soft">recorded</span>' : ''}
+        </div>
+        <p class="text-sm mt-1">${p.text}</p>
+      </div>`;
+    card.addEventListener('click', () => selectPrompt(p));
+    promptListEl.appendChild(card);
+  });
+  updateProgressLabel();
+}
+
+function updateProgressLabel() {
+  const total = activeSet().prompts.length;
+  const done = activeSet().prompts.filter((p) => recordedIds.has(p.id)).length;
+  progressLabel.textContent = dirHandle ? `${done} / ${total} recorded` : `${total} prompts`;
+}
+
+async function switchPromptSet(key) {
+  if (key === activeSetKey) return;
+  activeSetKey = key;
+  activePrompt = null;
+  activePromptMeta.textContent = 'Select a prompt';
+  activePromptText.textContent = '—';
+  recordBtn.disabled = true;
+  resetRecordingState();
+  await refreshRecordedIds();
+  renderPromptList();
+}
+
+// Reads the active set's manifest.json (if folder access is granted) so the
+// list can mark what's already recorded. Silently empty otherwise.
+async function refreshRecordedIds() {
+  recordedIds = new Set();
+  if (!dirHandle) return;
+  try {
+    const dir = await getNestedDir(dirHandle, activeSet().dir, false);
+    const manifest = await readJsonIfExists(dir, 'manifest.json', { items: [] });
+    recordedIds = new Set(manifest.items.map((item) => item.id));
+  } catch {
+    // Directory doesn't exist yet: nothing recorded for this set.
+  }
+}
 
 function selectPrompt(p) {
   activePrompt = p;
@@ -267,6 +419,8 @@ function selectPrompt(p) {
   recordBtn.disabled = false;
   resetRecordingState();
 }
+
+renderPromptList();
 
 // ---- Recording --------------------------------------------------------------
 const stopBtn = document.getElementById('stopBtn');
@@ -414,7 +568,6 @@ stopBtn.addEventListener('click', stopRecording);
 reRecordBtn.addEventListener('click', resetRecordingState);
 
 // ---- File System Access (optional — falls back to downloads) --------------
-let dirHandle = null; // repo root
 const grantAccessBtn = document.getElementById('grantAccessBtn');
 const folderStatus = document.getElementById('folderStatus');
 const accessGrantedLabel = document.getElementById('accessGrantedLabel');
@@ -438,6 +591,11 @@ grantAccessBtn.addEventListener('click', async () => {
     grantAccessBtn.textContent = 'Re-grant repo access';
     if (lastWavBlob) setE2EBtn.disabled = false;
     log(`Granted access to "${dirHandle.name}" — make sure this was the repo root (boostlingo_v2).`);
+    await refreshRecordedIds();
+    renderPromptList();
+    if (activePrompt) {
+      [...promptListEl.children].forEach((el) => el.classList.toggle('prompt-active', el.dataset.id === activePrompt.id));
+    }
   } catch (err) {
     log(`Folder access cancelled or failed: ${err.message}`);
   }
@@ -468,11 +626,11 @@ async function readJsonIfExists(dir, name, fallback) {
   }
 }
 
-async function appendManifestEntry(realAudioDir, entry) {
-  const manifest = await readJsonIfExists(realAudioDir, 'manifest.json', { items: [] });
+async function appendManifestEntry(setDir, entry) {
+  const manifest = await readJsonIfExists(setDir, 'manifest.json', { items: [] });
   const withoutDuplicate = manifest.items.filter((item) => item.id !== entry.id);
   manifest.items = [...withoutDuplicate, entry];
-  await writeFile(realAudioDir, 'manifest.json', new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' }));
+  await writeFile(setDir, 'manifest.json', new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' }));
 }
 
 function downloadBlob(blob, filename) {
@@ -487,6 +645,8 @@ function downloadBlob(blob, filename) {
 document.getElementById('saveBtn').addEventListener('click', async () => {
   if (!lastWavBlob || !activePrompt) return;
   const filename = `${activePrompt.id}.wav`;
+  const set = activeSet();
+  const setPath = set.dir.join('/');
   const entry = {
     id: activePrompt.id,
     audioFile: filename,
@@ -495,13 +655,19 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     referenceText: activePrompt.text,
     conditions: document.getElementById('conditionsInput').value || 'not noted',
   };
+  if (activePrompt.referenceTranslation) entry.referenceTranslation = activePrompt.referenceTranslation;
 
   if (dirHandle) {
     try {
-      const realAudioDir = await getNestedDir(dirHandle, ['backend', 'tests', 'fixtures', 'real_audio'], true);
-      await writeFile(realAudioDir, filename, lastWavBlob);
-      await appendManifestEntry(realAudioDir, entry);
-      log(`Saved ${filename} and updated manifest.json in backend/tests/fixtures/real_audio/`);
+      const setDir = await getNestedDir(dirHandle, set.dir, true);
+      await writeFile(setDir, filename, lastWavBlob);
+      await appendManifestEntry(setDir, entry);
+      recordedIds.add(activePrompt.id);
+      renderPromptList();
+      // Re-highlight without resetting: the recording stays available for
+      // "Also set as E2E real-speech.wav" after a save.
+      [...promptListEl.children].forEach((el) => el.classList.toggle('prompt-active', el.dataset.id === activePrompt.id));
+      log(`Saved ${filename} and updated manifest.json in ${setPath}/`);
       return;
     } catch (err) {
       log(`Direct save failed (${err.message}) — falling back to download.`);
@@ -516,7 +682,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
   document.getElementById('manifestSnippetWrap').classList.remove('hidden');
   document.getElementById('manifestSnippet').value = JSON.stringify(entry, null, 2) + ',';
   log(
-    `Downloaded ${filename} — move it into backend/tests/fixtures/real_audio/, ` +
+    `Downloaded ${filename} — move it into ${setPath}/, ` +
       'then paste the snippet below into manifest.json.',
   );
 });

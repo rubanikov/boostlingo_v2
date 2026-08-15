@@ -72,7 +72,11 @@ result; see the root `README.md`.
 directly in a browser, record a prompt, then click "Also set as E2E
 real-speech.wav" (needs the File System Access API — Chrome/Edge — and repo
 folder access granted in that page first). It writes an already-correct
-`e2e/fixtures/real-speech.wav` directly, no `ffmpeg` step.
+`e2e/fixtures/real-speech.wav` directly, no `ffmpeg` step. Prefer the
+`short-en-01` prompt ("Hi, how are you doing today?"): it's the sentence the
+COMPARISON.md latency runs already use, and it's also part of the Realtime
+quality corpus (see `../backend/tests/fixtures/realtime_quality/SCRIPT.md`),
+so one recording serves all three.
 
 Opening the file directly (`file://`) works in Chrome/Edge, but if prompts
 won't select or Record does nothing, some browsers block microphone access on

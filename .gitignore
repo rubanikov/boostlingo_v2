@@ -18,6 +18,13 @@ backend/tests/fixtures/real_audio/*.wav
 backend/tests/fixtures/real_audio/manifest.json
 backend/tests/fixtures/real_audio_report.json
 
+# Same reasoning for the Realtime-mode quality corpus (recorder.html's second
+# prompt set): personal recordings of the 33 dataset items. SCRIPT.md (what
+# to say) stays tracked; the audio and manifest do not.
+backend/tests/fixtures/realtime_quality/*.wav
+backend/tests/fixtures/realtime_quality/manifest.json
+backend/tests/fixtures/realtime_quality_report.json
+
 # Node / frontend
 frontend/node_modules/
 frontend/dist/
