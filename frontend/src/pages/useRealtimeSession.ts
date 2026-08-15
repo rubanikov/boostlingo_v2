@@ -13,6 +13,14 @@ import type { ConnectionStatus, SessionHandle, SessionLanguages } from './sessio
 
 export type { ConnectionStatus } from './sessionHandle';
 
+// Extra time to keep the mic muted past response.done before re-enabling the
+// local track: covers WebRTC/decode buffering so the tail of the model's own
+// voice output doesn't get sent back as new input. Mirrors the same guard in
+// useCascadeSession.ts (PLAYBACK_MUTE_TAIL_MS), applied here to the local
+// MediaStreamTrack instead of a withheld WebSocket frame, since Realtime
+// mode has no server-side segmentation of its own to protect from feedback.
+const REALTIME_MUTE_TAIL_MS = 300;
+
 // Shape of our backend's POST /api/realtime/session response: the ephemeral
 // token lives in `client_secret`. See backend/app/api/realtime.py's
 // RealtimeSessionResponse (reconciled against ticket 01's contract).
@@ -57,6 +65,11 @@ export function useRealtimeSession(): UseRealtimeSessionResult {
   const dataChannelRef = useRef<RTCDataChannel | null>(null);
   const levelAudioContextRef = useRef<AudioContext | null>(null);
   const levelMeterRef = useRef<MicLevelMeter | null>(null);
+  // Feedback-loop guard: disables the local mic track while the model's own
+  // reply is being spoken, so the WebRTC connection sends silence instead of
+  // whatever the speakers just played back into the mic. See the matching
+  // guard (and the incident that motivated it) in useCascadeSession.ts.
+  const unmuteTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fail = useCallback((message: string) => {
     setStatus('error');
@@ -90,11 +103,30 @@ export function useRealtimeSession(): UseRealtimeSessionResult {
       // occurrence after speech_stopped is our proxy for "the response has
       // started"; see realtimeLatency.ts for why this is an approximation,
       // not a precise playback-start timestamp.
-      case 'response.output_audio_transcript.delta':
+      case 'response.output_audio_transcript.delta': {
+        // The model has started (or is still) talking: mute the local mic
+        // track so its own voice, if picked up by the mic off the speakers,
+        // can't be sent back as new input. Re-armed on every delta rather
+        // than once, so a late-arriving unmute from a previous, shorter gap
+        // in deltas can't re-enable the mic mid-response.
+        const micTrack = mediaStreamRef.current?.getAudioTracks()[0];
+        if (micTrack) micTrack.enabled = false;
+        if (unmuteTimeoutRef.current !== null) {
+          clearTimeout(unmuteTimeoutRef.current);
+          unmuteTimeoutRef.current = null;
+        }
         if (typeof message.delta === 'string') {
           setTargetText((text) => text + message.delta);
         }
         setLatencyState((state) => onResponseAudioTranscriptDelta(state, Date.now()));
+        break;
+      }
+      case 'response.done':
+        unmuteTimeoutRef.current = setTimeout(() => {
+          const micTrack = mediaStreamRef.current?.getAudioTracks()[0];
+          if (micTrack) micTrack.enabled = true;
+          unmuteTimeoutRef.current = null;
+        }, REALTIME_MUTE_TAIL_MS);
         break;
       default:
         break;
@@ -116,6 +148,10 @@ export function useRealtimeSession(): UseRealtimeSessionResult {
   // unmount cleanup effect below.
   const teardown = useCallback(() => {
     stopLevelMetering();
+    if (unmuteTimeoutRef.current !== null) {
+      clearTimeout(unmuteTimeoutRef.current);
+      unmuteTimeoutRef.current = null;
+    }
     dataChannelRef.current = null;
     peerConnectionRef.current?.close();
     peerConnectionRef.current = null;
@@ -142,7 +178,10 @@ export function useRealtimeSession(): UseRealtimeSessionResult {
         setTargetText('');
         setLatencyState(EMPTY_REALTIME_LATENCY);
 
-        const stream = await requestMicStream(true, fail);
+        const stream = await requestMicStream(
+          { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          fail,
+        );
         if (!stream) {
           return;
         }

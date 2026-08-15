@@ -164,6 +164,48 @@ describe('useRealtimeSession', () => {
     expect(result.current.sourceText).toBe('Hi there');
   });
 
+  it('disables the local mic track while the model is speaking, then re-enables it once its reply finishes', async () => {
+    // Regression test for a real feedback loop found via manual testing: an
+    // unmuted mic transcribed the app's own translated reply off the
+    // speakers and re-translated it, looping indefinitely.
+    const { stream, track } = createMockMicStream();
+    stubMediaDevices(vi.fn().mockResolvedValue(stream));
+    stubHappyPathFetch();
+    installMockRTCPeerConnection();
+
+    const { result } = renderHook(() => useRealtimeSession());
+
+    act(() => {
+      result.current.connect(LANGUAGES);
+    });
+    await waitFor(() => expect(result.current.status).toBe('connected'));
+    expect(track.enabled).not.toBe(false); // not muted before the model has said anything
+
+    const pc = MockRTCPeerConnection.instances[0];
+    const dataChannel = pc.dataChannel;
+    if (!dataChannel) throw new Error('expected a data channel to have been created');
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      act(() => {
+        dataChannel.emitMessage(JSON.stringify({ type: 'response.output_audio_transcript.delta', delta: 'Hola' }));
+      });
+      expect(track.enabled).toBe(false); // muted the instant the model starts talking
+
+      act(() => {
+        dataChannel.emitMessage(JSON.stringify({ type: 'response.done' }));
+      });
+      expect(track.enabled).toBe(false); // still muted immediately after response.done
+
+      act(() => {
+        vi.advanceTimersByTime(400); // past REALTIME_MUTE_TAIL_MS
+      });
+      expect(track.enabled).toBe(true); // unmuted once the trailing buffer clears
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('starts with endToEndLatencyMs null', () => {
     const { result } = renderHook(() => useRealtimeSession());
     expect(result.current.endToEndLatencyMs).toBeNull();

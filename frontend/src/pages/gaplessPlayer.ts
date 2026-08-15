@@ -24,6 +24,8 @@ export interface AudioContextLike {
 export interface GaplessPlayer {
   /** Decode one PCM segment and schedule it to play immediately after whatever's already queued. */
   schedule(samples: Float32Array, sampleRate: number): AudioBufferSourceLike;
+  /** audioContext.currentTime at which everything currently queued will have finished playing. */
+  queuedUntil(): number;
 }
 
 /**
@@ -50,5 +52,5 @@ export function createGaplessPlayer(audioContext: AudioContextLike): GaplessPlay
     return source;
   }
 
-  return { schedule };
+  return { schedule, queuedUntil: () => nextStartTime };
 }

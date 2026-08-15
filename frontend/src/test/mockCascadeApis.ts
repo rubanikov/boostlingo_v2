@@ -119,16 +119,23 @@ export class FakeAudioContext {
 
 /** Stand-in for AudioWorkletNode — exposes a controllable `port` for simulating captured audio frames. */
 export class FakeAudioWorkletNode {
+  static instances: FakeAudioWorkletNode[] = [];
+  static reset() {
+    FakeAudioWorkletNode.instances = [];
+  }
+
   port: { onmessage: ((event: MessageEvent<ArrayBuffer>) => void) | null; postMessage: (data: unknown) => void };
   connect = vi.fn();
 
   constructor() {
     this.port = { onmessage: null, postMessage: vi.fn() };
+    FakeAudioWorkletNode.instances.push(this);
   }
 }
 
 export function installFakeAudioApis() {
   FakeAudioContext.reset();
+  FakeAudioWorkletNode.reset();
   vi.stubGlobal('AudioContext', FakeAudioContext as unknown as typeof AudioContext);
   vi.stubGlobal('AudioWorkletNode', FakeAudioWorkletNode as unknown as typeof AudioWorkletNode);
 }

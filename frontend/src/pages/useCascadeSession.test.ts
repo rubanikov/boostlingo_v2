@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockMicStream } from '../test/mockRealtimeApis';
 import {
   FakeAudioContext,
+  FakeAudioWorkletNode,
   installFakeAudioApis,
   installMockGetUserMedia,
   installMockWebSocket,
@@ -324,6 +325,53 @@ describe('useCascadeSession', () => {
       expect(playbackStarted).toMatchObject({ type: 'playback_started', segmentId: 's1' });
       expect(typeof playbackStarted?.clientTime).toBe('number');
     });
+  });
+
+  it('withholds mic frames from the backend while TTS audio is playing, then resumes once it finishes', async () => {
+    // Regression test for a real feedback loop found via manual testing: an
+    // unmuted mic transcribed the app's own translated reply off the
+    // speakers and re-translated it, looping indefinitely.
+    const { result } = renderHook(() => useCascadeSession());
+
+    act(() => {
+      result.current.connect(LANGUAGES);
+    });
+    await waitFor(() => expect(MockWebSocket.instances).toHaveLength(1));
+    const socket = latestSocket();
+    act(() => socket.emitOpen());
+    await waitFor(() => expect(result.current.status).toBe('connected'));
+
+    const captureWorklet = FakeAudioWorkletNode.instances[0];
+    if (!captureWorklet) throw new Error('expected a capture AudioWorkletNode to have been created');
+    const emitMicFrame = () => {
+      captureWorklet.port.onmessage?.({ data: new ArrayBuffer(4) } as MessageEvent<ArrayBuffer>);
+    };
+    const forwardedFrameCount = () => socket.sent.filter((entry) => entry instanceof ArrayBuffer).length;
+
+    act(emitMicFrame);
+    expect(forwardedFrameCount()).toBe(1); // baseline: forwarded before any TTS plays
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      act(() => {
+        socket.emitMessage(JSON.stringify({ type: 'tts_audio_meta', segmentId: 's1', sampleRate: 16000 }));
+        socket.emitMessage(new ArrayBuffer(4)); // two int16 samples -> 0.125ms of "audio"
+      });
+
+      act(emitMicFrame);
+      expect(forwardedFrameCount()).toBe(1); // still muted: no new frame forwarded
+
+      // PLAYBACK_MUTE_TAIL_MS (200ms) comfortably covers this segment's ~0.125ms
+      // of queued audio; advancing past it should lift the mute.
+      act(() => {
+        vi.advanceTimersByTime(250);
+      });
+
+      act(emitMicFrame);
+      expect(forwardedFrameCount()).toBe(2); // unmuted again
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('clears prior transcript text on a fresh connect()', async () => {

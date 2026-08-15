@@ -29,6 +29,11 @@ const CLOCK_SYNC_INTERVAL_MS = 30_000;
 // across a run of retryable segment failures.
 const CASCADE_TOAST_DURATION_MS = 5_000;
 
+// Extra time to keep the mic muted past the scheduled end of TTS playback:
+// covers speaker/room acoustic decay and scheduling slop, so the tail of our
+// own voice output doesn't get picked back up as the start of a new segment.
+const PLAYBACK_MUTE_TAIL_MS = 200;
+
 interface ServerEnvelope {
   type: string;
   segmentId?: string;
@@ -78,6 +83,13 @@ export function useCascadeSession(): UseCascadeSessionResult {
   const pendingTtsMetaRef = useRef<{ segmentId: string; sampleRate: number } | null>(null);
   const levelMeterRef = useRef<MicLevelMeter | null>(null);
   const clockSyncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Feedback-loop guard: while our own TTS is audibly playing, mic frames are
+  // withheld from the backend instead of being forwarded, so speaker output
+  // picked back up by the mic can't be mistaken for a new user segment (see
+  // the incident that motivated this: an unmuted mic transcribing the app's
+  // own translated reply and re-translating it, looping indefinitely).
+  const isPlaybackActiveRef = useRef(false);
+  const unmutePlaybackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // ticket 07 resilience bookkeeping: the sessionId a resume would need,
   // whether one's already been tried this session, and whether the socket
   // that's about to close was closed *by us* (disconnect()/teardown()) as
@@ -149,6 +161,11 @@ export function useCascadeSession(): UseCascadeSessionResult {
     playbackContextRef.current = null;
     gaplessPlayerRef.current = null;
     pendingTtsMetaRef.current = null;
+    if (unmutePlaybackTimeoutRef.current !== null) {
+      clearTimeout(unmutePlaybackTimeoutRef.current);
+      unmutePlaybackTimeoutRef.current = null;
+    }
+    isPlaybackActiveRef.current = false;
     for (const timeoutId of toastTimeoutsRef.current.values()) {
       clearTimeout(timeoutId);
     }
@@ -189,7 +206,26 @@ export function useCascadeSession(): UseCascadeSessionResult {
           return;
         }
         const samples = int16BufferToFloat32(event.data);
-        getGaplessPlayer(meta.sampleRate).schedule(samples, meta.sampleRate);
+        const player = getGaplessPlayer(meta.sampleRate);
+        player.schedule(samples, meta.sampleRate);
+
+        // Arm (or extend) the mic mute for exactly as long as this player
+        // still has audio queued, so speaker bleed-through can't be picked
+        // up as a new segment. Re-armed on every chunk rather than timed
+        // once, since one segment's reply can arrive as several chunks.
+        isPlaybackActiveRef.current = true;
+        if (unmutePlaybackTimeoutRef.current !== null) {
+          clearTimeout(unmutePlaybackTimeoutRef.current);
+        }
+        const playbackContext = playbackContextRef.current;
+        const remainingMs = playbackContext
+          ? Math.max(0, (player.queuedUntil() - playbackContext.currentTime) * 1000)
+          : 0;
+        unmutePlaybackTimeoutRef.current = setTimeout(() => {
+          isPlaybackActiveRef.current = false;
+          unmutePlaybackTimeoutRef.current = null;
+        }, remainingMs + PLAYBACK_MUTE_TAIL_MS);
+
         // Report the exact moment this segment's TTS audio was scheduled to
         // play, right after the scheduling call above. The server pairs
         // this against its own speech_end timestamp for the playback_start
@@ -386,7 +422,10 @@ export function useCascadeSession(): UseCascadeSessionResult {
         // Request mic access first (tied to this same click/user-gesture, per
         // the autoplay-policy note in issue 07). No point opening a backend
         // session if the user denies it.
-        const stream = await requestMicStream({ channelCount: 1, sampleRate: 16000 }, fail);
+        const stream = await requestMicStream(
+          { channelCount: 1, sampleRate: 16000, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          fail,
+        );
         if (!stream) {
           return;
         }
@@ -445,6 +484,7 @@ export function useCascadeSession(): UseCascadeSessionResult {
           const micSource = captureContext.createMediaStreamSource(stream);
           const workletNode = new AudioWorkletNode(captureContext, CASCADE_PCM_WORKLET_NAME);
           workletNode.port.onmessage = (workletEvent: MessageEvent<ArrayBuffer>) => {
+            if (isPlaybackActiveRef.current) return;
             if (wsRef.current?.readyState === WebSocket.OPEN) {
               wsRef.current.send(workletEvent.data);
             }
