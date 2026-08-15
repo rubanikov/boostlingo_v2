@@ -77,8 +77,16 @@ class ElevenLabsTTSProvider:
         queue: asyncio.Queue[bytes | ConnectionDropped | object] = asyncio.Queue()
 
         try:
+            # Same explicit connect/keepalive bounds as `deepgram_stt.py`:
+            # a hung connect or unresponsive peer becomes a detectable
+            # failure on the `with_reconnect` path, not a stalled segment.
             async with websockets.connect(
-                self._url(resolved_voice_id), additional_headers={"xi-api-key": self._api_key}
+                self._url(resolved_voice_id),
+                additional_headers={"xi-api-key": self._api_key},
+                open_timeout=10,
+                ping_interval=20,
+                ping_timeout=20,
+                close_timeout=10,
             ) as socket:
                 await socket.send(json.dumps(_initialize_message()))
 

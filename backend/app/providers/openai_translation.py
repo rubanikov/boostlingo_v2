@@ -10,6 +10,7 @@ translation finishes.
 from collections.abc import AsyncIterator
 from typing import Final
 
+import httpx
 from openai import (
     APIConnectionError,
     APIStatusError,
@@ -31,7 +32,13 @@ class OpenAITranslationProvider:
     """
 
     def __init__(self, api_key: str) -> None:
-        self._client = AsyncOpenAI(api_key=api_key)
+        # Explicit timeout instead of the SDK's 600s default: a hung
+        # request or stalled stream read raises `APITimeoutError` (mapped
+        # to a retryable TIMEOUT below) instead of blocking the serial
+        # segment pipeline for minutes.
+        self._client = AsyncOpenAI(
+            api_key=api_key, timeout=httpx.Timeout(30.0, connect=10.0)
+        )
 
     async def translate(
         self, source_text: str, *, source_lang: str, target_lang: str

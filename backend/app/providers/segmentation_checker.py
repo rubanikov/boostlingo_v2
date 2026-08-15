@@ -15,6 +15,7 @@ more often, per segment, than translation does.
 
 from typing import Final
 
+import httpx
 from openai import AsyncOpenAI, OpenAIError
 
 # Small/fast, not the translation model: this call gates real-time
@@ -33,7 +34,12 @@ _PROMPT_TEMPLATE: Final = (
 
 class SegmentationChecker:
     def __init__(self, api_key: str) -> None:
-        self._client = AsyncOpenAI(api_key=api_key)
+        # Tight explicit timeout (vs the SDK's 600s default): a slow
+        # verdict is worthless here anyway; Deepgram's own boundary
+        # signals will have cut the segment long before 600s.
+        self._client = AsyncOpenAI(
+            api_key=api_key, timeout=httpx.Timeout(10.0, connect=5.0)
+        )
 
     async def is_complete_clause(self, text: str, language: str) -> bool:
         """True iff `text` (the in-progress segment's accumulated transcript,

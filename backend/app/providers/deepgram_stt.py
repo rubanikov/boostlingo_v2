@@ -87,9 +87,19 @@ class DeepgramSTTProvider:
         ] = asyncio.Queue()
 
         try:
+            # Connect/keepalive bounds stated explicitly rather than
+            # inherited from library defaults: a connect attempt fails
+            # after 10s, and a peer that stops answering protocol pings is
+            # detected within ~40s (ping_interval + ping_timeout) and
+            # surfaces as `ConnectionClosed` -> the `with_reconnect` path,
+            # instead of a silently hung session.
             async with websockets.connect(
                 self._url(),
                 additional_headers={"Authorization": f"Token {self._api_key}"},
+                open_timeout=10,
+                ping_interval=20,
+                ping_timeout=20,
+                close_timeout=10,
             ) as socket:
                 pump_task = asyncio.create_task(_pump_audio(socket, audio_chunks))
                 receive_task = asyncio.create_task(_receive_results(socket, queue))

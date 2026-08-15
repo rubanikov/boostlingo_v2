@@ -89,7 +89,11 @@ $frontendPort = Resolve-Port -preferred 5173 -fallback 5183 -label 'frontend'
 if ($frontendPort -ne 5173) {
     $env:CORS_ORIGINS = '["http://localhost:{0}"]' -f $frontendPort
 }
-$backendCmd = "cd '$repoRoot\backend'; uv run uvicorn app.main:app --reload --port $backendPort"
+# --ws-ping-interval/--ws-ping-timeout: pin uvicorn's protocol-level
+# keepalive on /ws/cascade explicitly (matches the providers' own socket
+# settings) so a long quiet session can't be silently dropped by an idle
+# proxy, and a vanished client is detected within ~40s.
+$backendCmd = "cd '$repoRoot\backend'; uv run uvicorn app.main:app --reload --port $backendPort --ws-ping-interval 20 --ws-ping-timeout 20"
 Start-Process powershell -ArgumentList '-NoExit', '-Command', $backendCmd
 
 if ($backendPort -ne 8000) {

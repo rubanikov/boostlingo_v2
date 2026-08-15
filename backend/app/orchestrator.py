@@ -1269,13 +1269,27 @@ async def _process_segment(
     return translation_ok and tts_ok
 
 
+# Client-facing text per failure kind. Raw provider exception text (HTTP
+# bodies, upstream error payloads) is logged server-side only, never
+# forwarded to the browser: it can carry vendor internals the user has no
+# use for and shouldn't see.
+_CLIENT_ERROR_MESSAGES: Final[dict[ProviderErrorKind, str]] = {
+    ProviderErrorKind.RATE_LIMIT: "The provider is rate-limiting requests.",
+    ProviderErrorKind.TIMEOUT: "The provider took too long to respond.",
+    ProviderErrorKind.EMPTY_RESULT: "The provider returned no output for this segment.",
+    ProviderErrorKind.CONNECTION: "The connection to the provider was lost.",
+    ProviderErrorKind.UNKNOWN: "The provider failed unexpectedly.",
+}
+
+
 async def _send_error(outgoing: _OutgoingSocket, exc: ProviderError) -> None:
+    logger.warning("provider error sent to client as %s: %s", exc.kind.name, exc)
     await outgoing.send_json(
         {
             "type": "error",
             "provider": exc.provider,
             "kind": exc.kind.name,
-            "message": str(exc),
+            "message": _CLIENT_ERROR_MESSAGES[exc.kind],
             "retryable": exc.retryable,
         }
     )
