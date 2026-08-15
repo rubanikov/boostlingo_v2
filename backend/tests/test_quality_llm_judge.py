@@ -139,10 +139,10 @@ class TestJudgeTranslationHappyPath:
         completions = _FakeCompletions(content)
         client = _FakeClient(completions)
 
-        await judge_translation("Bonjour.", "fr", "Hello.", "en", client=client)
+        await judge_translation("Guten Tag.", "de", "Hello.", "en", client=client)
 
         user_message = completions.calls[0]["messages"][1]["content"]
-        assert "fr" in user_message
+        assert "de" in user_message
 
 
 class TestJudgeTranslationDefensiveParsing:

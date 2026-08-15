@@ -201,6 +201,24 @@ describe('WorkbenchPage', () => {
     );
   });
 
+  it('offers more than one language pair and passes a non-default selection through to connect()', async () => {
+    const user = userEvent.setup();
+    const fetchMock = createRealtimeFetchRouter();
+    vi.stubGlobal('fetch', fetchMock);
+    render(<WorkbenchPage />);
+
+    await user.selectOptions(screen.getByRole('combobox', { name: /language pair/i }), 'en-fr');
+    await user.click(screen.getByRole('tab', { name: 'Realtime' }));
+    await user.click(micButton());
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        REALTIME_SESSION_ENDPOINT,
+        expect.objectContaining({ body: JSON.stringify({ sourceLanguage: 'en', targetLanguage: 'fr' }) }),
+      ),
+    );
+  });
+
   it('mic button click while connected disconnects the active session', async () => {
     const user = userEvent.setup();
     render(<WorkbenchPage />);

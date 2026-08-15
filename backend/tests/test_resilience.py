@@ -198,13 +198,14 @@ class TestPerSegmentRetry:
         with client.websocket_connect("/ws/cascade") as ws:
             _start_session(ws, languages=["en", "es"])
             ws.send_bytes(b"\x00")
-            raw = [ws.receive() for _ in range(10)]
+            raw = [ws.receive() for _ in range(11)]
 
         assert [_message_kind(m) for m in raw] == [
             "source_transcript",
             "segment_boundary",
-            "latency",
-            "latency",
+            "latency",  # stt_final
+            "latency",  # speech_end
+            "latency",  # translation_first_token
             "target_transcript",
             "latency",
             "target_transcript",
@@ -214,7 +215,7 @@ class TestPerSegmentRetry:
         ]
         assert attempts["n"] == 3  # 1 initial + 2 retries
         assert sleeps == [0.2, 0.4]
-        final_target = json.loads(raw[6]["text"])
+        final_target = json.loads(raw[7]["text"])
         assert final_target == {
             "type": "target_transcript",
             "segmentId": final_target["segmentId"],
@@ -245,15 +246,16 @@ class TestPerSegmentRetry:
         with client.websocket_connect("/ws/cascade") as ws:
             _start_session(ws, languages=["en", "es"])
             ws.send_bytes(b"\x00")
-            raw = [ws.receive() for _ in range(4)]
+            raw = [ws.receive() for _ in range(5)]
 
         assert [_message_kind(m) for m in raw] == [
             "source_transcript",
             "segment_boundary",
-            "latency",
+            "latency",  # stt_final
+            "latency",  # speech_end
             "error",
         ]
-        error = json.loads(raw[3]["text"])
+        error = json.loads(raw[4]["text"])
         assert error["provider"] == "openai"
         assert error["kind"] == "RATE_LIMIT"
         assert error["retryable"] is True
@@ -280,9 +282,9 @@ class TestPerSegmentRetry:
         with client.websocket_connect("/ws/cascade") as ws:
             _start_session(ws, languages=["en", "es"])
             ws.send_bytes(b"\x00")
-            raw = [ws.receive() for _ in range(4)]
+            raw = [ws.receive() for _ in range(5)]
 
-        error = json.loads(raw[3]["text"])
+        error = json.loads(raw[4]["text"])
         assert error["kind"] == "TIMEOUT"
         assert attempts["n"] == 2  # 1 initial + 1 retry, then drop
         assert sleeps == [0.0]
@@ -307,9 +309,9 @@ class TestPerSegmentRetry:
         with client.websocket_connect("/ws/cascade") as ws:
             _start_session(ws, languages=["en", "es"])
             ws.send_bytes(b"\x00")
-            raw = [ws.receive() for _ in range(4)]
+            raw = [ws.receive() for _ in range(5)]
 
-        error = json.loads(raw[3]["text"])
+        error = json.loads(raw[4]["text"])
         assert error["provider"] == "translation"
         assert error["kind"] == "EMPTY_RESULT"
         assert attempts["n"] == 2  # 1 initial + 1 retry, then drop+log
@@ -337,9 +339,9 @@ class TestPerSegmentRetry:
         with client.websocket_connect("/ws/cascade") as ws:
             _start_session(ws, languages=["en", "es"])
             ws.send_bytes(b"\x00")
-            raw = [ws.receive() for _ in range(4)]
+            raw = [ws.receive() for _ in range(5)]
 
-        error = json.loads(raw[3]["text"])
+        error = json.loads(raw[4]["text"])
         assert error["kind"] == "UNKNOWN"
         assert error["retryable"] is False
         assert attempts["n"] == 1  # non-retryable -- no retry attempted at all
@@ -386,9 +388,9 @@ class TestCircuitBreaker:
             _start_session(ws, languages=["en", "es"])
             for _ in range(4):
                 ws.send_bytes(b"\x00")
-                messages = [json.loads(ws.receive()["text"]) for _ in range(4)]
-                assert messages[3]["type"] == "error"
-                assert messages[3]["kind"] == "TIMEOUT"
+                messages = [json.loads(ws.receive()["text"]) for _ in range(5)]
+                assert messages[4]["type"] == "error"
+                assert messages[4]["kind"] == "TIMEOUT"
 
             # Prove no circuit_open snuck in: the very next message is the
             # clock_sync_ack, not a 5th error.
@@ -419,29 +421,29 @@ class TestCircuitBreaker:
 
             for _ in range(4):
                 ws.send_bytes(b"\x00")
-                messages = [json.loads(ws.receive()["text"]) for _ in range(4)]
-                assert messages[3]["type"] == "error"
+                messages = [json.loads(ws.receive()["text"]) for _ in range(5)]
+                assert messages[4]["type"] == "error"
 
-            # 5th segment: the usual 4 messages, plus the breaker trip.
+            # 5th segment: the usual 5 messages, plus the breaker trip.
             ws.send_bytes(b"\x00")
-            messages = [json.loads(ws.receive()["text"]) for _ in range(5)]
-            assert messages[3]["type"] == "error"
-            assert messages[4] == {
+            messages = [json.loads(ws.receive()["text"]) for _ in range(6)]
+            assert messages[4]["type"] == "error"
+            assert messages[5] == {
                 "type": "error",
                 "provider": "orchestrator",
                 "kind": "circuit_open",
-                "message": messages[4]["message"],
+                "message": messages[5]["message"],
                 "retryable": False,
             }
 
             # 6th segment: STT (a separate task, unaware of the breaker)
             # still transcribes it -- source_transcript, segment_boundary,
-            # latency -- but the pipeline never attempts it: no error, no
-            # second circuit_open. Confirmed by reading a known-good
-            # follow-up message right after instead of a message that
-            # shouldn't come.
+            # latency stt_final, latency speech_end -- but the pipeline
+            # never attempts it: no error, no second circuit_open.
+            # Confirmed by reading a known-good follow-up message right
+            # after instead of a message that shouldn't come.
             ws.send_bytes(b"\x00")
-            for _ in range(3):
+            for _ in range(4):
                 ws.receive()
             ws.send_json({"type": "clock_sync", "clientTime": 1_000})
             ack = json.loads(ws.receive()["text"])
@@ -469,24 +471,24 @@ class TestCircuitBreaker:
         with client.websocket_connect("/ws/cascade") as ws:
             _start_session(ws, languages=["en", "es"])
 
-            # Segments 1-4: fail (4 messages each) -- streak reaches 4.
+            # Segments 1-4: fail (5 messages each) -- streak reaches 4.
             for _ in range(4):
                 ws.send_bytes(b"\x00")
-                messages = [json.loads(ws.receive()["text"]) for _ in range(4)]
-                assert messages[3]["type"] == "error"
+                messages = [json.loads(ws.receive()["text"]) for _ in range(5)]
+                assert messages[4]["type"] == "error"
 
-            # Segment 5: succeeds end-to-end (10 messages) -- resets the
+            # Segment 5: succeeds end-to-end (11 messages) -- resets the
             # streak to 0.
             ws.send_bytes(b"\x00")
-            for _ in range(10):
+            for _ in range(11):
                 ws.receive()
 
             # Segments 6-9: fail again -- only 4 more, one short of a fresh
             # 5-in-a-row, so the breaker must not trip.
             for _ in range(4):
                 ws.send_bytes(b"\x00")
-                messages = [json.loads(ws.receive()["text"]) for _ in range(4)]
-                assert messages[3]["type"] == "error"
+                messages = [json.loads(ws.receive()["text"]) for _ in range(5)]
+                assert messages[4]["type"] == "error"
 
             ws.send_json({"type": "clock_sync", "clientTime": 1_000})
             ack = json.loads(ws.receive()["text"])
@@ -545,8 +547,8 @@ class TestSessionResume:
             # 4 consecutive failures -- one short of tripping the breaker.
             for _ in range(4):
                 ws1.send_bytes(b"\x00")
-                messages = [json.loads(ws1.receive()["text"]) for _ in range(4)]
-                assert messages[3]["type"] == "error"
+                messages = [json.loads(ws1.receive()["text"]) for _ in range(5)]
+                assert messages[4]["type"] == "error"
 
             # Unexpected drop, not a clean client-initiated close.
             ws1.close(code=1006)
@@ -567,15 +569,15 @@ class TestSessionResume:
             # streak (4, from before the drop) carried over rather than
             # resetting on reconnect.
             ws2.send_bytes(b"\x00")
-            messages = [json.loads(ws2.receive()["text"]) for _ in range(5)]
+            messages = [json.loads(ws2.receive()["text"]) for _ in range(6)]
 
         assert session_id not in orchestrator._detached_sessions  # reclaimed, not left behind
-        assert messages[3]["type"] == "error"
-        assert messages[4] == {
+        assert messages[4]["type"] == "error"
+        assert messages[5] == {
             "type": "error",
             "provider": "orchestrator",
             "kind": "circuit_open",
-            "message": messages[4]["message"],
+            "message": messages[5]["message"],
             "retryable": False,
         }
 

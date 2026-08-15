@@ -29,9 +29,13 @@ export interface TranscriptSegment {
 
 /**
  * One stage of the Cascade server's per-segment latency pipeline (ticket 06):
- * `ms` is cumulative since that segment's `speech_end` (always 0).
+ * `ms` is cumulative since that segment's `speech_end` (always 0), except
+ * `stt_final`, which happened *before* the reference point: its `ms` is the
+ * standalone duration between the segment's last final STT result arriving
+ * and the segmentation decision that cut the segment.
  */
 export type LatencyStage =
+  | 'stt_final'
   | 'speech_end'
   | 'translation_first_token'
   | 'translation_complete'

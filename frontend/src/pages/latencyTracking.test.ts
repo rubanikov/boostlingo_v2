@@ -49,7 +49,7 @@ describe('recordLatencyStage / currentCascadeLatency', () => {
 
 describe('isLatencyStage', () => {
   it('accepts every known stage', () => {
-    for (const stage of ['speech_end', 'translation_first_token', 'translation_complete', 'tts_first_byte', 'playback_start']) {
+    for (const stage of ['stt_final', 'speech_end', 'translation_first_token', 'translation_complete', 'tts_first_byte', 'playback_start']) {
       expect(isLatencyStage(stage)).toBe(true);
     }
   });
@@ -103,5 +103,37 @@ describe('latencyBadges', () => {
 
   it('returns an empty list for a segment with no stages recorded', () => {
     expect(latencyBadges({})).toEqual([]);
+  });
+
+  it('orders stt_final before the speech_end reference point', () => {
+    const badges = latencyBadges({ stt_final: 480, speech_end: 0, playback_start: 650 });
+    expect(badges.map((b) => b.stage)).toEqual(['stt_final', 'speech_end', 'playback_start']);
+    expect(badges[0].label).toBe('STT finalize');
+  });
+
+  it('lets stt_final win the bottleneck flag with its own standalone duration', () => {
+    // stt_final is a pre-reference duration (480ms waiting on the
+    // segmentation decision), bigger than any later inter-stage jump.
+    const badges = latencyBadges({
+      stt_final: 480,
+      speech_end: 0,
+      translation_first_token: 150,
+      translation_complete: 400,
+      tts_first_byte: 600,
+      playback_start: 650,
+    });
+
+    const byStage = Object.fromEntries(badges.map((b) => [b.stage, b]));
+    expect(byStage.stt_final.tone).toBe('warning');
+    expect(byStage.speech_end.tone).toBe('ghost');
+    expect(byStage.translation_complete.tone).toBe('ghost');
+    expect(byStage.playback_start.tone).toBe('primary');
+  });
+
+  it('never flags speech_end as the bottleneck even when stt_final precedes it', () => {
+    const badges = latencyBadges({ stt_final: 5, speech_end: 0, translation_first_token: 150 });
+    const byStage = Object.fromEntries(badges.map((b) => [b.stage, b]));
+    expect(byStage.speech_end.tone).toBe('ghost');
+    expect(byStage.translation_first_token.tone).toBe('warning');
   });
 });

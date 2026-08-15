@@ -136,14 +136,15 @@ class TestCascadeOrchestrator:
             _start_session(ws, languages=["en", "es"])
             ws.send_bytes(b"\x00\x01")
 
-            raw_messages = [ws.receive() for _ in range(12)]
+            raw_messages = [ws.receive() for _ in range(13)]
 
         assert [_message_kind(m) for m in raw_messages] == [
             "source_transcript",
             "source_transcript",
             "segment_boundary",
-            "latency",
-            "latency",
+            "latency",  # stt_final
+            "latency",  # speech_end
+            "latency",  # translation_first_token
             "target_transcript",
             "target_transcript",
             "latency",
@@ -178,7 +179,13 @@ class TestCascadeOrchestrator:
             "trigger": "deepgram_speech_final",
         }
 
-        speech_end_latency = json.loads(raw_messages[3]["text"])
+        stt_final_latency = json.loads(raw_messages[3]["text"])
+        assert stt_final_latency["stage"] == "stt_final"
+        assert stt_final_latency["segmentId"] == segment_id
+        assert isinstance(stt_final_latency["ms"], int)
+        assert stt_final_latency["ms"] >= 0
+
+        speech_end_latency = json.loads(raw_messages[4]["text"])
         assert speech_end_latency == {
             "type": "latency",
             "segmentId": segment_id,
@@ -191,7 +198,7 @@ class TestCascadeOrchestrator:
         # assertions against a controlled clock): each is a `latency`
         # message for the same segment, a non-negative int `ms`, at the
         # positions the pipeline emits them.
-        timed_stages = [json.loads(raw_messages[i]["text"]) for i in (4, 7, 9)]
+        timed_stages = [json.loads(raw_messages[i]["text"]) for i in (5, 8, 10)]
         assert [m["stage"] for m in timed_stages] == [
             "translation_first_token",
             "translation_complete",
@@ -203,7 +210,7 @@ class TestCascadeOrchestrator:
             assert isinstance(message["ms"], int)
             assert message["ms"] >= 0
 
-        final_target = json.loads(raw_messages[8]["text"])
+        final_target = json.loads(raw_messages[9]["text"])
         assert final_target == {
             "type": "target_transcript",
             "segmentId": segment_id,
@@ -212,14 +219,14 @@ class TestCascadeOrchestrator:
             "speaker": None,
         }
 
-        audio_meta = json.loads(raw_messages[10]["text"])
+        audio_meta = json.loads(raw_messages[11]["text"])
         assert audio_meta == {
             "type": "tts_audio_meta",
             "segmentId": segment_id,
             "sampleRate": 16000,
             "speaker": None,
         }
-        assert raw_messages[11]["bytes"] == b"\x01\x02\x03"
+        assert raw_messages[12]["bytes"] == b"\x01\x02\x03"
 
     def test_silent_segment_produces_no_downstream_messages(self, client, monkeypatch):
         monkeypatch.setattr(orchestrator, "DeepgramSTTProvider", _FakeSilentThenSpeechSTT)
@@ -230,7 +237,7 @@ class TestCascadeOrchestrator:
             _start_session(ws, languages=["en", "es"])
             ws.send_bytes(b"\x00\x01")
 
-            raw_messages = [ws.receive() for _ in range(11)]
+            raw_messages = [ws.receive() for _ in range(12)]
 
         kinds = [_message_kind(m) for m in raw_messages]
         # Only one segment's worth of messages -- the silent segment
@@ -239,8 +246,9 @@ class TestCascadeOrchestrator:
         assert kinds == [
             "source_transcript",
             "segment_boundary",
-            "latency",
-            "latency",
+            "latency",  # stt_final
+            "latency",  # speech_end
+            "latency",  # translation_first_token
             "target_transcript",
             "target_transcript",
             "latency",
@@ -411,21 +419,22 @@ class TestCascadeDiarization:
             ws.send_bytes(b"\x00\x01")
 
             # 3 segments x (source_transcript, segment_boundary, latency
-            # speech_end, latency translation_first_token, target_transcript
-            # interim, latency translation_complete, target_transcript
-            # final, latency tts_first_byte, tts_audio_meta, binary_audio)
-            # = 30 messages. STT keeps flowing while a prior segment's
-            # translate/TTS is still in flight (see orchestrator's
-            # concurrency shape), so segments' messages can interleave on
-            # the wire -- group by segmentId below instead of asserting one
-            # fixed order.
-            raw_messages = [ws.receive() for _ in range(30)]
+            # stt_final, latency speech_end, latency translation_first_token,
+            # target_transcript interim, latency translation_complete,
+            # target_transcript final, latency tts_first_byte,
+            # tts_audio_meta, binary_audio) = 33 messages. STT keeps flowing
+            # while a prior segment's translate/TTS is still in flight (see
+            # orchestrator's concurrency shape), so segments' messages can
+            # interleave on the wire -- group by segmentId below instead of
+            # asserting one fixed order.
+            raw_messages = [ws.receive() for _ in range(33)]
 
         kinds = [_message_kind(m) for m in raw_messages]
         assert sorted(kinds) == sorted(
             [
                 "source_transcript",
                 "segment_boundary",
+                "latency",
                 "latency",
                 "latency",
                 "latency",
@@ -475,17 +484,20 @@ class TestCascadeDiarization:
 
 
 class TestCascadeLatency:
-    """Ticket 6: the `latency` message sequence for a segment (all 5
-    stages), and the `clock_sync`/`playback_started` protocol that drives
-    the final `playback_start` stage.
+    """Ticket 6: the `latency` message sequence for a segment (all 6
+    stages, including the pre-reference `stt_final`), and the
+    `clock_sync`/`playback_started` protocol that drives the final
+    `playback_start` stage.
     """
 
     def test_latency_stage_sequence_for_a_segment(self, client, monkeypatch):
-        # One `_now_ms()` call per stage: `mark_speech_end` (10_050), then
-        # one `elapsed_since_speech_end()` call each for
+        # `_now_ms()` calls in order: the final transcript's
+        # `finalized_at_ms` (10_000), `mark_speech_end` (10_050), the
+        # `stt_final` message's own read (10_050 -> ms = 50), then one
+        # `elapsed_since_speech_end()` call each for
         # translation_first_token (10_100), translation_complete (10_300),
-        # tts_first_byte (10_450) -- by hand: ms = 0, 50, 250, 400.
-        _sequential_clock(monkeypatch, [10_050, 10_100, 10_300, 10_450])
+        # tts_first_byte (10_450) -- by hand: ms = 50, 0, 50, 250, 400.
+        _sequential_clock(monkeypatch, [10_000, 10_050, 10_050, 10_100, 10_300, 10_450])
         monkeypatch.setattr(orchestrator, "DeepgramSTTProvider", _FakeSTT)
         monkeypatch.setattr(orchestrator, "OpenAITranslationProvider", _FakeTranslation)
         monkeypatch.setattr(orchestrator, "ElevenLabsTTSProvider", _FakeTTS)
@@ -494,22 +506,25 @@ class TestCascadeLatency:
             _start_session(ws, languages=["en", "es"])
             ws.send_bytes(b"\x00\x01")
 
-            raw_messages = [ws.receive() for _ in range(12)]
+            raw_messages = [ws.receive() for _ in range(13)]
 
         latency_messages = [
             json.loads(m["text"]) for m in raw_messages if _message_kind(m) == "latency"
         ]
         segment_ids = {m["segmentId"] for m in latency_messages}
-        assert len(segment_ids) == 1  # all 4 stages are for the same segment
+        assert len(segment_ids) == 1  # all 5 stages are for the same segment
 
         assert [(m["stage"], m["ms"]) for m in latency_messages] == [
+            ("stt_final", 50),
             ("speech_end", 0),
             ("translation_first_token", 50),
             ("translation_complete", 250),
             ("tts_first_byte", 400),
         ]
-        # Monotonically non-decreasing, as the wire contract requires.
-        ms_values = [m["ms"] for m in latency_messages]
+        # Monotonically non-decreasing from `speech_end` onward, as the
+        # wire contract requires (`stt_final` is the one pre-reference
+        # stage: a standalone duration, exempt from the cumulative order).
+        ms_values = [m["ms"] for m in latency_messages[1:]]
         assert ms_values == sorted(ms_values)
 
     def test_clock_sync_round_trip(self, client, monkeypatch):
@@ -527,12 +542,12 @@ class TestCascadeLatency:
         assert ack == {"type": "clock_sync_ack", "clientTime": 5_000, "serverTime": 20_000}
 
     def test_playback_started_converts_client_time_using_clock_offset(self, client, monkeypatch):
-        # Values 1-4 are the segment's 4 server-side stages (matching
-        # test_latency_stage_sequence_for_a_segment); value 5 is the
+        # Values 1-6 are the segment's server-side stages (matching
+        # test_latency_stage_sequence_for_a_segment); value 7 is the
         # clock_sync serverTime, read only after the segment is fully
         # drained below (so there's no ambiguity about which call produced
         # which value).
-        _sequential_clock(monkeypatch, [10_050, 10_100, 10_300, 10_450, 10_000])
+        _sequential_clock(monkeypatch, [10_000, 10_050, 10_050, 10_100, 10_300, 10_450, 10_000])
         monkeypatch.setattr(orchestrator, "DeepgramSTTProvider", _FakeSTT)
         monkeypatch.setattr(orchestrator, "OpenAITranslationProvider", _FakeTranslation)
         monkeypatch.setattr(orchestrator, "ElevenLabsTTSProvider", _FakeTTS)
@@ -541,13 +556,13 @@ class TestCascadeLatency:
             _start_session(ws, languages=["en", "es"])
             ws.send_bytes(b"\x00\x01")
 
-            raw_messages = [ws.receive() for _ in range(12)]
+            raw_messages = [ws.receive() for _ in range(13)]
             latency_messages = [
                 json.loads(m["text"]) for m in raw_messages if _message_kind(m) == "latency"
             ]
             segment_id = latency_messages[0]["segmentId"]
 
-            # clientTime=5_000 answered by the mocked server clock's 5th
+            # clientTime=5_000 answered by the mocked server clock's 7th
             # call (10_000) -- offset = 10_000 - 5_000 = 5_000.
             ws.send_json({"type": "clock_sync", "clientTime": 5_000})
             ack = json.loads(ws.receive()["text"])
@@ -555,7 +570,7 @@ class TestCascadeLatency:
 
             # Client reports playback scheduled at clientTime=20_000 ->
             # converted to server-time via the offset: 20_000 + 5_000 =
-            # 25_000. That segment's speech_end was 10_050 (the first
+            # 25_000. That segment's speech_end was 10_050 (the second
             # mocked clock value above), so ms = 25_000 - 10_050 = 14_950.
             ws.send_json(
                 {"type": "playback_started", "segmentId": segment_id, "clientTime": 20_000}

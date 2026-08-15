@@ -177,7 +177,7 @@ async def test_unsupported_language_code_returns_400_without_calling_openai(
     ) as client:
         response = await client.post(
             "/api/realtime/session",
-            json={"sourceLanguage": "fr", "targetLanguage": "es"},
+            json={"sourceLanguage": "de", "targetLanguage": "es"},
         )
 
     assert response.status_code == 400

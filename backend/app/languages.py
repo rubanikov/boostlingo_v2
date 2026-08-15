@@ -13,7 +13,15 @@ the other's behalf.
 
 from typing import Final
 
-# Only these are wired up for this ticket: the brief's minimum viable
-# language-pair support (English <-> Spanish). Extending this dict is how a
-# later ticket adds more languages; nothing else in either consumer changes.
-SUPPORTED_LANGUAGES: Final[dict[str, str]] = {"en": "English", "es": "Spanish"}
+# Extending this dict is how a new language is added; nothing else in
+# either consumer changes (the Realtime instructions and translation
+# prompts are templated on these names, and Deepgram's `language=multi`
+# streaming detection plus ElevenLabs' multilingual flash model both
+# already cover them). French was added exactly this way, as the brief's
+# "time-to-onboard a new language pair" metric predicts: one entry here,
+# one pair entry in the frontend's `LANGUAGE_PAIRS`.
+SUPPORTED_LANGUAGES: Final[dict[str, str]] = {
+    "en": "English",
+    "es": "Spanish",
+    "fr": "French",
+}

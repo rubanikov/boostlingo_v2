@@ -720,6 +720,7 @@ async def _cut_segment(
     speaker: int | None,
     detected_language: str | None,
     trigger: str,
+    finalized_at_ms: int | None,
 ) -> None:
     """Closes out the current in-progress segment for whichever mechanism
     won Ticket 5's segmentation race: `trigger` is one of
@@ -728,11 +729,30 @@ async def _cut_segment(
     `speech_end` latency mark, and the queued `_CompletedSegment` stay in
     lockstep regardless of which signal fired. Caller guarantees `buffer`
     is non-empty: an empty in-progress segment has nothing to cut.
+
+    `finalized_at_ms` is the wall-clock arrival time of the segment's last
+    buffer-growing final STT result, reported as the `stt_final` latency
+    stage: how long the finished transcript sat waiting for a segmentation
+    decision (an LLM clause-check round trip, or Deepgram's
+    `utterance_end_ms` silence window) before this cut. Unlike every other
+    stage's cumulative-since-`speech_end` ms, it happened *before* the
+    `speech_end` reference point, so it's reported as its own duration:
+    ~0 for a `speech_final` cut (the same event both finalizes and cuts),
+    the real wait for the other two triggers.
     """
     latency.mark_speech_end(segment_id)
     await outgoing.send_json(
         {"type": "segment_boundary", "segmentId": segment_id, "trigger": trigger}
     )
+    if finalized_at_ms is not None:
+        await outgoing.send_json(
+            {
+                "type": "latency",
+                "segmentId": segment_id,
+                "stage": "stt_final",
+                "ms": max(0, _now_ms() - finalized_at_ms),
+            }
+        )
     await outgoing.send_json(
         {"type": "latency", "segmentId": segment_id, "stage": "speech_end", "ms": 0}
     )
@@ -844,6 +864,10 @@ async def _run_stt(
         # solved here.
         current_speaker: int | None = None
         current_detected_language: str | None = None
+        # Wall-clock arrival of the most recent buffer-growing final STT
+        # result for the in-progress segment: the `stt_final` latency
+        # stage's start point (see `_cut_segment`).
+        finalized_at_ms: int | None = None
         # At most one clause-check in flight for this in-progress segment
         # (Ticket 5's debounce). See the class docstring's race
         # description for what races against what.
@@ -889,11 +913,13 @@ async def _run_stt(
                                 current_speaker,
                                 current_detected_language,
                                 "deepgram_utterance_end",
+                                finalized_at_ms,
                             )
                             buffer = ""
                             segment_id = _new_segment_id()
                             current_speaker = None
                             current_detected_language = None
+                            finalized_at_ms = None
                         continue
 
                     if result.speaker is not None:
@@ -908,6 +934,7 @@ async def _run_stt(
                                 if buffer
                                 else result.text.strip()
                             )
+                            finalized_at_ms = _now_ms()
                             await outgoing.send_json(
                                 {
                                     "type": "source_transcript",
@@ -960,11 +987,13 @@ async def _run_stt(
                                 current_speaker,
                                 current_detected_language,
                                 "deepgram_speech_final",
+                                finalized_at_ms,
                             )
                         buffer = ""
                         segment_id = _new_segment_id()
                         current_speaker = None
                         current_detected_language = None
+                        finalized_at_ms = None
 
                 if clause_check_task is not None and clause_check_task in done:
                     task, clause_check_task = clause_check_task, None
@@ -987,11 +1016,13 @@ async def _run_stt(
                             current_speaker,
                             current_detected_language,
                             "llm",
+                            finalized_at_ms,
                         )
                         buffer = ""
                         segment_id = _new_segment_id()
                         current_speaker = None
                         current_detected_language = None
+                        finalized_at_ms = None
         except ProviderError as exc:
             if clause_check_task is not None:
                 _park_stale(clause_check_task)

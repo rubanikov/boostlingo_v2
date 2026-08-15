@@ -9,8 +9,14 @@ export interface LatencyStageEvent {
   ms: number;
 }
 
-/** Ordered stage sequence, matching the brief's cumulative-ms-since-`speech_end` contract. */
+/**
+ * Ordered stage sequence, matching the brief's cumulative-ms-since-`speech_end`
+ * contract. `stt_final` is the one pre-reference stage: it happened *before*
+ * `speech_end` and its `ms` is a standalone duration (final transcript →
+ * segmentation cut), not cumulative — see `sessionHandle.LatencyStage`.
+ */
 export const LATENCY_STAGES: LatencyStage[] = [
+  'stt_final',
   'speech_end',
   'translation_first_token',
   'translation_complete',
@@ -71,6 +77,7 @@ export interface LatencyBadge {
 }
 
 const STAGE_LABELS: Record<LatencyStage, string> = {
+  stt_final: 'STT finalize',
   speech_end: 'speech end',
   translation_first_token: 'translation',
   translation_complete: 'translation done',
@@ -93,9 +100,14 @@ export function latencyBadges(stages: Partial<Record<LatencyStage, number>>): La
   let bottleneckStage: LatencyStage | null = null;
   let biggestDelta = -Infinity;
   present.forEach((stage, index) => {
-    if (index === 0) return; // speech_end is the 0ms reference point, not itself a candidate bottleneck
-    const previousMs = stages[present[index - 1]] ?? 0;
-    const delta = (stages[stage] ?? 0) - previousMs;
+    if (stage === 'speech_end') return; // the 0ms reference point, not itself a candidate bottleneck
+    // `stt_final` is a standalone pre-reference duration, so it competes
+    // with its own ms; every later stage competes with its jump over the
+    // previous cumulative stage.
+    const delta =
+      stage === 'stt_final'
+        ? (stages[stage] ?? 0)
+        : (stages[stage] ?? 0) - (index > 0 ? (stages[present[index - 1]] ?? 0) : 0);
     if (delta > biggestDelta) {
       biggestDelta = delta;
       bottleneckStage = stage;

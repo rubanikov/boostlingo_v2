@@ -12,10 +12,13 @@ interface LanguagePairOption {
   languages: SessionLanguages;
 }
 
-// The brief's only required pair for this ticket: modeled as a list (not a
-// hardcoded pair) so adding more later is just adding another entry.
+// Each entry must be backed by the backend's `SUPPORTED_LANGUAGES`
+// allow-list (`backend/app/languages.py`); adding a pair is one entry here
+// plus one there. Direction within a pair is auto-resolved per utterance
+// from the detected language, so there's no separate swap control.
 const LANGUAGE_PAIR_OPTIONS: LanguagePairOption[] = [
   { key: 'en-es', label: 'English ↔ Spanish', languages: { sourceLanguage: 'en', targetLanguage: 'es' } },
+  { key: 'en-fr', label: 'English ↔ French', languages: { sourceLanguage: 'en', targetLanguage: 'fr' } },
 ];
 
 const MODES: { key: Mode; label: string }[] = [
