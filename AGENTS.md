@@ -86,30 +86,30 @@ comments and docs (this file included), and the removal of two leftover placehol
 (`frontend/src/pages/CascadePage.tsx`/`RealtimePage.tsx`) that Ticket 3's real UI had fully
 superseded but nobody had deleted.
 
-## A build-environment constraint that shaped everything
+## A build-environment constraint that shaped the build (later lifted)
 
-**No live provider API keys (`OPENAI_API_KEY`, `DEEPGRAM_API_KEY`, `ELEVENLABS_API_KEY`)
-have existed at any point in this build environment**: not during implementation, not
-while writing this comparison. Every provider boundary (`backend/app/providers/*.py`) was
-built and tested against mocked/faked SDK clients and fake WebSocket sockets, never a real
-network call. This is a deliberate, consistent constraint, not an oversight per ticket:
-`backend/tests/` skips (rather than fails) every test that needs a real key, with a
-message naming exactly which one; [COMPARISON.md](COMPARISON.md) is explicit about which
-of its numbers are real (cost, computed from current public pricing) versus placeholders
-a human with real keys needs to fill in (latency, quality; exact commands given inline).
+**During implementation (tickets 1–9), no live provider API keys (`OPENAI_API_KEY`,
+`DEEPGRAM_API_KEY`, `ELEVENLABS_API_KEY`) existed in the build environment.** Every
+provider boundary (`backend/app/providers/*.py`) was built and tested against
+mocked/faked SDK clients and fake WebSocket sockets, never a real network call. This was
+a deliberate, consistent constraint, not an oversight per ticket: `backend/tests/` skips
+(rather than fails) every test that needs a real key, with a message naming exactly
+which one.
 
-## A known gap in the current submission state
+**That constraint was lifted after the build was complete.** Real keys were added and
+the app was exercised live: the live testing surfaced and fixed two real bugs (Deepgram
+finalization and a long-utterance timeout, commit `7b355fc`), a real-speech testing
+harness was added (`da54a71`, `eafeef7`), and [COMPARISON.md](COMPARISON.md)'s latency
+and quality numbers were replaced with measured results from those live runs (`5aa54a4`).
+COMPARISON.md states exactly how each number was obtained and how to reproduce it. The
+key-gated tests still self-skip without keys, so the suites pass in either environment.
 
-The wayfinder phase (Phase 1 above) has a real, iterative commit history: `git log`
-shows one commit per ticket claimed and one per ticket resolved, 31 commits total. **The
-implementation phase's actual code does not yet share that history**: as of this write-up,
-everything under `backend/` and `frontend/` (all 8 implementation tickets' worth of work)
-is present in the working tree but untracked by git (`git status` shows both
-directories as untracked, not modified). The brief explicitly calls out "commits scoped
-to logical units of work... no single 'initial commit' dumps" as a code-quality
-expectation, so committing this now as one bulk dump would not satisfy that expectation
-either. This is flagged here rather than silently fixed by this documentation-only ticket
-(which was explicitly asked not to touch application code or run `git commit`). Whoever
-finalizes this submission should commit `backend/` and `frontend/` in a small number of
-logical increments (e.g., one per implementation ticket, matching the wayfinder phase's
-own convention) rather than as a single commit.
+## Commit history
+
+Both phases have a real, iterative commit history. The wayfinder phase (Phase 1) shows
+one commit per ticket claimed and one per ticket resolved. The implementation phase was
+committed in the same convention — one commit per implementation ticket (1–9), followed
+by separate commits for the validation/fix round, final polish, and the post-build live
+testing round described above. (An earlier draft of this file flagged the implementation
+work as still untracked at write-up time; that gap was closed by exactly the per-ticket
+commit sequence recommended then.)

@@ -16,9 +16,13 @@ Ticket 3's transport decision, and the first concrete instance of the controllab
 in §4.
 
 **Cascade** owns every stage server-side, so `app/orchestrator.py` emits a `latency` WS
-message per segment at each of five stages (`speech_end` → `translation_first_token` →
-`translation_complete` → `tts_first_byte` → `playback_start`), each `ms` cumulative since
-`speech_end`. Clock offset resyncs every 30s and after reconnects. Target **< 2s**.
+message per segment at each of six stages: `stt_final` (a standalone pre-reference
+duration: how long the finished transcript waited on the segmentation decision before the
+cut), then `speech_end` → `translation_first_token` → `translation_complete` →
+`tts_first_byte` → `playback_start`, each of those `ms` cumulative since `speech_end`.
+Clock offset resyncs every 30s and after reconnects. Target **< 2s**. (The measured
+numbers below predate the `stt_final` stage; the cumulative stages they report are
+unchanged by its addition.)
 
 **Realtime** mints an ephemeral token and is then off the audio path entirely (WebRTC goes
 browser ↔ OpenAI directly), so no server-side sub-stage timestamps are possible. The

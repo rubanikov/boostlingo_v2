@@ -14,6 +14,25 @@ assumed.
 See [COMPARISON.md](COMPARISON.md) for the full latency/quality/cost/controllability
 write-up, and [AGENTS.md](AGENTS.md) for how this was built with an AI coding agent.
 
+## Why Python + TypeScript (and not .NET)
+
+The brief prefers .NET/C# for the backend and asks for the choice to be explained. This
+build uses Python (FastAPI) + TypeScript (React) deliberately:
+
+- **The backend is an async-streaming problem, not a throughput problem.** Cascade mode
+  holds one browser WebSocket plus concurrent streaming connections to Deepgram, OpenAI,
+  and ElevenLabs, with an LLM clause-checker racing alongside. Python's `asyncio` +
+  FastAPI's first-class WebSocket support fit that shape directly, and every provider in
+  play ships a first-party or well-maintained async Python SDK. ASP.NET Core could do
+  the same, but with more ceremony per provider and thinner streaming examples to draw
+  from for these specific vendors.
+- **A 15–20 hour budget rewards iteration speed over runtime performance.** The backend
+  is I/O-bound glue between vendor APIs; nothing here needs .NET's performance profile.
+- **TypeScript on the frontend is exactly the brief's preference**, kept as-is.
+
+The FastAPI-vs-Flask and React-vs-Svelte depth is in the framework decision ticket
+(`.scratch/ai-interpreter-workbench/issues/01-framework-choice.md`).
+
 ## Architecture at a glance
 
 ```
@@ -79,7 +98,7 @@ Two terminals, both from repo root:
 ```bash
 # Terminal 1: backend, http://localhost:8000
 cd backend
-uv run uvicorn app.main:app --reload
+uv run uvicorn app.main:app --reload --ws-ping-interval 20 --ws-ping-timeout 20
 
 # Terminal 2: frontend, http://localhost:5173
 cd frontend
@@ -103,11 +122,12 @@ cd backend
 uv run pytest -v
 ```
 
-Verified in this repo: **78 passed, 33 skipped**. The skipped tests are the ones that need
-a live provider key (WER regression against real Deepgram, the LLM-judge plumbing tests
-that don't inject a fake client, etc.). They self-skip with a message explaining exactly
-which env var to set, rather than failing. See [COMPARISON.md](COMPARISON.md) §2 for the
-exact commands to run the quality-validation suite for real.
+Verified in this repo: **119 passed** (with live provider keys in `backend/.env`, so the
+key-gated tests ran for real). Without keys, the tests that need a live provider (WER
+regression against real Deepgram, the LLM-judge plumbing tests that don't inject a fake
+client, etc.) self-skip with a message explaining exactly which env var to set, rather
+than failing. See [COMPARISON.md](COMPARISON.md) §2 for the exact commands to run the
+quality-validation suite for real.
 
 ### Frontend (Vitest, unit/component)
 
@@ -116,7 +136,7 @@ cd frontend
 npm test
 ```
 
-Verified in this repo: **13 test files, 144 passed**.
+Verified in this repo: **11 test files, 137 passed**.
 
 ### Frontend (Playwright: E2E, fake-mic)
 
