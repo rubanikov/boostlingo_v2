@@ -17,6 +17,16 @@ class Settings(BaseSettings):
     # .env.
     elevenlabs_voice_id_speaker_b: str = "ErXwobaYiN019PkySvjV"
     cors_origins: list[str] = ["http://localhost:5173"]
+    # Realtime-mode server-VAD tuning. Both default to "unset" so the session
+    # is created at OpenAI's own defaults (~500ms silence ends a turn; resumed
+    # speech interrupts the reply in flight), which is what COMPARISON.md's
+    # as-shipped Realtime quality number was measured against. Set via .env
+    # to run the tuned variant that write-up compares against: a longer
+    # silence window so a mid-sentence breath doesn't end the turn, and no
+    # barge-in so a resumed speaker doesn't cancel the translation being
+    # spoken. See `app.api.realtime._turn_detection`.
+    realtime_vad_silence_ms: int | None = None
+    realtime_vad_interrupt_response: bool | None = None
 
 
 settings = Settings()

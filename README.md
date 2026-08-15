@@ -67,6 +67,9 @@ COMPARISON.md §1 for why that matters for latency instrumentation).
   - `ELEVENLABS_API_KEY`: required for Cascade mode's TTS stage.
   - `ELEVENLABS_VOICE_ID`: optional, defaults to a premade ElevenLabs voice ("Rachel")
     if unset.
+  - `REALTIME_VAD_SILENCE_MS` / `REALTIME_VAD_INTERRUPT_RESPONSE`: optional Realtime-mode
+    server-VAD tuning; unset means OpenAI's defaults. COMPARISON.md §2 measures both
+    settings (58% vs 94% acceptable on real speech) and explains the trade.
 
 These are exactly the variables in `backend/.env.example`.
 

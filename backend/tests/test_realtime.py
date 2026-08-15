@@ -127,6 +127,30 @@ async def test_calls_openai_client_secrets_with_gpt_realtime_and_translation_ins
     assert session["audio"]["input"]["turn_detection"] == {"type": "server_vad"}
 
 
+async def test_vad_tuning_settings_are_forwarded_only_when_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The as-shipped session is bare `server_vad` (OpenAI defaults, the
+    configuration COMPARISON.md's Realtime quality number was measured at);
+    the two tuning knobs add their keys only when set in settings."""
+    captured = _mock_client_secrets(monkeypatch, _success_response)
+    monkeypatch.setattr(settings, "realtime_vad_silence_ms", 900)
+    monkeypatch.setattr(settings, "realtime_vad_interrupt_response", False)
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test"
+    ) as client:
+        await client.post("/api/realtime/session")
+
+    turn_detection = json.loads(captured[0].content)["session"]["audio"]["input"]["turn_detection"]
+    assert turn_detection == {
+        "type": "server_vad",
+        "silence_duration_ms": 900,
+        "interrupt_response": False,
+    }
+
+
 async def test_default_language_pair_used_when_body_is_empty_dict(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

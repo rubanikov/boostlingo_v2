@@ -85,6 +85,19 @@ def _interpreter_instructions(source_name: str, target_name: str) -> str:
     )
 
 
+def _turn_detection() -> dict:
+    """Server-VAD config for the session. Bare `server_vad` (OpenAI's own
+    defaults) unless the two tuning knobs in `settings` are set; keys are
+    only added when set, so an unset knob is genuinely the API default
+    rather than a re-statement of it."""
+    turn_detection: dict = {"type": "server_vad"}
+    if settings.realtime_vad_silence_ms is not None:
+        turn_detection["silence_duration_ms"] = settings.realtime_vad_silence_ms
+    if settings.realtime_vad_interrupt_response is not None:
+        turn_detection["interrupt_response"] = settings.realtime_vad_interrupt_response
+    return turn_detection
+
+
 @router.post("/session", response_model=RealtimeSessionResponse)
 async def create_realtime_session(
     body: RealtimeSessionRequest | None = None,
@@ -138,7 +151,7 @@ async def create_realtime_session(
                 "input": {
                     "format": {"type": "audio/pcm", "rate": 24000},
                     "transcription": {"model": TRANSCRIPTION_MODEL},
-                    "turn_detection": {"type": "server_vad"},
+                    "turn_detection": _turn_detection(),
                 },
                 "output": {
                     "format": {"type": "audio/pcm", "rate": 24000},

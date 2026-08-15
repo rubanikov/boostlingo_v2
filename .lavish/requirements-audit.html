@@ -274,7 +274,7 @@
       <div class="card bg-base-200 shadow">
         <div class="card-body">
           <h3 class="card-title text-success">✓ 6 · Realtime quality measured <span class="badge badge-ghost">33 real-voice clips</span></h3>
-          <p class="text-sm">The corpus was recorded, a fake-mic capture harness (<code>npm run capture:realtime-quality</code>) played each clip into a live <code>gpt-realtime</code> session, and the same LLM judge scored the replies: <strong>19/33 (58%)</strong> vs Cascade's 33/33 — with the failure mechanism (server-VAD turn splits + barge-in cancelling replies on mid-sentence pauses) documented in COMPARISON.md §2. Still open: a recorded 5-minute stability run and content-level e2e assertions.</p>
+          <p class="text-sm">The corpus was recorded, a fake-mic capture harness (<code>npm run capture:realtime-quality</code>) played each clip into a live <code>gpt-realtime</code> session, and the same LLM judge scored the replies: <strong>19/33 (58%)</strong> at OpenAI's VAD defaults vs Cascade's 33/33, with the mechanism (server-VAD turn splits + barge-in cancelling replies on mid-sentence pauses) documented in COMPARISON.md §2 — then re-run with two VAD knobs (<code>silence_duration_ms=900</code>, <code>interrupt_response=false</code>, now <code>.env</code>-configurable): <strong>31/33 (94%)</strong>. Still open: a recorded 5-minute stability run and content-level e2e assertions.</p>
         </div>
       </div>
     </div>

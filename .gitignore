@@ -23,9 +23,9 @@ backend/tests/fixtures/real_audio_report.json
 # to say) stays tracked; the audio and manifest do not.
 backend/tests/fixtures/realtime_quality/*.wav
 backend/tests/fixtures/realtime_quality/manifest.json
-backend/tests/fixtures/realtime_quality/captures.json
+backend/tests/fixtures/realtime_quality/captures*.json
 backend/tests/fixtures/realtime_quality/.padded/
-backend/tests/fixtures/realtime_quality_report.json
+backend/tests/fixtures/realtime_quality_report*.json
 
 # Node / frontend
 frontend/node_modules/
