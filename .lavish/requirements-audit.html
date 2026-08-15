@@ -101,7 +101,7 @@
           <tr>
             <td>8</td><td>Comparison write-up: latency, quality, cost, controllability + recommendation</td>
             <td><span class="badge badge-success">Meets</span></td>
-            <td>COMPARISON.md covers all five topics with measured latency (live run 2026-08-12), measured WER + LLM-judge quality, computed per-minute cost, concrete controllability asymmetries, and a scenario-based recommendation. Caveats: ~3 pages vs. the asked 1–2; Realtime-mode quality metric not run (manual step, disclosed); live numbers from one short automated scenario, also disclosed.</td>
+            <td>COMPARISON.md covers all five topics with measured latency (live runs 2026-08-12 and a 33-turn sample 2026-08-15), measured WER + LLM-judge quality for <strong>both</strong> modes (Cascade 33/33, Realtime 19/33 on real voice, with the turn-taking failure mechanism explained), computed per-minute cost, concrete controllability asymmetries, and a scenario-based recommendation. Caveat: ~3 pages vs. the asked 1–2.</td>
           </tr>
         </tbody>
       </table>
@@ -273,8 +273,8 @@
       </div>
       <div class="card bg-base-200 shadow">
         <div class="card-body">
-          <h3 class="card-title text-warning">◌ 6 · Remaining: live-run evidence <span class="badge badge-ghost">needs a human + keys</span></h3>
-          <p class="text-sm">The two surviving Partials both need live sessions, not code: a recorded 5-minute back-and-forth run (stability), and deeper e2e/Realtime-quality captures (test depth). Deliberately left for a human with the mic and the API budget.</p>
+          <h3 class="card-title text-success">✓ 6 · Realtime quality measured <span class="badge badge-ghost">33 real-voice clips</span></h3>
+          <p class="text-sm">The corpus was recorded, a fake-mic capture harness (<code>npm run capture:realtime-quality</code>) played each clip into a live <code>gpt-realtime</code> session, and the same LLM judge scored the replies: <strong>19/33 (58%)</strong> vs Cascade's 33/33 — with the failure mechanism (server-VAD turn splits + barge-in cancelling replies on mid-sentence pauses) documented in COMPARISON.md §2. Still open: a recorded 5-minute stability run and content-level e2e assertions.</p>
         </div>
       </div>
     </div>

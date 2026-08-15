@@ -111,11 +111,24 @@ one specifically: it's the sentence the latency measurements in COMPARISON.md
 ## What happens with the audio next
 
 `manifest.json` in this folder (written by the recorder) lists each clip with
-its dataset id, languages, reference text, and reference translation. The
-runner that consumes it plays each clip into a live Realtime session through
-Chromium's fake-mic device, captures `gpt-realtime`'s output transcript per
-turn, and scores every (source, transcript) pair with the same
-`judge_translation()` that produced Cascade's 33/33 — writing
-`backend/tests/fixtures/realtime_quality_report.json` and the number for
-COMPARISON.md §2. That runner needs live `OPENAI_API_KEY` and costs a few
-dollars of `gpt-realtime` audio tokens for the whole corpus.
+its dataset id, languages, reference text, and reference translation. Once
+it's complete:
+
+1. Start both dev servers with real keys in `backend/.env` (`.\dev.ps1` from
+   the repo root).
+2. `cd frontend && npm run capture:realtime-quality` — plays each clip into a
+   live Realtime session through Chromium's fake-mic device (one headless
+   browser per clip; add `--headed` to watch) and writes `captures.json` here
+   with what the model heard and said, plus that turn's end-to-end latency.
+   Safe to interrupt and re-run: it saves after every clip and re-captures
+   only what you ask for (`--only id1,id2`, `--limit N`).
+3. `cd backend && uv run python -m tests.fixtures.run_realtime_quality_report`
+   — scores every capture with the same `judge_translation()` that produced
+   Cascade's 33/33, writes `backend/tests/fixtures/realtime_quality_report.json`,
+   and prints the row to paste into COMPARISON.md §2.
+
+Costs a few dollars of `gpt-realtime` audio tokens for the whole corpus. If a
+custom port is in use, set `BASE_URL` / `BACKEND_URL` for step 2 (dev.ps1
+prints both). Note that step 2 checks `BACKEND_URL/health` and the endpoint
+must be *this* backend: another app answering 200 on port 8000 will make
+every session settle to "Could not start a realtime session".
