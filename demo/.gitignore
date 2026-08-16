@@ -1,0 +1,4 @@
+# Everything the pipeline generates: per-scene screencasts, tapped app audio,
+# fake-mic WAVs, narration MP3s, timeline. Re-create with `npm run demo`.
+out/
+node_modules/

@@ -60,5 +60,5 @@ frontend/e2e/fixtures/real-speech.wav
 .DS_Store
 Thumbs.db
 
-# Narrated demo video pipeline + its ~16 MB output; regenerate with `npm run demo` in demo/.
-demo/
+# Narrated demo video: the pipeline and the finished MP4 are tracked (demo/);
+# its intermediates are ignored by demo/.gitignore.
