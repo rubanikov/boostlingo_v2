@@ -41,11 +41,17 @@ class SegmentationChecker:
             api_key=api_key, timeout=httpx.Timeout(10.0, connect=5.0)
         )
 
-    async def is_complete_clause(self, text: str, language: str) -> bool:
+    async def is_complete_clause(
+        self, text: str, language: str, *, model: str | None = None
+    ) -> bool:
         """True iff `text` (the in-progress segment's accumulated transcript,
         in `language`) reads as a complete, translatable clause.
         Non-streaming, single-token response: this is a gate, not a
         generation.
+
+        `model` is per call (defaulting to `MODEL`) so a mid-session tuning
+        Apply reaches the very next clause-check instead of waiting for a
+        new session.
 
         Any OpenAI failure (rate limit, timeout, malformed response) is
         treated as `False` rather than raised: a negative verdict just
@@ -56,7 +62,7 @@ class SegmentationChecker:
         """
         try:
             response = await self._client.chat.completions.create(
-                model=MODEL,
+                model=model or MODEL,
                 stream=False,
                 # A couple tokens' headroom for "YES"/"NO" plus stray
                 # punctuation, without inviting a rambling response;

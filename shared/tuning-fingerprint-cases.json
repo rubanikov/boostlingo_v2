@@ -1,0 +1,751 @@
+[
+  {
+    "name": "defaults-realtime",
+    "mode": "realtime",
+    "config": {
+      "schemaVersion": 1,
+      "client": {
+        "microphone": {
+          "echoCancellation": true,
+          "noiseSuppression": true,
+          "autoGainControl": true
+        },
+        "rmsGate": {
+          "enabled": false,
+          "thresholdDbfs": -45,
+          "holdMs": 200,
+          "attackMs": 5,
+          "releaseMs": 80,
+          "attenuationDb": 12,
+          "fullMute": false
+        },
+        "rnnoise": {
+          "enabled": false,
+          "voiceProbThreshold": 0.5
+        }
+      },
+      "realtime": {
+        "model": "gpt-realtime",
+        "voice": "alloy",
+        "turnDetection": {
+          "type": "server_vad"
+        },
+        "transcriptCheck": {
+          "mode": "off",
+          "model": "gpt-4o-mini"
+        }
+      },
+      "cascade": {
+        "deepgram": {
+          "model": "nova-3",
+          "endpointingMs": 500,
+          "utteranceEndMs": 3000,
+          "diarize": true
+        },
+        "segmentation": {
+          "mode": "hybrid",
+          "model": "gpt-4o-mini"
+        },
+        "denoise": {
+          "noisereduce": {
+            "enabled": false,
+            "propDecrease": 1,
+            "stationary": false
+          },
+          "deepfilternet": {
+            "enabled": false,
+            "attenuationLimitDb": 30,
+            "postFilterBeta": 0.02
+          },
+          "offline": {
+            "demucs": false,
+            "dns64": false
+          }
+        },
+        "transcriptCheck": {
+          "mode": "off",
+          "model": "gpt-4o-mini"
+        },
+        "translationModel": "gpt-4o-mini",
+        "ttsVoiceA": "21m00Tcm4TlvDq8ikWAM",
+        "ttsVoiceB": "ErXwobaYiN019PkySvjV"
+      }
+    },
+    "expectedFingerprint": "cfg:724ea8f0"
+  },
+  {
+    "name": "defaults-cascade",
+    "mode": "cascade",
+    "config": {
+      "schemaVersion": 1,
+      "client": {
+        "microphone": {
+          "echoCancellation": true,
+          "noiseSuppression": true,
+          "autoGainControl": true
+        },
+        "rmsGate": {
+          "enabled": false,
+          "thresholdDbfs": -45,
+          "holdMs": 200,
+          "attackMs": 5,
+          "releaseMs": 80,
+          "attenuationDb": 12,
+          "fullMute": false
+        },
+        "rnnoise": {
+          "enabled": false,
+          "voiceProbThreshold": 0.5
+        }
+      },
+      "realtime": {
+        "model": "gpt-realtime",
+        "voice": "alloy",
+        "turnDetection": {
+          "type": "server_vad"
+        },
+        "transcriptCheck": {
+          "mode": "off",
+          "model": "gpt-4o-mini"
+        }
+      },
+      "cascade": {
+        "deepgram": {
+          "model": "nova-3",
+          "endpointingMs": 500,
+          "utteranceEndMs": 3000,
+          "diarize": true
+        },
+        "segmentation": {
+          "mode": "hybrid",
+          "model": "gpt-4o-mini"
+        },
+        "denoise": {
+          "noisereduce": {
+            "enabled": false,
+            "propDecrease": 1,
+            "stationary": false
+          },
+          "deepfilternet": {
+            "enabled": false,
+            "attenuationLimitDb": 30,
+            "postFilterBeta": 0.02
+          },
+          "offline": {
+            "demucs": false,
+            "dns64": false
+          }
+        },
+        "transcriptCheck": {
+          "mode": "off",
+          "model": "gpt-4o-mini"
+        },
+        "translationModel": "gpt-4o-mini",
+        "ttsVoiceA": "21m00Tcm4TlvDq8ikWAM",
+        "ttsVoiceB": "ErXwobaYiN019PkySvjV"
+      }
+    },
+    "expectedFingerprint": "cfg:17b55bea"
+  },
+  {
+    "name": "defaults-cascade-key-reordered",
+    "mode": "cascade",
+    "config": {
+      "cascade": {
+        "ttsVoiceB": "ErXwobaYiN019PkySvjV",
+        "ttsVoiceA": "21m00Tcm4TlvDq8ikWAM",
+        "translationModel": "gpt-4o-mini",
+        "transcriptCheck": {
+          "model": "gpt-4o-mini",
+          "mode": "off"
+        },
+        "denoise": {
+          "offline": {
+            "dns64": false,
+            "demucs": false
+          },
+          "deepfilternet": {
+            "postFilterBeta": 0.02,
+            "attenuationLimitDb": 30,
+            "enabled": false
+          },
+          "noisereduce": {
+            "stationary": false,
+            "propDecrease": 1,
+            "enabled": false
+          }
+        },
+        "segmentation": {
+          "model": "gpt-4o-mini",
+          "mode": "hybrid"
+        },
+        "deepgram": {
+          "diarize": true,
+          "utteranceEndMs": 3000,
+          "endpointingMs": 500,
+          "model": "nova-3"
+        }
+      },
+      "realtime": {
+        "model": "gpt-realtime",
+        "voice": "alloy",
+        "turnDetection": {
+          "type": "server_vad"
+        },
+        "transcriptCheck": {
+          "mode": "off",
+          "model": "gpt-4o-mini"
+        }
+      },
+      "client": {
+        "rnnoise": {
+          "voiceProbThreshold": 0.5,
+          "enabled": false
+        },
+        "rmsGate": {
+          "fullMute": false,
+          "attenuationDb": 12,
+          "releaseMs": 80,
+          "attackMs": 5,
+          "holdMs": 200,
+          "thresholdDbfs": -45,
+          "enabled": false
+        },
+        "microphone": {
+          "autoGainControl": true,
+          "noiseSuppression": true,
+          "echoCancellation": true
+        }
+      },
+      "schemaVersion": 1
+    },
+    "expectedFingerprint": "cfg:17b55bea"
+  },
+  {
+    "name": "realtime-optional-keys-explicit",
+    "mode": "realtime",
+    "config": {
+      "schemaVersion": 1,
+      "client": {
+        "microphone": {
+          "echoCancellation": true,
+          "noiseSuppression": true,
+          "autoGainControl": true
+        },
+        "rmsGate": {
+          "enabled": false,
+          "thresholdDbfs": -45,
+          "holdMs": 200,
+          "attackMs": 5,
+          "releaseMs": 80,
+          "attenuationDb": 12,
+          "fullMute": false
+        },
+        "rnnoise": {
+          "enabled": false,
+          "voiceProbThreshold": 0.5
+        }
+      },
+      "realtime": {
+        "model": "gpt-realtime",
+        "voice": "alloy",
+        "turnDetection": {
+          "type": "server_vad",
+          "threshold": 0.55,
+          "prefixPaddingMs": 300,
+          "silenceDurationMs": 500,
+          "interruptResponse": true
+        },
+        "transcriptCheck": {
+          "mode": "off",
+          "model": "gpt-4o-mini"
+        },
+        "noiseReduction": "near_field"
+      },
+      "cascade": {
+        "deepgram": {
+          "model": "nova-3",
+          "endpointingMs": 500,
+          "utteranceEndMs": 3000,
+          "diarize": true
+        },
+        "segmentation": {
+          "mode": "hybrid",
+          "model": "gpt-4o-mini"
+        },
+        "denoise": {
+          "noisereduce": {
+            "enabled": false,
+            "propDecrease": 1,
+            "stationary": false
+          },
+          "deepfilternet": {
+            "enabled": false,
+            "attenuationLimitDb": 30,
+            "postFilterBeta": 0.02
+          },
+          "offline": {
+            "demucs": false,
+            "dns64": false
+          }
+        },
+        "transcriptCheck": {
+          "mode": "off",
+          "model": "gpt-4o-mini"
+        },
+        "translationModel": "gpt-4o-mini",
+        "ttsVoiceA": "21m00Tcm4TlvDq8ikWAM",
+        "ttsVoiceB": "ErXwobaYiN019PkySvjV"
+      }
+    },
+    "expectedFingerprint": "cfg:f230aeb7"
+  },
+  {
+    "name": "realtime-noise-reduction-off",
+    "mode": "realtime",
+    "config": {
+      "schemaVersion": 1,
+      "client": {
+        "microphone": {
+          "echoCancellation": true,
+          "noiseSuppression": true,
+          "autoGainControl": true
+        },
+        "rmsGate": {
+          "enabled": false,
+          "thresholdDbfs": -45,
+          "holdMs": 200,
+          "attackMs": 5,
+          "releaseMs": 80,
+          "attenuationDb": 12,
+          "fullMute": false
+        },
+        "rnnoise": {
+          "enabled": false,
+          "voiceProbThreshold": 0.5
+        }
+      },
+      "realtime": {
+        "model": "gpt-realtime",
+        "voice": "alloy",
+        "turnDetection": {
+          "type": "server_vad"
+        },
+        "transcriptCheck": {
+          "mode": "off",
+          "model": "gpt-4o-mini"
+        },
+        "noiseReduction": "off"
+      },
+      "cascade": {
+        "deepgram": {
+          "model": "nova-3",
+          "endpointingMs": 500,
+          "utteranceEndMs": 3000,
+          "diarize": true
+        },
+        "segmentation": {
+          "mode": "hybrid",
+          "model": "gpt-4o-mini"
+        },
+        "denoise": {
+          "noisereduce": {
+            "enabled": false,
+            "propDecrease": 1,
+            "stationary": false
+          },
+          "deepfilternet": {
+            "enabled": false,
+            "attenuationLimitDb": 30,
+            "postFilterBeta": 0.02
+          },
+          "offline": {
+            "demucs": false,
+            "dns64": false
+          }
+        },
+        "transcriptCheck": {
+          "mode": "off",
+          "model": "gpt-4o-mini"
+        },
+        "translationModel": "gpt-4o-mini",
+        "ttsVoiceA": "21m00Tcm4TlvDq8ikWAM",
+        "ttsVoiceB": "ErXwobaYiN019PkySvjV"
+      }
+    },
+    "expectedFingerprint": "cfg:c9a699db"
+  },
+  {
+    "name": "cascade-float-knobs",
+    "mode": "cascade",
+    "config": {
+      "schemaVersion": 1,
+      "client": {
+        "microphone": {
+          "echoCancellation": true,
+          "noiseSuppression": true,
+          "autoGainControl": true
+        },
+        "rmsGate": {
+          "enabled": false,
+          "thresholdDbfs": -45,
+          "holdMs": 200,
+          "attackMs": 5,
+          "releaseMs": 80,
+          "attenuationDb": 12,
+          "fullMute": false
+        },
+        "rnnoise": {
+          "enabled": true,
+          "voiceProbThreshold": 0.35
+        }
+      },
+      "realtime": {
+        "model": "gpt-realtime",
+        "voice": "alloy",
+        "turnDetection": {
+          "type": "server_vad"
+        },
+        "transcriptCheck": {
+          "mode": "off",
+          "model": "gpt-4o-mini"
+        }
+      },
+      "cascade": {
+        "deepgram": {
+          "model": "nova-3",
+          "endpointingMs": 500,
+          "utteranceEndMs": 3000,
+          "diarize": true
+        },
+        "segmentation": {
+          "mode": "hybrid",
+          "model": "gpt-4o-mini"
+        },
+        "denoise": {
+          "noisereduce": {
+            "enabled": true,
+            "propDecrease": 0.85,
+            "stationary": false
+          },
+          "deepfilternet": {
+            "enabled": true,
+            "attenuationLimitDb": 30,
+            "postFilterBeta": 0.07
+          },
+          "offline": {
+            "demucs": false,
+            "dns64": false
+          }
+        },
+        "transcriptCheck": {
+          "mode": "off",
+          "model": "gpt-4o-mini"
+        },
+        "translationModel": "gpt-4o-mini",
+        "ttsVoiceA": "21m00Tcm4TlvDq8ikWAM",
+        "ttsVoiceB": "ErXwobaYiN019PkySvjV"
+      }
+    },
+    "expectedFingerprint": "cfg:0f2fda57"
+  },
+  {
+    "name": "cascade-schema-version-2",
+    "mode": "cascade",
+    "config": {
+      "schemaVersion": 2,
+      "client": {
+        "microphone": {
+          "echoCancellation": true,
+          "noiseSuppression": true,
+          "autoGainControl": true
+        },
+        "rmsGate": {
+          "enabled": false,
+          "thresholdDbfs": -45,
+          "holdMs": 200,
+          "attackMs": 5,
+          "releaseMs": 80,
+          "attenuationDb": 12,
+          "fullMute": false
+        },
+        "rnnoise": {
+          "enabled": false,
+          "voiceProbThreshold": 0.5
+        }
+      },
+      "realtime": {
+        "model": "gpt-realtime",
+        "voice": "alloy",
+        "turnDetection": {
+          "type": "server_vad"
+        },
+        "transcriptCheck": {
+          "mode": "off",
+          "model": "gpt-4o-mini"
+        }
+      },
+      "cascade": {
+        "deepgram": {
+          "model": "nova-3",
+          "endpointingMs": 500,
+          "utteranceEndMs": 3000,
+          "diarize": true
+        },
+        "segmentation": {
+          "mode": "hybrid",
+          "model": "gpt-4o-mini"
+        },
+        "denoise": {
+          "noisereduce": {
+            "enabled": false,
+            "propDecrease": 1,
+            "stationary": false
+          },
+          "deepfilternet": {
+            "enabled": false,
+            "attenuationLimitDb": 30,
+            "postFilterBeta": 0.02
+          },
+          "offline": {
+            "demucs": false,
+            "dns64": false
+          }
+        },
+        "transcriptCheck": {
+          "mode": "off",
+          "model": "gpt-4o-mini"
+        },
+        "translationModel": "gpt-4o-mini",
+        "ttsVoiceA": "21m00Tcm4TlvDq8ikWAM",
+        "ttsVoiceB": "ErXwobaYiN019PkySvjV"
+      }
+    },
+    "expectedFingerprint": "cfg:a09c8fdc"
+  },
+  {
+    "name": "cascade-max-denoise",
+    "mode": "cascade",
+    "config": {
+      "schemaVersion": 1,
+      "client": {
+        "microphone": {
+          "echoCancellation": true,
+          "noiseSuppression": true,
+          "autoGainControl": true
+        },
+        "rmsGate": {
+          "enabled": true,
+          "thresholdDbfs": -50,
+          "holdMs": 300,
+          "attackMs": 10,
+          "releaseMs": 120,
+          "attenuationDb": 24,
+          "fullMute": false
+        },
+        "rnnoise": {
+          "enabled": true,
+          "voiceProbThreshold": 0.6
+        }
+      },
+      "realtime": {
+        "model": "gpt-realtime",
+        "voice": "alloy",
+        "turnDetection": {
+          "type": "server_vad"
+        },
+        "transcriptCheck": {
+          "mode": "off",
+          "model": "gpt-4o-mini"
+        }
+      },
+      "cascade": {
+        "deepgram": {
+          "model": "nova-3",
+          "endpointingMs": 500,
+          "utteranceEndMs": 3000,
+          "diarize": true
+        },
+        "segmentation": {
+          "mode": "hybrid",
+          "model": "gpt-4o-mini"
+        },
+        "denoise": {
+          "noisereduce": {
+            "enabled": true,
+            "propDecrease": 1,
+            "stationary": true
+          },
+          "deepfilternet": {
+            "enabled": true,
+            "attenuationLimitDb": 60,
+            "postFilterBeta": 0.05
+          },
+          "offline": {
+            "demucs": true,
+            "dns64": true
+          }
+        },
+        "transcriptCheck": {
+          "mode": "correct",
+          "model": "gpt-4.1-mini"
+        },
+        "translationModel": "gpt-4o-mini",
+        "ttsVoiceA": "21m00Tcm4TlvDq8ikWAM",
+        "ttsVoiceB": "ErXwobaYiN019PkySvjV"
+      }
+    },
+    "expectedFingerprint": "cfg:67a98ba1"
+  },
+  {
+    "name": "cascade-off-grid-values-quantised",
+    "mode": "cascade",
+    "config": {
+      "schemaVersion": 1,
+      "client": {
+        "microphone": {
+          "echoCancellation": true,
+          "noiseSuppression": true,
+          "autoGainControl": true
+        },
+        "rmsGate": {
+          "enabled": true,
+          "thresholdDbfs": -45.5,
+          "holdMs": 205,
+          "attackMs": 7,
+          "releaseMs": 85,
+          "attenuationDb": 12,
+          "fullMute": false
+        },
+        "rnnoise": {
+          "enabled": true,
+          "voiceProbThreshold": 0.33
+        }
+      },
+      "realtime": {
+        "model": "gpt-realtime",
+        "voice": "alloy",
+        "turnDetection": {
+          "type": "server_vad"
+        },
+        "transcriptCheck": {
+          "mode": "off",
+          "model": "gpt-4o-mini"
+        }
+      },
+      "cascade": {
+        "deepgram": {
+          "model": "nova-3",
+          "endpointingMs": 500,
+          "utteranceEndMs": 3000,
+          "diarize": true
+        },
+        "segmentation": {
+          "mode": "hybrid",
+          "model": "gpt-4o-mini"
+        },
+        "denoise": {
+          "noisereduce": {
+            "enabled": true,
+            "propDecrease": 0.87,
+            "stationary": false
+          },
+          "deepfilternet": {
+            "enabled": true,
+            "attenuationLimitDb": 30.4,
+            "postFilterBeta": 0.024
+          },
+          "offline": {
+            "demucs": false,
+            "dns64": false
+          }
+        },
+        "transcriptCheck": {
+          "mode": "off",
+          "model": "gpt-4o-mini"
+        },
+        "translationModel": "gpt-4o-mini",
+        "ttsVoiceA": "21m00Tcm4TlvDq8ikWAM",
+        "ttsVoiceB": "ErXwobaYiN019PkySvjV"
+      }
+    },
+    "expectedFingerprint": "cfg:7bc64a51"
+  },
+  {
+    "name": "realtime-out-of-range-values-clamped",
+    "mode": "realtime",
+    "config": {
+      "schemaVersion": 1,
+      "client": {
+        "microphone": {
+          "echoCancellation": true,
+          "noiseSuppression": true,
+          "autoGainControl": true
+        },
+        "rmsGate": {
+          "enabled": false,
+          "thresholdDbfs": -400,
+          "holdMs": 200,
+          "attackMs": 5,
+          "releaseMs": 80,
+          "attenuationDb": 12,
+          "fullMute": false
+        },
+        "rnnoise": {
+          "enabled": false,
+          "voiceProbThreshold": 0.5
+        }
+      },
+      "realtime": {
+        "model": "gpt-realtime",
+        "voice": "alloy",
+        "turnDetection": {
+          "type": "server_vad",
+          "threshold": 1.4,
+          "prefixPaddingMs": -50,
+          "silenceDurationMs": 99999
+        },
+        "transcriptCheck": {
+          "mode": "off",
+          "model": "gpt-4o-mini"
+        }
+      },
+      "cascade": {
+        "deepgram": {
+          "model": "nova-3",
+          "endpointingMs": 99999,
+          "utteranceEndMs": 3000,
+          "diarize": true
+        },
+        "segmentation": {
+          "mode": "hybrid",
+          "model": "gpt-4o-mini"
+        },
+        "denoise": {
+          "noisereduce": {
+            "enabled": false,
+            "propDecrease": 1,
+            "stationary": false
+          },
+          "deepfilternet": {
+            "enabled": false,
+            "attenuationLimitDb": 30,
+            "postFilterBeta": 0.02
+          },
+          "offline": {
+            "demucs": false,
+            "dns64": false
+          }
+        },
+        "transcriptCheck": {
+          "mode": "off",
+          "model": "gpt-4o-mini"
+        },
+        "translationModel": "gpt-4o-mini",
+        "ttsVoiceA": "21m00Tcm4TlvDq8ikWAM",
+        "ttsVoiceB": "ErXwobaYiN019PkySvjV"
+      }
+    },
+    "expectedFingerprint": "cfg:940acf32"
+  }
+]

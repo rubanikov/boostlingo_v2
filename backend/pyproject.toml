@@ -17,6 +17,53 @@ dependencies = [
     "websockets>=17.0.1",
 ]
 
+[project.optional-dependencies]
+# The server-side denoise chain's `noisereduce` stage (app/providers/denoise.py)
+# and the tuning sweep that measures it. An extra rather than a main dependency
+# on purpose: it pulls in scipy/librosa/matplotlib, the core suite must run
+# without them, and a default install therefore reports the stage as "not
+# installed" in `/api/tuning/capabilities` -- with `uv sync --extra bench` as
+# the hint. Install it to run the sweep or the real-processing tests in
+# tests/test_denoise.py.
+bench = [
+    "noisereduce>=3.0.3",
+    "numpy>=1.26",
+]
+
+# The DeepFilterNet stage (app/providers/denoise.py). Its own extra rather
+# than part of `bench` because torch is the single largest thing this repo
+# can install (~200 MB even as a CPU wheel) and nothing else needs it: core
+# CI runs plain `uv sync` and stays torch-free, with the stage honestly
+# reporting `installed: false` in `/api/tuning/capabilities`. `torchaudio`
+# is listed explicitly (deepfilternet depends on it, but the stage imports
+# `torchaudio.functional.resample` itself, and the CPU pin below has to name
+# it). DeepFilterNet downloads its model weights on first use.
+# The `torchaudio < 2.9` bound is load-bearing, not caution: DeepFilterNet
+# 0.5.6 (the newest release, Aug 2023) imports `torchaudio.backend.common`
+# at `df/io.py:9`, and torchaudio 2.9 deleted that deprecated module. With
+# it unbounded, `import df` raises ModuleNotFoundError -- the stage degrades
+# honestly rather than crashing, but it can never actually run. Verified by
+# installing both: 2.8.0 ships `torchaudio/backend/common.py`, 2.9.0 does
+# not. torchaudio pins its own matching `torch`, hence no upper bound here.
+denoise = [
+    "torch>=2.4",
+    "torchaudio>=2.4,<2.9",
+    "deepfilternet>=0.5.6",
+]
+
+# CPU wheels only: this stage is CPU-only by decision (no GPU anywhere in
+# this repo), and PyPI's default torch wheels bundle the CUDA runtime, which
+# is gigabytes nobody here would use. `explicit = true` keeps the index from
+# being consulted for anything but the two packages routed to it below.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+torchaudio = { index = "pytorch-cpu" }
+
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",

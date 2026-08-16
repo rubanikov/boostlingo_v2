@@ -28,12 +28,20 @@ reconnects with backoff, and calls `_stream_once` again, reusing the same
 `audio_chunks` iterator, which is safe since it's just a live queue of PCM
 frames, not a one-shot resource. Only once reconnecting is exhausted (3
 attempts) does a `ProviderError(CONNECTION)` reach `app.orchestrator`.
+
+Tuning lab: the four query-string knobs the panel exposes (`model`,
+`endpointing`, `utterance_end_ms`, `diarize`) come in as a `DeepgramParams`
+argument to `stream()` rather than being read from the module constants, so
+one session's live Apply can never re-parameterise another session's
+connection. The constants stay, as `DeepgramParams`' defaults: a `stream()`
+call that passes no params builds exactly the URL it always did.
 """
 
 import asyncio
 import collections
 import json
 from collections.abc import AsyncIterator
+from dataclasses import dataclass
 from typing import Any, Final
 
 import websockets
@@ -47,6 +55,7 @@ from app.providers.base import (
     TranscriptSegment,
     UtteranceEndSignal,
 )
+from app.tuning.schema import CascadeTuning
 
 DEEPGRAM_URL: Final = "wss://api.deepgram.com/v1/listen"
 MODEL: Final = "nova-3"
@@ -63,6 +72,35 @@ SAMPLE_RATE: Final = 16000
 _STREAM_DONE: Final = object()
 
 
+@dataclass(frozen=True)
+class DeepgramParams:
+    """The four connection-level knobs the tuning panel exposes: they live in
+    the query string, so changing any of them means a new socket (see
+    `app.tuning.allowlists.DEEPGRAM_CONNECTION_LEVEL_FIELDS`).
+
+    Every default here **is** the module constant above, which is what keeps a
+    `stream()` call that passes no params byte-identical to the pre-tuning
+    URL. Passed per `stream()` call and never stored on the provider: one
+    session's Apply must not re-parameterise another session's live
+    connection, which is exactly what mutating the module constants (or
+    provider state) would do.
+    """
+
+    model: str = MODEL
+    endpointing_ms: int = ENDPOINTING_MS
+    utterance_end_ms: int = UTTERANCE_END_MS
+    diarize: bool = True
+
+    @classmethod
+    def from_tuning(cls, tuning: CascadeTuning) -> "DeepgramParams":
+        return cls(
+            model=tuning.deepgram.model,
+            endpointing_ms=tuning.deepgram.endpointing_ms,
+            utterance_end_ms=tuning.deepgram.utterance_end_ms,
+            diarize=tuning.deepgram.diarize,
+        )
+
+
 class DeepgramSTTProvider:
     """Swapping STT vendors means writing one class like this one:
     nothing upstream or downstream of `STTProvider.stream()` changes.
@@ -72,13 +110,20 @@ class DeepgramSTTProvider:
         self._api_key = api_key
 
     def stream(
-        self, audio_chunks: AsyncIterator[AudioChunk], *, languages: tuple[str, ...]
+        self,
+        audio_chunks: AsyncIterator[AudioChunk],
+        *,
+        languages: tuple[str, ...],
+        params: DeepgramParams | None = None,
     ) -> AsyncIterator[TranscriptSegment | UtteranceEndSignal]:
         del languages  # candidate-set language detection is a later ticket
-        return with_reconnect(lambda: self._stream_once(audio_chunks), provider="deepgram")
+        resolved = params or DeepgramParams()
+        return with_reconnect(
+            lambda: self._stream_once(audio_chunks, resolved), provider="deepgram"
+        )
 
     async def _stream_once(
-        self, audio_chunks: AsyncIterator[AudioChunk]
+        self, audio_chunks: AsyncIterator[AudioChunk], params: DeepgramParams
     ) -> AsyncIterator[TranscriptSegment | UtteranceEndSignal]:
         """One connect+drain attempt. See `with_reconnect` for the
         reconnect loop wrapped around this."""
@@ -94,7 +139,7 @@ class DeepgramSTTProvider:
             # surfaces as `ConnectionClosed` -> the `with_reconnect` path,
             # instead of a silently hung session.
             async with websockets.connect(
-                self._url(),
+                self._url(params),
                 additional_headers={"Authorization": f"Token {self._api_key}"},
                 open_timeout=10,
                 ping_interval=20,
@@ -137,10 +182,10 @@ class DeepgramSTTProvider:
                 ProviderErrorKind.TIMEOUT, "deepgram", str(exc), retryable=True
             ) from exc
 
-    def _url(self) -> str:
-        params = {
+    def _url(self, params: DeepgramParams) -> str:
+        query_params = {
             "interim_results": "true",
-            "endpointing": str(ENDPOINTING_MS),
+            "endpointing": str(params.endpointing_ms),
             # Ticket 5: `utterance_end_ms` needs `interim_results=true`
             # (already set above) to fire at all; `vad_events=true` enables
             # Deepgram's voice-activity events (e.g. `SpeechStarted`);
@@ -148,20 +193,20 @@ class DeepgramSTTProvider:
             # Deepgram's docs. Any event type this provider doesn't
             # explicitly parse (`_parse_message`) is ignored, same as
             # `Metadata` already is.
-            "utterance_end_ms": str(UTTERANCE_END_MS),
+            "utterance_end_ms": str(params.utterance_end_ms),
             "vad_events": "true",
             "encoding": "linear16",
             "sample_rate": str(SAMPLE_RATE),
             "channels": "1",
-            "model": MODEL,
+            "model": params.model,
             # `detect_language` is pre-recorded-audio-only per Deepgram's
             # docs. Not usable on this live streaming connection.
             # `language=multi` is Nova-3's streaming equivalent: every word
             # in a Results message carries its own `language` field instead.
             "language": "multi",
-            "diarize": "true",
+            "diarize": "true" if params.diarize else "false",
         }
-        query = "&".join(f"{key}={value}" for key, value in params.items())
+        query = "&".join(f"{key}={value}" for key, value in query_params.items())
         return f"{DEEPGRAM_URL}?{query}"
 
 

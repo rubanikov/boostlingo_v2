@@ -35,6 +35,8 @@ import pytest
 
 from app import orchestrator
 from app.providers.base import TranscriptSegment, TTSFlush
+from app.tuning.defaults import default_cascade_tuning
+from app.tuning.schema import ClientTuning
 
 # Large enough to make a genuine per-segment leak (an ever-growing dict/set/
 # task backlog) visible, small enough to keep this test fast -- every stage
@@ -89,7 +91,7 @@ class _FakeManySegmentsSTT:
     def __init__(self, count: int) -> None:
         self._count = count
 
-    async def stream(self, audio_chunks, *, languages):
+    async def stream(self, audio_chunks, *, languages, params=None):
         del audio_chunks, languages
         for i in range(self._count):
             yield TranscriptSegment(text=f"segment {i}", is_final=True, speech_final=True)
@@ -101,15 +103,24 @@ class _AlwaysFalseChecker:
     always cut by `speech_final` instead, same as most of `test_resilience.py`'s
     fakes."""
 
-    async def is_complete_clause(self, text: str, language: str) -> bool:
+    async def is_complete_clause(self, text: str, language: str, *, model: str | None = None) -> bool:
         del text, language
         return False
 
 
 class _FakeTranslation:
-    async def translate(self, source_text, *, source_lang, target_lang):
+    async def translate(self, source_text, *, source_lang, target_lang, model=None):
         del source_lang, target_lang
         yield source_text.upper()
+
+
+class _UncheckedTranscriptChecker:
+    """Ticket 14's checker, wired in only to prove it stays unused: the
+    default tuning leaves `transcriptCheck.mode` at `off`, so no segment here
+    should reach it."""
+
+    async def check(self, text: str, language: str, mode: str, *, model: str | None = None):
+        raise AssertionError("transcriptCheck.mode is off -- no check should run")
 
 
 class _FakeTTS:
@@ -149,6 +160,7 @@ async def _run_simulated_session(segment_count: int, tracker: _ProgressTracker) 
     latency = orchestrator._LatencyTracker()
     breaker = orchestrator._CircuitBreaker()
     segment_queue: asyncio.Queue = asyncio.Queue()
+    tuning = orchestrator._SessionTuning(default_cascade_tuning(), ClientTuning())
 
     stt_task = asyncio.create_task(
         orchestrator._run_stt(
@@ -161,12 +173,21 @@ async def _run_simulated_session(segment_count: int, tracker: _ProgressTracker) 
             "es",
             breaker,
             _AlwaysFalseChecker(),
-            "hybrid",
+            tuning,
         )
     )
     pipeline_task = asyncio.create_task(
         orchestrator._run_pipeline(
-            segment_queue, _FakeTranslation(), _FakeTTS(tracker), outgoing, latency, "en", "es", breaker
+            segment_queue,
+            _FakeTranslation(),
+            _FakeTTS(tracker),
+            _UncheckedTranscriptChecker(),
+            outgoing,
+            latency,
+            "en",
+            "es",
+            breaker,
+            tuning,
         )
     )
 

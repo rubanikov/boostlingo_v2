@@ -18,7 +18,12 @@ import openai as openai_errors
 import pytest
 from websockets.exceptions import ConnectionClosedError, InvalidStatus
 
-from app.providers import _resilience
+from app.providers import (
+    _resilience,
+    deepgram_stt,
+    openai_translation,
+    segmentation_checker,
+)
 from app.providers.base import (
     ProviderError,
     ProviderErrorKind,
@@ -26,12 +31,14 @@ from app.providers.base import (
     TTSText,
     UtteranceEndSignal,
 )
-from app.providers.deepgram_stt import DeepgramSTTProvider
+from app.providers.deepgram_stt import DeepgramParams, DeepgramSTTProvider
 from app.providers.deepgram_stt import websockets as deepgram_websockets
 from app.providers.elevenlabs_tts import ElevenLabsTTSProvider
 from app.providers.elevenlabs_tts import websockets as elevenlabs_websockets
 from app.providers.openai_translation import OpenAITranslationProvider
 from app.providers.segmentation_checker import SegmentationChecker
+from app.tuning.defaults import default_cascade_tuning
+from app.tuning.schema import CascadeDeepgram
 
 
 def _mock_sleep(monkeypatch: pytest.MonkeyPatch) -> list[float]:
@@ -320,6 +327,63 @@ class TestDeepgramSTTProvider:
         assert "interim_results=true" in urls[0]
 
     @pytest.mark.asyncio
+    async def test_tuned_params_reach_the_connection_url(self, monkeypatch):
+        """Ticket 6: the four connection-level knobs are per-`stream()` call
+        arguments, so a session running non-default tuning connects with a
+        different query string -- while the two tests above, which pass no
+        params at all, keep asserting the untouched defaults. That is what
+        makes the module constants the defaults rather than the only
+        values."""
+        urls: list[str] = []
+
+        def _fake_connect(url, **kwargs):
+            del kwargs
+            urls.append(url)
+            return FakeSocket()
+
+        monkeypatch.setattr(deepgram_websockets, "connect", _fake_connect)
+
+        provider = DeepgramSTTProvider(api_key="test-key")
+        params = DeepgramParams(
+            model="nova-2", endpointing_ms=300, utterance_end_ms=1500, diarize=False
+        )
+        async for _ in provider.stream(
+            _no_audio(), languages=("en", "es"), params=params
+        ):
+            pass
+
+        assert "endpointing=300" in urls[0]
+        assert "model=nova-2" in urls[0]
+        assert "utterance_end_ms=1500" in urls[0]
+        assert "diarize=false" in urls[0]
+
+    def test_params_default_to_the_module_constants(self):
+        """The design constraint the two URL tests above rest on, asserted
+        directly rather than left to coincidence."""
+        assert DeepgramParams() == DeepgramParams(
+            model=deepgram_stt.MODEL,
+            endpointing_ms=deepgram_stt.ENDPOINTING_MS,
+            utterance_end_ms=deepgram_stt.UTTERANCE_END_MS,
+            diarize=True,
+        )
+
+    def test_from_tuning_reads_the_cascade_deepgram_block(self):
+        tuning = default_cascade_tuning().model_copy(
+            update={
+                "deepgram": CascadeDeepgram(
+                    model="nova-2",
+                    endpointing_ms=300,
+                    utterance_end_ms=1500,
+                    diarize=False,
+                )
+            }
+        )
+
+        assert DeepgramParams.from_tuning(tuning) == DeepgramParams(
+            model="nova-2", endpointing_ms=300, utterance_end_ms=1500, diarize=False
+        )
+
+    @pytest.mark.asyncio
     async def test_parses_utterance_end_message_into_utterance_end_signal(self, monkeypatch):
         socket = FakeSocket(
             incoming=[
@@ -429,6 +493,30 @@ class TestOpenAITranslationProvider:
         assert deltas == ["Hola", " ", "mundo"]
 
     @pytest.mark.asyncio
+    async def test_model_is_per_call_and_defaults_to_the_module_constant(self, monkeypatch):
+        """Ticket 6: the tuning panel picks the translation model, and the
+        orchestrator passes it per segment (the same way `voice` is passed
+        per segment to TTS) so a mid-session Apply lands on the next
+        segment. An omitted `model` still means `MODEL`."""
+        provider = OpenAITranslationProvider(api_key="test-key")
+        create = AsyncMock(
+            side_effect=lambda **_: _FakeChatStream(["Hola"]),
+        )
+        monkeypatch.setattr(provider._client.chat.completions, "create", create)
+
+        async for _ in provider.translate("hi", source_lang="en", target_lang="es"):
+            pass
+        async for _ in provider.translate(
+            "hi", source_lang="en", target_lang="es", model="gpt-4.1-nano"
+        ):
+            pass
+
+        assert [call.kwargs["model"] for call in create.await_args_list] == [
+            openai_translation.MODEL,
+            "gpt-4.1-nano",
+        ]
+
+    @pytest.mark.asyncio
     async def test_rate_limit_maps_to_retryable_error(self, monkeypatch):
         provider = OpenAITranslationProvider(api_key="test-key")
         response = httpx2.Response(429, request=_openai_request())
@@ -527,6 +615,24 @@ class TestSegmentationChecker:
         )
 
         assert await checker.is_complete_clause("The meeting starts at noon.", "en") is True
+
+    @pytest.mark.asyncio
+    async def test_model_is_per_call_and_defaults_to_the_module_constant(self, monkeypatch):
+        """Same per-call seam as translation: the segmentation model is a
+        tuning knob read at clause-check time, not baked in at construction."""
+        checker = SegmentationChecker(api_key="test-key")
+        create = AsyncMock(
+            return_value=_FakeChatCompletion([_FakeChoiceWithMessage("YES")])
+        )
+        monkeypatch.setattr(checker._client.chat.completions, "create", create)
+
+        await checker.is_complete_clause("hi.", "en")
+        await checker.is_complete_clause("hi.", "en", model="gpt-4.1-mini")
+
+        assert [call.kwargs["model"] for call in create.await_args_list] == [
+            segmentation_checker.MODEL,
+            "gpt-4.1-mini",
+        ]
 
     @pytest.mark.asyncio
     async def test_no_response_is_not_a_complete_clause(self, monkeypatch):

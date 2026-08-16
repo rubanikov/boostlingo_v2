@@ -30,6 +30,8 @@ import pytest
 
 from app import orchestrator
 from app.providers.base import TranscriptSegment, UtteranceEndSignal
+from app.tuning.defaults import default_cascade_tuning
+from app.tuning.schema import ClientTuning
 
 # ---------------------------------------------------------------------------
 # Shared test doubles
@@ -62,12 +64,18 @@ async def _next_message(outgoing: _RecordingOutgoing, message_type: str) -> dict
 
 def _start_run_stt(stt_provider, segmentation_checker, *, mode: str = "hybrid"):
     """Runs `orchestrator._run_stt` as a background task over fresh,
-    real (not faked) `_LatencyTracker`/`_CircuitBreaker` instances -- both
-    are simple, side-effect-free bookkeeping already covered by
-    `test_orchestrator.py`, not what these tests are about. Returns the
-    task plus the two things a test asserts against."""
+    real (not faked) `_LatencyTracker`/`_CircuitBreaker`/`_SessionTuning`
+    instances -- all three are simple, side-effect-free bookkeeping already
+    covered by `test_orchestrator.py`, not what these tests are about. The
+    segmentation mode reaches `_run_stt` through the session's tuning
+    (Ticket 6), which is why `mode` is applied to a default config here.
+    Returns the task plus the two things a test asserts against."""
     outgoing = _RecordingOutgoing()
     segment_queue: asyncio.Queue = asyncio.Queue()
+    cascade = default_cascade_tuning()
+    cascade = cascade.model_copy(
+        update={"segmentation": cascade.segmentation.model_copy(update={"mode": mode})}
+    )
     task = asyncio.create_task(
         orchestrator._run_stt(
             stt_provider,
@@ -79,7 +87,7 @@ def _start_run_stt(stt_provider, segmentation_checker, *, mode: str = "hybrid"):
             "es",
             orchestrator._CircuitBreaker(),
             segmentation_checker,
-            mode,
+            orchestrator._SessionTuning(cascade, ClientTuning()),
         )
     )
     return task, outgoing, segment_queue
@@ -94,7 +102,7 @@ class _NeverResolvingChecker:
         self.calls = 0
         self._gate = asyncio.Event()
 
-    async def is_complete_clause(self, text: str, language: str) -> bool:
+    async def is_complete_clause(self, text: str, language: str, *, model: str | None = None) -> bool:
         del text, language
         self.calls += 1
         await self._gate.wait()
@@ -105,7 +113,7 @@ class _NeverResolvingChecker:
 
 
 class _RaisingChecker:
-    async def is_complete_clause(self, text: str, language: str) -> bool:
+    async def is_complete_clause(self, text: str, language: str, *, model: str | None = None) -> bool:
         del text, language
         raise RuntimeError("clause-check exploded")
 
@@ -114,7 +122,7 @@ class _FastTrueChecker:
     def __init__(self) -> None:
         self.calls: list[str] = []
 
-    async def is_complete_clause(self, text: str, language: str) -> bool:
+    async def is_complete_clause(self, text: str, language: str, *, model: str | None = None) -> bool:
         del language
         self.calls.append(text)
         return True
@@ -129,7 +137,7 @@ class _GatedTrueChecker:
         self.calls: list[str] = []
         self._gate = asyncio.Event()
 
-    async def is_complete_clause(self, text: str, language: str) -> bool:
+    async def is_complete_clause(self, text: str, language: str, *, model: str | None = None) -> bool:
         del language
         self.calls.append(text)
         await self._gate.wait()
@@ -148,7 +156,7 @@ class TestSegmentationRace:
     @pytest.mark.asyncio
     async def test_speech_final_cuts_even_though_clause_check_never_resolves(self):
         class _STT:
-            async def stream(self, audio_chunks, *, languages):
+            async def stream(self, audio_chunks, *, languages, params=None):
                 del audio_chunks, languages
                 yield TranscriptSegment(text="hello world", is_final=True, speech_final=False)
                 # No new words, just the endpoint marker -- realistic for
@@ -175,7 +183,7 @@ class TestSegmentationRace:
     @pytest.mark.asyncio
     async def test_utterance_end_cuts_even_though_clause_check_never_resolves(self):
         class _STT:
-            async def stream(self, audio_chunks, *, languages):
+            async def stream(self, audio_chunks, *, languages, params=None):
                 del audio_chunks, languages
                 yield TranscriptSegment(text="hello world", is_final=True, speech_final=False)
                 yield UtteranceEndSignal()
@@ -195,7 +203,7 @@ class TestSegmentationRace:
     @pytest.mark.asyncio
     async def test_erroring_clause_check_does_not_crash_session_and_deepgram_still_cuts(self):
         class _STT:
-            async def stream(self, audio_chunks, *, languages):
+            async def stream(self, audio_chunks, *, languages, params=None):
                 del audio_chunks, languages
                 yield TranscriptSegment(text="hello world", is_final=True, speech_final=False)
                 yield TranscriptSegment(text="", is_final=True, speech_final=True)
@@ -214,7 +222,7 @@ class TestSegmentationRace:
         release_event = asyncio.Event()
 
         class _STT:
-            async def stream(self, audio_chunks, *, languages):
+            async def stream(self, audio_chunks, *, languages, params=None):
                 del audio_chunks, languages
                 yield TranscriptSegment(text="hello world", is_final=True, speech_final=False)
                 await release_event.wait()
@@ -239,7 +247,7 @@ class TestSegmentationRace:
     @pytest.mark.asyncio
     async def test_cut_uses_latest_buffer_not_the_snapshot_the_clause_check_evaluated(self):
         class _STT:
-            async def stream(self, audio_chunks, *, languages):
+            async def stream(self, audio_chunks, *, languages, params=None):
                 del audio_chunks, languages
                 yield TranscriptSegment(text="hello", is_final=True, speech_final=False)
                 yield TranscriptSegment(
@@ -271,7 +279,7 @@ class TestSegmentationRace:
     @pytest.mark.asyncio
     async def test_llm_priority_mode_ignores_speech_final_but_still_cuts_on_utterance_end(self):
         class _STT:
-            async def stream(self, audio_chunks, *, languages):
+            async def stream(self, audio_chunks, *, languages, params=None):
                 del audio_chunks, languages
                 yield TranscriptSegment(text="hello world", is_final=True, speech_final=False)
                 # Carries real text and speech_final=True -- in llm_priority
@@ -295,7 +303,7 @@ class TestSegmentationRace:
     @pytest.mark.asyncio
     async def test_debounce_does_not_fire_a_second_clause_check_while_one_is_in_flight(self):
         class _STT:
-            async def stream(self, audio_chunks, *, languages):
+            async def stream(self, audio_chunks, *, languages, params=None):
                 del audio_chunks, languages
                 yield TranscriptSegment(text="one", is_final=True, speech_final=False)
                 yield TranscriptSegment(text="two", is_final=True, speech_final=False)

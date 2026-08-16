@@ -27,6 +27,18 @@ backend/tests/fixtures/realtime_quality/captures*.json
 backend/tests/fixtures/realtime_quality/.padded/
 backend/tests/fixtures/realtime_quality_report*.json
 
+# Ticket 08: the noise-mixed benchmark corpus
+# (tests/fixtures/make_noisy_corpus.py). ~430 WAVs regenerated deterministically
+# from the clean fixtures above plus `--seed`, so committing them buys nothing.
+# SCRIPT.md (how to regenerate, what each condition is) stays tracked.
+backend/tests/fixtures/noisy/*.wav
+backend/tests/fixtures/noisy/noisy_manifest.json
+
+# Ticket 09: the sweep's own output (tests/fixtures/run_tuning_sweep.py). Rows
+# are measurements of one machine on one day against live APIs, resumable and
+# re-runnable; COMPARISON.md section 7 is where the numbers worth keeping go.
+backend/tests/fixtures/tuning_sweep*.json
+
 # Node / frontend
 frontend/node_modules/
 frontend/dist/

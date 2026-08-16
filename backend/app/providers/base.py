@@ -12,7 +12,7 @@ different mode entirely, owned by app/api/realtime.py).
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Protocol
+from typing import Any, Protocol
 
 
 class ProviderErrorKind(Enum):
@@ -92,7 +92,11 @@ class UtteranceEndSignal:
 
 class STTProvider(Protocol):
     def stream(
-        self, audio_chunks: AsyncIterator[AudioChunk], *, languages: tuple[str, ...]
+        self,
+        audio_chunks: AsyncIterator[AudioChunk],
+        *,
+        languages: tuple[str, ...],
+        params: Any = None,
     ) -> AsyncIterator[TranscriptSegment | UtteranceEndSignal]:
         """One long-lived call for the whole session: audio never stops
         flowing in, regardless of what the orchestrator does with the
@@ -104,6 +108,12 @@ class STTProvider(Protocol):
         (a later ticket); this ticket's orchestrator always passes
         `("en", "es")` and the provider is free to ignore it.
 
+        `params` is this session's connection-level tuning, passed per call
+        so it can never become shared provider state (see
+        `deepgram_stt.DeepgramParams`). Its concrete shape is the vendor's
+        business, hence `Any` on this side of the boundary; `None` means
+        "the provider's own defaults".
+
         Raises `ProviderError` on connection/auth/rate-limit failure. An
         empty final result (silence) is a valid `TranscriptSegment` with
         `is_empty=True`, never an error.
@@ -113,11 +123,21 @@ class STTProvider(Protocol):
 
 class TranslationProvider(Protocol):
     def translate(
-        self, source_text: str, *, source_lang: str, target_lang: str
+        self,
+        source_text: str,
+        *,
+        source_lang: str,
+        target_lang: str,
+        model: str | None = None,
     ) -> AsyncIterator[str]:
         """Translates one already-segmented unit of text: segmentation is
         the orchestrator's job, not this stage's. Yields incremental
         translated text deltas as they stream from the model.
+
+        `model` is per call, the same way `voice` is for TTS: the tuning
+        panel can change it mid-session and the next segment picks it up
+        without rebuilding the provider. `None` means the provider's own
+        default model.
 
         Raises `ProviderError` on API failure (rate limit, timeout, etc).
         """

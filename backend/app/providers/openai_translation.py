@@ -5,6 +5,10 @@ One call translates one already-segmented unit of text: segmentation
 orchestrator, not here. Streams `choices[].delta.content` fragments as they
 arrive so the orchestrator can start feeding TTS before the full
 translation finishes.
+
+`MODEL` is the default, not the only choice: the tuning panel picks a model
+per call (`translate(..., model=...)`), which is what lets a mid-session
+Apply take effect on the very next segment without a reconnect.
 """
 
 from collections.abc import AsyncIterator
@@ -41,14 +45,19 @@ class OpenAITranslationProvider:
         )
 
     async def translate(
-        self, source_text: str, *, source_lang: str, target_lang: str
+        self,
+        source_text: str,
+        *,
+        source_lang: str,
+        target_lang: str,
+        model: str | None = None,
     ) -> AsyncIterator[str]:
         source_name = SUPPORTED_LANGUAGES.get(source_lang, source_lang)
         target_name = SUPPORTED_LANGUAGES.get(target_lang, target_lang)
 
         try:
             stream = await self._client.chat.completions.create(
-                model=MODEL,
+                model=model or MODEL,
                 stream=True,
                 messages=[
                     {

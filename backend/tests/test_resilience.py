@@ -39,7 +39,7 @@ class _FakeOneSegmentPerAudioChunkSTT:
     def __init__(self, api_key: str) -> None:
         pass
 
-    async def stream(self, audio_chunks, *, languages):
+    async def stream(self, audio_chunks, *, languages, params=None):
         del languages
         i = 0
         async for _ in audio_chunks:
@@ -55,7 +55,7 @@ class _FakeFailingSTT:
     def __init__(self, api_key: str) -> None:
         pass
 
-    async def stream(self, audio_chunks, *, languages):
+    async def stream(self, audio_chunks, *, languages, params=None):
         del audio_chunks, languages
         raise ProviderError(ProviderErrorKind.TIMEOUT, "deepgram", "boom", retryable=True)
         yield  # pragma: no cover -- makes this an async generator function
@@ -68,7 +68,7 @@ class _FakeIdleSTT:
     def __init__(self, api_key: str) -> None:
         pass
 
-    async def stream(self, audio_chunks, *, languages):
+    async def stream(self, audio_chunks, *, languages, params=None):
         del audio_chunks, languages
         return
         yield  # pragma: no cover
@@ -108,7 +108,7 @@ class _UnreachableTranslation:
     def __init__(self, api_key: str) -> None:
         pass
 
-    async def translate(self, source_text, *, source_lang, target_lang):
+    async def translate(self, source_text, *, source_lang, target_lang, model=None):
         raise AssertionError("translate() should never be called in this test")
         yield  # pragma: no cover
 
@@ -120,6 +120,10 @@ def _message_kind(raw_message: dict) -> str:
 
 
 def _start_session(ws, languages: list[str] | None = None) -> str:
+    """Sends `start_session` and drains the two messages every new session
+    opens with -- `session_started` and Ticket 6's unsolicited
+    `tuning_applied` -- so each test's own message-count assertions stay
+    about the pipeline."""
     payload: dict = {"type": "start_session"}
     if languages is not None:
         payload["languages"] = languages
@@ -127,6 +131,8 @@ def _start_session(ws, languages: list[str] | None = None) -> str:
     session_started = json.loads(ws.receive()["text"])
     assert session_started["type"] == "session_started"
     assert session_started["sessionId"]
+    tuning_applied = json.loads(ws.receive()["text"])
+    assert tuning_applied["type"] == "tuning_applied"
     return session_started["sessionId"]
 
 
@@ -182,7 +188,7 @@ class TestPerSegmentRetry:
             def __init__(self, api_key: str) -> None:
                 pass
 
-            async def translate(self, source_text, *, source_lang, target_lang):
+            async def translate(self, source_text, *, source_lang, target_lang, model=None):
                 attempts["n"] += 1
                 if attempts["n"] < 3:
                     raise ProviderError(
@@ -232,7 +238,7 @@ class TestPerSegmentRetry:
             def __init__(self, api_key: str) -> None:
                 pass
 
-            async def translate(self, source_text, *, source_lang, target_lang):
+            async def translate(self, source_text, *, source_lang, target_lang, model=None):
                 attempts["n"] += 1
                 raise ProviderError(
                     ProviderErrorKind.RATE_LIMIT, "openai", "rate limited", retryable=True
@@ -270,7 +276,7 @@ class TestPerSegmentRetry:
             def __init__(self, api_key: str) -> None:
                 pass
 
-            async def translate(self, source_text, *, source_lang, target_lang):
+            async def translate(self, source_text, *, source_lang, target_lang, model=None):
                 attempts["n"] += 1
                 raise ProviderError(ProviderErrorKind.TIMEOUT, "openai", "timed out", retryable=True)
                 yield  # pragma: no cover
@@ -297,7 +303,7 @@ class TestPerSegmentRetry:
             def __init__(self, api_key: str) -> None:
                 pass
 
-            async def translate(self, source_text, *, source_lang, target_lang):
+            async def translate(self, source_text, *, source_lang, target_lang, model=None):
                 attempts["n"] += 1
                 return
                 yield  # pragma: no cover
@@ -325,7 +331,7 @@ class TestPerSegmentRetry:
             def __init__(self, api_key: str) -> None:
                 pass
 
-            async def translate(self, source_text, *, source_lang, target_lang):
+            async def translate(self, source_text, *, source_lang, target_lang, model=None):
                 attempts["n"] += 1
                 raise ProviderError(
                     ProviderErrorKind.UNKNOWN, "openai", "bad request", retryable=False
@@ -376,7 +382,7 @@ class TestCircuitBreaker:
             def __init__(self, api_key: str) -> None:
                 pass
 
-            async def translate(self, source_text, *, source_lang, target_lang):
+            async def translate(self, source_text, *, source_lang, target_lang, model=None):
                 raise ProviderError(ProviderErrorKind.TIMEOUT, "openai", "timed out", retryable=True)
                 yield  # pragma: no cover
 
@@ -408,7 +414,7 @@ class TestCircuitBreaker:
             def __init__(self, api_key: str) -> None:
                 pass
 
-            async def translate(self, source_text, *, source_lang, target_lang):
+            async def translate(self, source_text, *, source_lang, target_lang, model=None):
                 raise ProviderError(ProviderErrorKind.TIMEOUT, "openai", "timed out", retryable=True)
                 yield  # pragma: no cover
 
@@ -457,7 +463,7 @@ class TestCircuitBreaker:
             def __init__(self, api_key: str) -> None:
                 pass
 
-            async def translate(self, source_text, *, source_lang, target_lang):
+            async def translate(self, source_text, *, source_lang, target_lang, model=None):
                 if source_text == "segment 5":
                     yield "ok"
                     return
@@ -529,7 +535,7 @@ class TestSessionResume:
             def __init__(self, api_key: str) -> None:
                 pass
 
-            async def translate(self, source_text, *, source_lang, target_lang):
+            async def translate(self, source_text, *, source_lang, target_lang, model=None):
                 # 0.0s backoff (TIMEOUT's policy) -- fast enough to leave
                 # `GRACE_WINDOW_S` (5s, real, unmocked here) with plenty of
                 # room, so this test doesn't need to touch the grace-window
@@ -647,6 +653,25 @@ class TestOriginValidation:
         monkeypatch.setattr(orchestrator, "ElevenLabsTTSProvider", _FakeTTS)
 
         with client.websocket_connect("/ws/cascade") as ws:
+            session_id = _start_session(ws, languages=["en", "es"])
+
+        assert session_id
+
+    def test_e15_the_playwright_harness_origin_is_accepted(self, client, monkeypatch):
+        """Tuning-lab ticket 01 (E15): the e2e harness serves the app on
+        **5183** (`frontend/playwright.config.ts`) while `cors_origins`
+        defaulted to 5173 only, so every harness-driven Cascade run was
+        rejected at connect. 5183 is a repo-owned dev port, so adding it gives
+        the guard nothing away: it still blocks arbitrary third-party pages
+        from opening a session against real keys.
+        """
+        monkeypatch.setattr(orchestrator, "DeepgramSTTProvider", _FakeIdleSTT)
+        monkeypatch.setattr(orchestrator, "OpenAITranslationProvider", _UnreachableTranslation)
+        monkeypatch.setattr(orchestrator, "ElevenLabsTTSProvider", _FakeTTS)
+
+        with client.websocket_connect(
+            "/ws/cascade", headers={"origin": "http://localhost:5183"}
+        ) as ws:
             session_id = _start_session(ws, languages=["en", "es"])
 
         assert session_id
