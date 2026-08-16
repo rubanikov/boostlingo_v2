@@ -13,10 +13,6 @@ assumed.
 
 See [COMPARISON.md](COMPARISON.md) for the full latency/quality/cost/controllability
 write-up, and [AGENTS.md](AGENTS.md) for how this was built with an AI coding agent.
-There is a narrated demo video, both modes on a real conversation plus the Tuning
-panel walkthrough, at [demo/ai-interpreter-workbench-demo.mp4](demo/ai-interpreter-workbench-demo.mp4);
-[demo/README.md](demo/README.md) explains how it is recorded from the live app and how
-to regenerate it.
 
 ## Why Python + TypeScript (and not .NET)
 
