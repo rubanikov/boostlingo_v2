@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EMPTY_TRANSCRIPT_PANE, appendTranscriptSegment, paneText } from './transcriptPane';
+import { EMPTY_TRANSCRIPT_PANE, appendTranscriptSegment, applyTranscriptCheck, paneText } from './transcriptPane';
 
 describe('appendTranscriptSegment', () => {
   it('appends the first message for a segment with no leading separator', () => {
@@ -101,5 +101,87 @@ describe('appendTranscriptSegment', () => {
 
       expect(state.segments[0]).toEqual({ id: 'a', text: 'Hello world', speaker: null });
     });
+  });
+});
+
+describe('applyTranscriptCheck (transcript check, ticket 14)', () => {
+  /** A pane holding one final segment, the state every check verdict arrives into. */
+  function paneWithFinalSegment() {
+    return appendTranscriptSegment(EMPTY_TRANSCRIPT_PANE, {
+      segmentId: 'a',
+      text: 'I scream for ice cream',
+      speaker: 0,
+    });
+  }
+
+  it('flag: marks the existing segment without appending a second copy of it', () => {
+    const state = applyTranscriptCheck(paneWithFinalSegment(), {
+      segmentId: 'a',
+      text: 'I scream for ice cream',
+      flagged: true,
+      speaker: 0,
+    });
+
+    expect(state.segments).toEqual([{ id: 'a', text: 'I scream for ice cream', speaker: 0, flagged: true }]);
+    expect(paneText(state)).toBe('I scream for ice cream');
+  });
+
+  it('correct: replaces the segment text and records what it was rewritten from', () => {
+    const state = applyTranscriptCheck(paneWithFinalSegment(), {
+      segmentId: 'a',
+      text: 'Ice cream for ice cream',
+      flagged: true,
+      correctedFrom: 'I scream for ice cream',
+      speaker: 0,
+    });
+
+    expect(state.segments).toEqual([
+      {
+        id: 'a',
+        text: 'Ice cream for ice cream',
+        speaker: 0,
+        flagged: true,
+        correctedFrom: 'I scream for ice cream',
+      },
+    ]);
+    // Replaced, never concatenated onto the original.
+    expect(paneText(state)).toBe('Ice cream for ice cream');
+  });
+
+  it('leaves every other segment in the pane untouched, in order', () => {
+    let state = paneWithFinalSegment();
+    state = appendTranscriptSegment(state, { segmentId: 'b', text: 'and so does he', speaker: 1 });
+    state = applyTranscriptCheck(state, { segmentId: 'a', text: 'Ice cream', flagged: true, correctedFrom: 'I scream for ice cream' });
+
+    expect(state.segments.map((segment) => segment.id)).toEqual(['a', 'b']);
+    expect(state.segments[1]).toEqual({ id: 'b', text: 'and so does he', speaker: 1 });
+  });
+
+  it("keeps the segment's diarized speaker when the verdict omits one", () => {
+    const state = applyTranscriptCheck(paneWithFinalSegment(), {
+      segmentId: 'a',
+      text: 'Ice cream',
+      flagged: true,
+    });
+
+    expect(state.segments[0]).toMatchObject({ speaker: 0 });
+  });
+
+  it('renders a verdict for a segment the pane never saw rather than dropping its text', () => {
+    const state = applyTranscriptCheck(EMPTY_TRANSCRIPT_PANE, { segmentId: 'z', text: 'Ice cream', flagged: true });
+
+    expect(state.segments).toEqual([{ id: 'z', text: 'Ice cream', speaker: null, flagged: true }]);
+  });
+
+  it('leaves the corrected text as the segment baseline for any later append', () => {
+    let state = applyTranscriptCheck(paneWithFinalSegment(), {
+      segmentId: 'a',
+      text: 'Ice cream',
+      flagged: true,
+      correctedFrom: 'I scream for ice cream',
+    });
+    state = appendTranscriptSegment(state, { segmentId: 'a', text: 'Ice cream for all' });
+
+    expect(state.segments[0].text).toBe('Ice cream for all');
   });
 });

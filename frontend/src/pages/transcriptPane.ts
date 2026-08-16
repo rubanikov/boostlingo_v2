@@ -63,6 +63,52 @@ export function appendTranscriptSegment(
   return { segments, lastTextBySegment };
 }
 
+/** A `source_transcript` re-sent for an already-final segment carrying the transcript check's verdict (ticket 14). */
+export interface TranscriptCheckEvent {
+  segmentId: string;
+  /** The text the check settled on: the original in `flag` mode, the rewrite in `correct` mode. */
+  text: string;
+  flagged: boolean;
+  /** Only in `correct` mode: the text as first transcribed, before the rewrite. */
+  correctedFrom?: string;
+  speaker?: number | null;
+}
+
+/**
+ * Merges a transcript-check verdict into the segment it is about, by
+ * `segmentId`, so a checked segment never renders twice.
+ *
+ * Not `appendTranscriptSegment`, which does the opposite: a re-send in `flag`
+ * mode repeats text the pane already has (that diffs to an empty delta and is
+ * dropped), and one in `correct` mode carries a replacement for it (that would
+ * be concatenated onto the original). Here `text` always replaces, because the
+ * check re-sends the whole final segment either way.
+ *
+ * A verdict for a segment the pane has never seen is rendered rather than
+ * dropped: the text is the same text the segment would have had.
+ */
+export function applyTranscriptCheck(
+  state: TranscriptPaneState,
+  event: TranscriptCheckEvent,
+): TranscriptPaneState {
+  const checked = (segment: TranscriptSegment): TranscriptSegment => ({
+    ...segment,
+    text: event.text,
+    flagged: event.flagged,
+    ...(event.correctedFrom === undefined ? {} : { correctedFrom: event.correctedFrom }),
+  });
+
+  const lastTextBySegment = { ...state.lastTextBySegment, [event.segmentId]: event.text };
+
+  if (!(event.segmentId in state.lastTextBySegment)) {
+    const segment = checked({ id: event.segmentId, text: event.text, speaker: event.speaker ?? null });
+    return { segments: [...state.segments, segment], lastTextBySegment };
+  }
+
+  const segments = state.segments.map((segment) => (segment.id === event.segmentId ? checked(segment) : segment));
+  return { segments, lastTextBySegment };
+}
+
 /**
  * Flattens a pane's segments into a single display string, space-separating
  * segments: the same join `appendTranscriptSegment` produced when it

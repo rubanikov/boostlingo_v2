@@ -54,6 +54,10 @@ describe('isLatencyStage', () => {
     }
   });
 
+  it('accepts the transcript_check stage (ticket 14)', () => {
+    expect(isLatencyStage('transcript_check')).toBe(true);
+  });
+
   it('rejects an unrecognized stage', () => {
     expect(isLatencyStage('bogus_stage')).toBe(false);
   });
@@ -128,6 +132,49 @@ describe('latencyBadges', () => {
     expect(byStage.speech_end.tone).toBe('ghost');
     expect(byStage.translation_complete.tone).toBe('ghost');
     expect(byStage.playback_start.tone).toBe('primary');
+  });
+
+  describe('transcript_check stage (ticket 14)', () => {
+    it('orders transcript_check after speech_end and before translation_first_token', () => {
+      const badges = latencyBadges({
+        stt_final: 480,
+        speech_end: 0,
+        transcript_check: 220,
+        translation_first_token: 300,
+        playback_start: 900,
+      });
+      expect(badges.map((b) => b.stage)).toEqual([
+        'stt_final',
+        'speech_end',
+        'transcript_check',
+        'translation_first_token',
+        'playback_start',
+      ]);
+    });
+
+    it('labels it with the short strip label and its cumulative ms', () => {
+      const badges = latencyBadges({ speech_end: 0, transcript_check: 220 });
+      expect(badges[1]).toMatchObject({ stage: 'transcript_check', label: 'check', ms: 220 });
+    });
+
+    it('skips the stage entirely in off mode, where it never arrives', () => {
+      const badges = latencyBadges({ speech_end: 0, translation_first_token: 150, playback_start: 650 });
+      expect(badges.map((b) => b.stage)).not.toContain('transcript_check');
+    });
+
+    it('can win the bottleneck flag when a blocking correct-mode check is the biggest jump', () => {
+      const badges = latencyBadges({
+        speech_end: 0,
+        transcript_check: 400,
+        translation_first_token: 500,
+        translation_complete: 700,
+        tts_first_byte: 800,
+        playback_start: 850,
+      });
+      const byStage = Object.fromEntries(badges.map((b) => [b.stage, b]));
+      expect(byStage.transcript_check.tone).toBe('warning');
+      expect(byStage.translation_complete.tone).toBe('ghost');
+    });
   });
 
   it('never flags speech_end as the bottleneck even when stt_final precedes it', () => {

@@ -14,6 +14,7 @@
     "capture:realtime-quality": "node e2e/realtime-quality-capture.mjs"
   },
   "dependencies": {
+    "@sapphi-red/web-noise-suppressor": "^0.4.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },

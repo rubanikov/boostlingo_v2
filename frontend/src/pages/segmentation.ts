@@ -42,6 +42,11 @@ const TRIGGER_LABELS: Record<string, string> = {
   llm: 'llm',
   deepgram_speech_final: 'pause',
   deepgram_utterance_end: 'pause',
+  // ticket 07: the partial in flight when a live tuning change reopened the
+  // Deepgram connection. Not a pause and not an LLM decision: the segment ended
+  // because the configuration did, and the hybrid-vs-LLM-priority comparison
+  // depends on telling those apart.
+  tuning_reconnect: 'reconfig',
 };
 
 export function segmentTriggerLabel(trigger: string): string {

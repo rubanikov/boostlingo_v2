@@ -57,6 +57,7 @@ npx playwright install chromium   # one-time, fetches the browser binary
 npm run test:e2e                  # runs the whole suite headless
 npx playwright test --reporter=list         # same, more verbose output
 npx playwright test --project=cascade-fake-mic   # one project only
+npx playwright test --project=tuning-import      # the tuning-import smoke spec alone
 npx playwright show-report        # open the last HTML report
 ```
 
@@ -113,6 +114,40 @@ explaining why. Fix: from the repo root, run
 - `noise-rejection.spec.ts`'s second test will stop self-skipping and
   actually assert "no spurious transcript" once `finalStatus === 'Connected'`
   is reachable.
+
+## Realtime quality capture harness (`realtime-quality-capture.mjs`)
+
+Not a Playwright *test* — a script that uses the same fake-mic mechanism to
+play each clip of the recorded Realtime corpus into a live session and record
+what `gpt-realtime` said back (one Chromium launch per clip; the flag it needs
+is fixed at launch). It costs real `gpt-realtime` audio tokens, so it is never
+part of `npm run test:e2e`.
+
+```bash
+# from frontend/, with both servers running (.\dev.ps1) and real keys set
+npm run capture:realtime-quality
+npm run capture:realtime-quality -- --limit 2 --headed
+npm run capture:realtime-quality -- --tuning configs/a.json --out ../backend/tests/fixtures/realtime_quality/captures.a.json
+```
+
+`--tuning <file>` takes a `TuningConfig` (or a realtime `ModeTuningConfig`)
+JSON document — whatever the panel's Export button writes — and applies it
+through the panel's own Import button before each session connects: open
+Tuning, Import, choose the file, Apply (which, while disconnected, commits
+locally so `connect()` sends it). Importing the whole document is the point of
+the `tuning-import-file` testid; driving thirty controls per clip would be
+both slower and a different code path from the one users take.
+
+The applied config's fingerprint is then read off the `tuning-fingerprint-latency`
+chip and stamped on the capture file's envelope (alongside `tuningFile`, the
+path exactly as typed) and on every item, so `run_realtime_quality_report.py`
+can carry it into the report and into COMPARISON.md section 7. **Runs without
+`--tuning` are stamped too** — that fingerprint is the server's own defaults,
+so no capture file is ever ambiguous about which configuration produced it.
+
+`tuning-import.spec.ts` is the smoke test for that import path (no live keys
+needed): it asserts the import is accepted and that Apply moves the chip. If
+it fails, the harness's `--tuning` is what broke.
 
 ## Fixtures
 

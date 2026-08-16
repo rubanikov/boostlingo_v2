@@ -18,6 +18,7 @@ export interface LatencyStageEvent {
 export const LATENCY_STAGES: LatencyStage[] = [
   'stt_final',
   'speech_end',
+  'transcript_check',
   'translation_first_token',
   'translation_complete',
   'tts_first_byte',
@@ -79,6 +80,7 @@ export interface LatencyBadge {
 const STAGE_LABELS: Record<LatencyStage, string> = {
   stt_final: 'STT finalize',
   speech_end: 'speech end',
+  transcript_check: 'check',
   translation_first_token: 'translation',
   translation_complete: 'translation done',
   tts_first_byte: 'TTS first byte',

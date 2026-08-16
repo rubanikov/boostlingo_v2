@@ -7,6 +7,8 @@
  * useCascadeSession.ts's resume logic and cascadeResilience.ts's
  * attempt-vs-give-up decision).
  */
+import type { ModeTuningConfig } from './tuningConfig';
+
 export type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'error';
 
 /** The language pair a session is started with: plain data, not tied to either transport. */
@@ -20,11 +22,20 @@ export interface SessionLanguages {
  * speaker index. `speaker` is `null` when a segment exists but hasn't (or
  * can't be) attributed to a speaker. Cascade mode only, see ticket 04;
  * Realtime mode has no diarization equivalent.
+ *
+ * `flagged`/`correctedFrom` carry the transcript check's verdict (ticket 14,
+ * Cascade source segments only): `flagged` means the check thought the
+ * segment was likely misrecognised, and `correctedFrom` — present only in
+ * `correct` mode — is the text as first transcribed, before the rewrite
+ * that `text` now holds. Both absent for a segment no check ran on, which is
+ * every segment when the mode is `off`.
  */
 export interface TranscriptSegment {
   id: string;
   text: string;
   speaker: number | null;
+  flagged?: boolean;
+  correctedFrom?: string;
 }
 
 /**
@@ -33,10 +44,15 @@ export interface TranscriptSegment {
  * `stt_final`, which happened *before* the reference point: its `ms` is the
  * standalone duration between the segment's last final STT result arriving
  * and the segmentation decision that cut the segment.
+ *
+ * `transcript_check` (ticket 14) sits between `speech_end` and the
+ * translation stages, and only arrives when the check ran at all: in `off`
+ * mode there is no such stage, and the strip simply skips it.
  */
 export type LatencyStage =
   | 'stt_final'
   | 'speech_end'
+  | 'transcript_check'
   | 'translation_first_token'
   | 'translation_complete'
   | 'tts_first_byte'
@@ -65,6 +81,46 @@ export interface CascadeToast {
 }
 
 /**
+ * What a transport reports back from a live mid-session apply (ticket 04's
+ * contract; the transports that can do it arrive in tickets 05/07). Lives here
+ * rather than in `useTuningConfig.ts`, where ticket 02 first declared it,
+ * because it is part of the transport contract. `useTuningConfig.ts` re-exports
+ * it so ticket 02's callers keep importing it from where they already do.
+ *
+ * `fingerprint` is on both arms on purpose: after a failure the panel still has
+ * to name the config the session is actually running on.
+ */
+export type ApplyResult =
+  | { ok: true; fingerprint: string; reconnectedStt: boolean; deferred: boolean }
+  | { ok: false; fingerprint: string; attempt: number; maxAttempts: number; message: string };
+
+export type ApplyTuning = (config: ModeTuningConfig) => Promise<ApplyResult>;
+
+/** One server-reported failed attempt at applying a config (ticket 07). */
+export interface ApplyAttemptFailure {
+  attempt: number;
+  message: string;
+  /** Browser-local, display-only: the failure dialog's attempt log. */
+  at: Date;
+}
+
+/**
+ * Progress of the apply currently on the wire (ticket 07), for the states an
+ * `ApplyResult` can't express because it only settles once: which retry the
+ * server has reached, and what each failed attempt said.
+ *
+ * Survives a failed settle: the failure dialog's attempt log is read from it
+ * after `applyTuning` has already resolved. Cleared when the next apply starts,
+ * or when one succeeds.
+ */
+export interface ApplyProgress {
+  /** The attempt the server is on now, 1-based. */
+  attempt: number;
+  maxAttempts: number;
+  failures: ApplyAttemptFailure[];
+}
+
+/**
  * Shared interface both `useCascadeSession` (WebSocket transport) and
  * `useRealtimeSession` (WebRTC transport) implement, so the workbench shell
  * UI can drive either one identically without ever importing a
@@ -86,6 +142,15 @@ export interface SessionHandle {
    */
   sourceSegments?: TranscriptSegment[];
   targetSegments?: TranscriptSegment[];
+  /**
+   * Realtime only (ticket 15): the flat-text counterpart of a segment's
+   * `flagged`. Cascade badges the individual segment the transcript check
+   * suspected; Realtime has no segments to badge, so this says the same thing
+   * about the turn that just settled, and the shell renders one badge after
+   * `sourceText`. Cleared when the next turn starts. Left `undefined` by
+   * Cascade, which reports per-segment `flagged` instead.
+   */
+  sourceFlagged?: boolean;
   /** Current mic input level, 0-1, for driving a live level meter. */
   micLevel: number;
   /**
@@ -126,7 +191,35 @@ export interface SessionHandle {
    * instead.
    */
   endToEndLatencyMs?: number | null;
-  connect: (languages: SessionLanguages) => void;
+  /**
+   * The fingerprint the transport is actually running on, once the server has
+   * confirmed it (ticket 04): `POST /api/realtime/session`'s `fingerprint` for
+   * Realtime, the `tuning_applied` message's for Cascade. `null` while
+   * disconnected, or when the server is old enough not to report one — the
+   * shell then falls back to the locally computed fingerprint. Left `undefined`
+   * by a transport that doesn't carry tuning at all yet.
+   */
+  appliedFingerprint?: string | null;
+  /**
+   * Live mid-session apply (tickets 05/07). Left `undefined` by a transport
+   * that can't do it, which the panel reads as "commit locally" — the same
+   * thing it does while disconnected.
+   */
+  applyTuning?: ApplyTuning;
+  /**
+   * How the apply currently on the wire is going (ticket 07): the retry the
+   * server has reached, and every attempt that has failed so far. `null`
+   * between applies. Left `undefined` by a transport whose applies can't fail
+   * partway (Realtime's `session.update` is fire-and-forget over an open data
+   * channel — there is no retry to report).
+   */
+  applyProgress?: ApplyProgress | null;
+  /**
+   * `tuning` is the config this session should start with (ticket 04). It is
+   * optional so a caller that has none — and every pre-tuning call site —
+   * keeps compiling and keeps today's server-default behaviour exactly.
+   */
+  connect: (languages: SessionLanguages, tuning?: ModeTuningConfig) => void;
   /** Tears the session down (transport + mic + audio contexts) and resets to `'idle'`, without unmounting. */
   disconnect: () => void;
 }

@@ -33,6 +33,10 @@ describe('segmentTriggerLabel', () => {
     expect(segmentTriggerLabel('deepgram_utterance_end')).toBe('pause');
   });
 
+  it('labels the live-tuning reconnect cut as "reconfig", distinct from a pause (E6, ticket 07)', () => {
+    expect(segmentTriggerLabel('tuning_reconnect')).toBe('reconfig');
+  });
+
   it('passes an unrecognized trigger value through unchanged, rather than dropping it', () => {
     expect(segmentTriggerLabel('some_future_trigger')).toBe('some_future_trigger');
   });

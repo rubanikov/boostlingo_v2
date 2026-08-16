@@ -1,6 +1,23 @@
 import { vi } from 'vitest';
-import { OPENAI_REALTIME_CALLS_ENDPOINT, REALTIME_SESSION_ENDPOINT } from '../pages/realtimeConfig';
+import {
+  OPENAI_REALTIME_CALLS_ENDPOINT,
+  REALTIME_SESSION_ENDPOINT,
+  TRANSCRIPT_CHECK_ENDPOINT,
+} from '../pages/realtimeConfig';
+import { TUNING_CAPABILITIES_ENDPOINT } from '../pages/tuningCapabilities';
+import { DEFAULT_TUNING_CONFIG, fingerprint, projectMode } from '../pages/tuningConfig';
 import { FakeAnalyserNode } from './mockAudioAnalysis';
+import {
+  createFakeDestination,
+  FakeAudioWorkletNode,
+  type FakeAudioNode,
+  type FakeMediaStreamDestination,
+} from './mockCascadeApis';
+
+// The client DSP graph is the same one in both modes (ticket 12), so its fakes
+// are the Cascade ones, re-exported so a Realtime test has one import site.
+export { FakeAudioWorkletNode } from './mockCascadeApis';
+export type { FakeAudioNode } from './mockCascadeApis';
 
 /** Minimal fetch Response stand-in — only the members useRealtimeSession reads. */
 export interface FakeFetchResponse {
@@ -31,24 +48,81 @@ export function textResponse(body: string, status = 200): FakeFetchResponse {
 }
 
 /**
- * Routes fetch to fake responses for our backend's session endpoint and
- * OpenAI's SDP-exchange endpoint, defaulting to a full happy-path pair.
- * Kept as a plain 2-arg function (not just `input`) so `.mock.calls` retains
- * the `init` argument for assertions on headers/body.
+ * A `GET /api/tuning/capabilities` body (ticket 01) that mirrors a default
+ * server install: the `.env`-derived defaults are the client defaults, the
+ * allow-lists are the curated ones, and no optional denoise extra is
+ * installed.
+ */
+export function defaultCapabilitiesBody() {
+  return {
+    schemaVersion: 1,
+    defaults: DEFAULT_TUNING_CONFIG,
+    allowLists: {
+      realtimeModels: ['gpt-realtime', 'gpt-realtime-mini'],
+      realtimeVoices: ['alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse', 'marin', 'cedar'],
+      deepgramModels: ['nova-3', 'nova-2'],
+      textModels: ['gpt-4o-mini', 'gpt-4.1-mini', 'gpt-4.1-nano'],
+      elevenLabsVoices: [
+        { id: '21m00Tcm4TlvDq8ikWAM', label: 'Rachel (voice A default)' },
+        { id: 'ErXwobaYiN019PkySvjV', label: 'Antoni (voice B default)' },
+      ],
+      turnDetectionTypes: ['server_vad', 'semantic_vad'],
+      eagerness: ['low', 'medium', 'high', 'auto'],
+      noiseReduction: ['off', 'near_field', 'far_field'],
+    },
+    stages: {
+      deepfilternet: {
+        installed: false,
+        liveCapable: true,
+        reason: 'torch not installed — run `uv sync --extra denoise` in backend/',
+      },
+      noisereduce: { installed: false, liveCapable: true, reason: 'run `uv sync --extra bench` in backend/' },
+      demucs: { installed: false, liveCapable: false, reason: 'benchmark-only stage; install with `uv sync --extra denoise`' },
+      dns64: { installed: false, liveCapable: false, reason: 'benchmark-only stage; install with `uv sync --extra denoise`' },
+    },
+  };
+}
+
+/**
+ * Routes fetch to fake responses for our backend's session and tuning-
+ * capabilities endpoints and OpenAI's SDP-exchange endpoint, defaulting to a
+ * full happy-path set. Kept as a plain 2-arg function (not just `input`) so
+ * `.mock.calls` retains the `init` argument for assertions on headers/body.
  */
 export function createRealtimeFetchRouter(overrides?: {
   sessionResponse?: FakeFetchResponse;
   callsResponse?: FakeFetchResponse;
+  capabilitiesResponse?: FakeFetchResponse;
+  transcriptCheckResponse?: FakeFetchResponse;
 }) {
+  // `fingerprint` / `appliedTuning` (ticket 04) echo the default config back,
+  // which is what a correct server does: the fingerprint it reports is the hash
+  // of the document it says it applied. A test that needs the pre-tuning server
+  // passes the four original fields as its own `sessionResponse`.
+  const appliedTuning = projectMode(DEFAULT_TUNING_CONFIG, 'realtime');
   const sessionResponse =
     overrides?.sessionResponse ??
-    jsonResponse({ client_secret: 'ek_test_token', expires_at: 1893456000, model: 'gpt-realtime', voice: 'alloy' });
+    jsonResponse({
+      client_secret: 'ek_test_token',
+      expires_at: 1893456000,
+      model: 'gpt-realtime',
+      voice: 'alloy',
+      fingerprint: fingerprint(appliedTuning),
+      appliedTuning,
+    });
   const callsResponse = overrides?.callsResponse ?? textResponse('v=0\r\no=- fake-answer\r\n');
+  const capabilitiesResponse = overrides?.capabilitiesResponse ?? jsonResponse(defaultCapabilitiesBody());
+  // ticket 15: the default verdict is "nothing wrong with it", so a test that
+  // isn't about the transcript check never grows a badge it didn't ask for.
+  const transcriptCheckResponse =
+    overrides?.transcriptCheckResponse ?? jsonResponse({ flagged: false, correctedText: null, elapsedMs: 42 });
 
   return vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input.toString();
     if (url === REALTIME_SESSION_ENDPOINT) return sessionResponse;
     if (url === OPENAI_REALTIME_CALLS_ENDPOINT) return callsResponse;
+    if (url === TUNING_CAPABILITIES_ENDPOINT) return capabilitiesResponse;
+    if (url === TRANSCRIPT_CHECK_ENDPOINT) return transcriptCheckResponse;
     throw new Error(`Unexpected fetch to ${url}`);
   });
 }
@@ -69,7 +143,15 @@ type TrackEventLike = { streams: MediaStream[] };
 /** Stand-in for RTCDataChannel — tests emit simulated `oai-events` server frames on it. */
 export class MockRTCDataChannel {
   label: string;
+  /**
+   * A real channel is `'connecting'` from `createDataChannel()` until the peer
+   * opens it, and `send()` on it throws. That window is why
+   * `useRealtimeSession` queues a `session.update` instead of sending one
+   * (ticket 05, test E3), so the default here is the real default.
+   */
+  readyState: RTCDataChannelState = 'connecting';
   onmessage: ((event: MessageEvent) => void) | null = null;
+  onopen: ((event: Event) => void) | null = null;
   send = vi.fn();
   close = vi.fn();
 
@@ -80,6 +162,12 @@ export class MockRTCDataChannel {
   /** Test helper: simulate an incoming JSON event frame from OpenAI. */
   emitMessage(data: string) {
     this.onmessage?.({ data } as MessageEvent);
+  }
+
+  /** Test helper: simulate the peer opening the channel. */
+  emitOpen() {
+    this.readyState = 'open';
+    this.onopen?.(new Event('open'));
   }
 }
 
@@ -133,8 +221,9 @@ export function installMockRTCPeerConnection() {
 
 /**
  * Stand-in for AudioContext, sufficient for useRealtimeSession's mic-level
- * metering (it doesn't need capture/playback like Cascade's does — WebRTC
- * carries the actual audio).
+ * metering and — once a client DSP stage is enabled (ticket 12) — for the
+ * `source -> gate -> MediaStreamAudioDestinationNode` graph whose track is what
+ * WebRTC then sends.
  */
 export class FakeAudioContext {
   static instances: FakeAudioContext[] = [];
@@ -142,13 +231,35 @@ export class FakeAudioContext {
     FakeAudioContext.instances = [];
   }
 
+  /**
+   * `sampleRate` honours the constructor option (ticket 13 asks the DSP context
+   * for 48 kHz explicitly, and a test needs to see which rate was asked for) and
+   * otherwise reports the rate the level-metering context gets handed by the
+   * hardware, which is 48 kHz on essentially everything.
+   */
+  sampleRate: number;
   createdAnalysers: FakeAnalyserNode[] = [];
+  createdDestinations: FakeMediaStreamDestination[] = [];
+  createdSources: FakeAudioNode[] = [];
+  audioWorklet = { addModule: vi.fn(async () => undefined) };
 
-  constructor() {
+  constructor(options?: { sampleRate?: number }) {
+    this.sampleRate = options?.sampleRate ?? 48000;
     FakeAudioContext.instances.push(this);
   }
 
-  createMediaStreamSource = vi.fn(() => ({ connect: vi.fn() }));
+  /** The graph's head node, kept so a test can read the first `connect` off it. */
+  createMediaStreamSource = vi.fn(() => {
+    const node: FakeAudioNode = { connect: vi.fn() };
+    this.createdSources.push(node);
+    return node;
+  });
+
+  createMediaStreamDestination = vi.fn(() => {
+    const destination = createFakeDestination();
+    this.createdDestinations.push(destination);
+    return destination;
+  });
 
   createAnalyser = vi.fn(() => {
     const node = new FakeAnalyserNode();
@@ -161,5 +272,7 @@ export class FakeAudioContext {
 
 export function installFakeAudioApis() {
   FakeAudioContext.reset();
+  FakeAudioWorkletNode.reset();
   vi.stubGlobal('AudioContext', FakeAudioContext as unknown as typeof AudioContext);
+  vi.stubGlobal('AudioWorkletNode', FakeAudioWorkletNode as unknown as typeof AudioWorkletNode);
 }

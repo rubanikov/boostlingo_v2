@@ -15,8 +15,9 @@
 //         record).
 // Output: backend/tests/fixtures/realtime_quality/captures.json, one entry
 //         per clip: the input-side transcript (gpt-4o-transcribe's caption of
-//         the clip), the model's spoken-output transcript, and the end-to-end
-//         latency the UI measured for that turn.
+//         the clip), the model's spoken-output transcript, the end-to-end
+//         latency the UI measured for that turn, and the fingerprint of the
+//         tuning config that turn ran under.
 //
 // Then:   cd backend && uv run python -m tests.fixtures.run_realtime_quality_report
 //         judges every capture and writes realtime_quality_report.json.
@@ -30,8 +31,19 @@
 //   node e2e/realtime-quality-capture.mjs --only short-en-01,short-es-03
 //   node e2e/realtime-quality-capture.mjs --limit 2 --headed
 //   node e2e/realtime-quality-capture.mjs --manifest other/manifest.json --out other/captures.json
+//   node e2e/realtime-quality-capture.mjs --tuning configs/a.json --out captures.a.json
 // Env: BASE_URL (default http://localhost:5173), BACKEND_URL (default
 //   http://localhost:8000).
+//
+// `--tuning <file>` takes a TuningConfig (or a realtime ModeTuningConfig) JSON
+// document and hands it to the running app through the Tuning panel's own
+// Import button before each session connects, rather than driving thirty
+// controls: importing the whole document is exactly what `tuning-import-file`
+// exists for. The applied config's fingerprint is then scraped off the panel's
+// chip and stamped on the envelope and on every item, so a capture file can
+// never be read without knowing which configuration produced it. Runs with no
+// `--tuning` still record the chip — that fingerprint is the server's own
+// defaults. See COMPARISON.md section 7 for how the two sides join up.
 
 import { chromium } from '@playwright/test';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -71,8 +83,19 @@ const REPLY_GRACE_MS = 15_000;
 const STABLE_MS = 3_000;
 const CONNECT_TIMEOUT_MS = 20_000;
 
+// `cfg:` + 8 hex digits — tuningConfig.ts's fingerprint() display form, and
+// the join key between a capture file and COMPARISON.md section 7.
+const FINGERPRINT_PATTERN = /^cfg:[0-9a-f]{8}$/;
+const FINGERPRINT_TIMEOUT_MS = 10_000;
+
+// The fingerprint the last capture ran under, stamped on the envelope. Held
+// here rather than threaded through writeCaptures() because the envelope
+// describes the run, not any one clip.
+let runFingerprint = null;
+
 async function main() {
   await assertServersUp();
+  assertTuningFileUsable();
 
   if (!existsSync(MANIFEST_PATH)) {
     throw new UsageError(`No manifest at ${MANIFEST_PATH}. Record the corpus first: see ${path.join(CORPUS_DIR, 'SCRIPT.md')}.`);
@@ -88,7 +111,8 @@ async function main() {
   const previous = existsSync(CAPTURES_PATH) ? JSON.parse(readFileSync(CAPTURES_PATH, 'utf8')).items ?? [] : [];
   const byId = new Map(previous.map((c) => [c.id, c]));
 
-  console.log(`Capturing ${items.length} clip(s) against ${BASE_URL}\n`);
+  console.log(`Capturing ${items.length} clip(s) against ${BASE_URL}`);
+  console.log(args.tuning ? `Tuning config: ${args.tuning} (imported before every connect)\n` : 'Tuning config: server defaults\n');
   for (const [index, item] of items.entries()) {
     const wavPath = path.join(CORPUS_DIR, item.audioFile);
     if (!existsSync(wavPath)) {
@@ -99,6 +123,7 @@ async function main() {
     process.stdout.write(`[${index + 1}/${items.length}] ${item.id} (${item.sourceLang}→${item.targetLang}, ${clipDurationS.toFixed(1)}s) … `);
     const capture = await captureOne(item, paddedPath, clipDurationS);
     byId.set(item.id, capture);
+    if (capture.fingerprint) runFingerprint = capture.fingerprint;
     // Written after every clip so a crash or Ctrl+C partway keeps what's done.
     writeCaptures([...byId.values()]);
     if (capture.error) {
@@ -109,7 +134,7 @@ async function main() {
       console.log(`      said:  ${JSON.stringify(capture.outputTranscript)}`);
     }
   }
-  console.log(`\nWrote ${CAPTURES_PATH}`);
+  console.log(`\nWrote ${CAPTURES_PATH}${runFingerprint ? ` (config ${runFingerprint})` : ''}`);
   console.log('Next: cd backend && uv run python -m tests.fixtures.run_realtime_quality_report');
 }
 
@@ -122,6 +147,9 @@ async function captureOne(item, paddedPath, clipDurationS) {
     referenceTranslation: item.referenceTranslation ?? null,
     conditions: item.conditions ?? null,
     capturedAt: new Date().toISOString(),
+    // Filled in below, once the panel has confirmed a config: every return
+    // path spreads `base`, so assigning here reaches all of them.
+    fingerprint: null,
   };
   // `%noloop`: play the file once, then silence, instead of Chromium's
   // default of looping it (which would make the model hear the line again
@@ -141,6 +169,25 @@ async function captureOne(item, paddedPath, clipDurationS) {
   try {
     await page.goto(BASE_URL);
     await page.getByRole('tab', { name: 'Realtime' }).click();
+    // Read the chip *before* touching the panel, and not only for the
+    // no-`--tuning` case: the chip is blank until `/api/tuning/capabilities`
+    // answers, and the panel re-seeds its draft from that response when it
+    // lands. A config imported into the panel before then is silently
+    // discarded a moment later (seen in this environment). Waiting for the
+    // chip is waiting for that hydration.
+    base.fingerprint = await readFingerprint(page);
+    if (args.tuningPath) {
+      if (base.fingerprint === null) {
+        throw new UsageError(
+          `the tuning fingerprint chip at ${BASE_URL} never showed a cfg:xxxxxxxx value, so ${args.tuningPath} ` +
+            'cannot be applied safely. Is this app build serving the tuning panel, and is the backend reachable?',
+        );
+      }
+      const committed = await importTuning(page, args.tuningPath);
+      // Apply is a no-op when the imported document already *is* what's
+      // applied, and then the fingerprint legitimately does not move.
+      if (committed) base.fingerprint = (await readFingerprint(page, 5_000, base.fingerprint)) ?? base.fingerprint;
+    }
     // The fake mic starts playing here (getUserMedia resolves inside
     // connect()), so the lead silence budget starts now.
     await page.getByRole('button', { name: 'Connect microphone' }).click();
@@ -150,6 +197,10 @@ async function captureOne(item, paddedPath, clipDurationS) {
       const alert = await page.getByRole('alert').textContent().catch(() => null);
       return { ...base, error: `session settled to '${status}'${alert ? `: ${alert.trim()}` : ''}` };
     }
+    // Once connected the chip shows the *server's* confirmation of the config
+    // it actually applied, which is the one worth recording: if the two ever
+    // disagree, the server is right about what ran.
+    base.fingerprint = (await readFingerprint(page, 3_000)) ?? base.fingerprint;
 
     const target = page.getByTestId('target-transcript');
     const source = page.getByTestId('source-transcript');
@@ -192,10 +243,78 @@ async function captureOne(item, paddedPath, clipDurationS) {
       error: outputTranscript ? null : 'no reply transcript arrived before the deadline',
     };
   } catch (err) {
+    // A tuning file the panel won't take fails identically on every clip, so
+    // it aborts the run instead of writing 33 identical errors.
+    if (err instanceof UsageError) throw err;
     return { ...base, error: `capture threw: ${err.message}`, pageErrors };
   } finally {
     await browser.close().catch(() => {});
   }
+}
+
+/**
+ * Hands `--tuning`'s document to the app the way a person would: open the
+ * panel, open the importer, give it the file, press Apply. Apply while
+ * disconnected commits locally ("Apply at next connect"), which is precisely
+ * what this needs — the config has to be committed *before* connect() so the
+ * session is negotiated with it, not re-applied mid-session afterwards.
+ *
+ * Returns whether Apply was actually pressed; it is disabled, correctly, when
+ * the imported document is already the applied one.
+ */
+async function importTuning(page, tuningPath) {
+  await page.getByTestId('tuning-toggle').click();
+  await page.getByTestId('tuning-import').click();
+  try {
+    await page.getByTestId('tuning-import-file').setInputFiles(tuningPath);
+  } catch (err) {
+    // Some Chromium/driver combinations refuse setInputFiles on a hidden
+    // input; the paste box takes the same document and runs the same parser.
+    console.log(`      (file input unavailable: ${err.message}; pasting instead)`);
+    await page.getByTestId('tuning-import-text').fill(readFileSync(tuningPath, 'utf8'));
+    await page.getByTestId('tuning-import-paste').click();
+  }
+
+  const message = page.getByTestId('tuning-import-message');
+  const deadline = Date.now() + 10_000;
+  let text = '';
+  while (Date.now() < deadline) {
+    text = (await message.first().textContent().catch(() => ''))?.trim() ?? '';
+    // Both the clean and the "ignored N unknown field(s)" outcomes start with
+    // "Imported."; a rejection says something else entirely.
+    if (text.includes('Imported')) break;
+    if (text) throw new UsageError(`the app rejected ${tuningPath}: ${text}`);
+    await page.waitForTimeout(100);
+  }
+  if (!text.includes('Imported')) {
+    throw new UsageError(`the app never confirmed the import of ${tuningPath}.`);
+  }
+
+  const apply = page.getByTestId('tuning-apply');
+  const committed = await apply.isEnabled();
+  if (committed) await apply.click();
+  await page.getByTestId('tuning-close').click();
+  return committed;
+}
+
+/**
+ * The applied config's fingerprint, from the chip beside the latency badge
+ * (falling back to the navbar chip). Both render a skeleton with no text
+ * until `/api/tuning/capabilities` settles, hence the poll. `notThis` waits
+ * past a known-stale value, so an Apply that hasn't re-rendered yet is not
+ * mistaken for one that changed nothing.
+ */
+async function readFingerprint(page, timeoutMs = FINGERPRINT_TIMEOUT_MS, notThis = null) {
+  const chips = [page.getByTestId('tuning-fingerprint-latency'), page.getByTestId('tuning-fingerprint')];
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    for (const chip of chips) {
+      const text = (await chip.first().textContent().catch(() => ''))?.trim();
+      if (text && FINGERPRINT_PATTERN.test(text) && text !== notThis) return text;
+    }
+    await page.waitForTimeout(200);
+  }
+  return null;
 }
 
 // Mirrors e2e/support/workbench.ts's connectionBadge(): the badge is the
@@ -271,8 +390,33 @@ function padClip(srcPath, dstPath) {
 function writeCaptures(items) {
   writeFileSync(
     CAPTURES_PATH,
-    JSON.stringify({ baseUrl: BASE_URL, leadSilenceS: LEAD_SILENCE_S, items }, null, 2) + '\n',
+    JSON.stringify(
+      {
+        baseUrl: BASE_URL,
+        leadSilenceS: LEAD_SILENCE_S,
+        // The run's config: `tuningFile` exactly as it was typed on the
+        // command line (so a relative path still points where it was run
+        // from), `fingerprint` as the app confirmed it.
+        fingerprint: runFingerprint,
+        tuningFile: args.tuning,
+        items,
+      },
+      null,
+      2,
+    ) + '\n',
   );
+}
+
+function assertTuningFileUsable() {
+  if (!args.tuningPath) return;
+  if (!existsSync(args.tuningPath)) {
+    throw new UsageError(`No tuning config at ${args.tuningPath}. Export one from the app's Tuning panel.`);
+  }
+  try {
+    JSON.parse(readFileSync(args.tuningPath, 'utf8'));
+  } catch (err) {
+    throw new UsageError(`${args.tuningPath} is not valid JSON (${err.message}).`);
+  }
 }
 
 async function assertServersUp() {
@@ -308,7 +452,9 @@ async function assertServersUp() {
 }
 
 function parseArgs(argv) {
-  const out = { only: null, limit: 0, headed: false, manifest: null, out: null };
+  // `tuning` is kept exactly as typed (it is what lands in the capture
+  // envelope); `tuningPath` is the resolved one everything else uses.
+  const out = { only: null, limit: 0, headed: false, manifest: null, out: null, tuning: null, tuningPath: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--only') out.only = argv[++i].split(',').map((s) => s.trim());
@@ -316,6 +462,10 @@ function parseArgs(argv) {
     else if (a === '--headed') out.headed = true;
     else if (a === '--manifest') out.manifest = path.resolve(argv[++i]);
     else if (a === '--out') out.out = path.resolve(argv[++i]);
+    else if (a === '--tuning') {
+      out.tuning = argv[++i];
+      out.tuningPath = path.resolve(out.tuning);
+    }
     else {
       // Runs at module top-level before anything async is open, so a direct
       // exit is safe here (unlike inside main(), see the bottom of the file).

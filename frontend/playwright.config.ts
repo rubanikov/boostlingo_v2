@@ -112,6 +112,14 @@ export default defineConfig({
       },
     },
     {
+      // No fake-mic flags and no microphone permission: this project only
+      // imports a tuning config and reads the fingerprint chip, which happens
+      // entirely before (and independently of) any getUserMedia() call.
+      name: 'tuning-import',
+      testMatch: /tuning-import\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
       name: 'noise-rejection-fake-mic',
       testMatch: /noise-rejection\.spec\.ts/,
       use: {

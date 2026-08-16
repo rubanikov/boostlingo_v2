@@ -16,6 +16,18 @@
 .speakerB {
   border-left: 3px solid #fb923c;
 }
+/*
+ * Tuning panel (ticket 02): a row whose knob has been changed but not yet
+ * applied. One of the three pending layers — the other two (an amber dot
+ * before the control and a `was: …` badge) are markup, because this rule gets
+ * clipped inside nested bordered cards and colour is never the only signal.
+ * An inset box-shadow rather than a border so the row's box doesn't resize as
+ * the marker comes and goes.
+ */
+.tuning-pending {
+  box-shadow: inset 3px 0 0 var(--color-warning);
+}
+
 .speakerA-badge {
   background: #0c4a6e;
   color: #e0f2fe;

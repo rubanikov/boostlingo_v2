@@ -4,7 +4,12 @@
     "target": "es2023",
     "lib": ["ES2023", "DOM"],
     "module": "esnext",
-    "types": ["vite/client"],
+    // "node" is here for the co-located Vitest tests only (they live under
+    // src/, so this is the tsconfig that covers them): tuningConfig.test.ts
+    // reads shared/tuning-fingerprint-cases.json off disk with node:fs, so
+    // the cross-language parity fixture is literally the same bytes the
+    // backend's test suite reads. Application code still targets the browser.
+    "types": ["vite/client", "node"],
     "allowArbitraryExtensions": true,
     "skipLibCheck": true,
 
