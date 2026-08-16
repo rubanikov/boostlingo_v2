@@ -87,6 +87,27 @@ uv sync
 clients, `jiwer` for WER, `psutil` for the memory-stability test, etc.) into
 `backend/.venv/`. Verified working from a clean checkout in this repo.
 
+There are two optional extras, one per server-side denoise stage. Neither is needed to
+run the app, and the whole test suite passes with or without them — a stage whose extra
+is missing reports `installed: false` from `GET /api/tuning/capabilities`, the Tuning
+panel disables that row with the install command as the reason, and the audio path is
+left untouched.
+
+```bash
+uv sync --extra bench      # noisereduce + numpy  -> the "noisereduce" stage
+uv sync --extra denoise    # torch, torchaudio, deepfilternet -> the "DeepFilterNet" stage
+uv sync --extra bench --extra denoise    # both
+```
+
+`--extra denoise` is the large one: **CPU-only torch wheels are pinned** in
+`backend/pyproject.toml` (`[[tool.uv.index]] pytorch-cpu` +
+`[tool.uv.sources]`), because nothing here uses a GPU and the default PyPI wheels
+bundle a CUDA runtime that would be gigabytes of nothing. It is still a ~200 MB
+install, which is exactly why it is an extra and why core CI stays torch-free.
+DeepFilterNet downloads its model weights on first use, so the first mic frame of the
+first session that enables the stage takes a couple of seconds; the model is cached for
+the life of the process after that.
+
 ### Frontend (`frontend/`)
 
 ```bash
@@ -115,6 +136,29 @@ backend; override with `VITE_API_BASE_URL` if you run the backend elsewhere.
 
 Open `http://localhost:5173`, grant microphone access, pick a mode (Realtime/Cascade) and
 a language pair (minimum EN↔ES), and start a session.
+
+## The Tuning panel
+
+The **Tuning** button in the header opens a side panel listing every audio processing step
+between the microphone and the provider, in signal order: microphone constraints, the
+denoise chain (client-side RMS gate and RNNoise, the server-side stages, OpenAI's own
+noise reduction), turn detection / endpointing, segmentation (Cascade only), transcript
+check, and models & voices. Knobs that nothing sits behind are never shown, so the panel
+doubles as the inventory of what is actually adjustable.
+
+Changes are staged until you press **Apply**, and the button says which kind of apply you
+are about to get: plain `Apply` for a knob that takes effect live, `Apply (reconnects STT)`
+for one of Deepgram's connection-level settings, and `Apply at next connect` for the ones
+that can only be set when a session is opened. Applying while disconnected commits locally
+and is carried by the next `connect()`. Three built-in presets ship with it (`Provider
+defaults`, `Tuned turn-taking`, `Max denoise`) and you can save your own.
+
+Export writes the whole document, both modes, as a `TuningConfig` JSON file; Import reads
+one back. That file is the same artifact the benchmark harnesses below take, which is what
+makes a measured row reproducible: every config hashes to a **fingerprint** (`cfg:` plus
+eight hex digits), shown on a chip in the app and stamped on every row the harnesses emit.
+Backend and frontend compute it independently and are held byte-compatible by a shared
+golden fixture (`shared/tuning-fingerprint-cases.json`) that both test suites read.
 
 ## Running the test suites
 
@@ -154,6 +198,46 @@ Drives the real capture → session-negotiation path in both modes using Chrome'
 `frontend/e2e/README.md` for exactly what's real vs. still placeholder in this harness
 without a live backend + real speech fixtures.
 
+### Benchmark harnesses (noisy corpus + tuning sweep)
+
+Neither of these is part of `pytest`: they're manual-tier harnesses that produce the
+numbers in [COMPARISON.md](COMPARISON.md) §7. Run from `backend/`.
+
+```bash
+# 0. Optional: the denoise extras. Without them the server-side stages report "not
+#    installed" in the Tuning panel and pass audio through untouched; the core suite
+#    deliberately runs without either. Sweeping a config that enables a stage whose
+#    extra is missing measures the unfiltered audio, so install what you sweep.
+uv sync --extra bench --extra denoise
+
+# 1. Build the noisy corpus: each clean fixture mixed with babble/street/fan/white
+#    noise at 20, 10 and 5 dB SNR. No API key, no network, deterministic from --seed.
+uv run python -m tests.fixtures.make_noisy_corpus
+
+# 2. Score one or more TuningConfig files against it (needs a live DEEPGRAM_API_KEY).
+uv run python -m tests.fixtures.run_tuning_sweep --config configs/a.json --config configs/b.json
+```
+
+That sweep is the Cascade half. The Realtime half runs the same config through a live
+session instead: `cd frontend && npm run capture:realtime-quality -- --tuning configs/a.json`
+imports the config through the app's Tuning panel before each clip, stamps its fingerprint
+on every capture, and `uv run python -m tests.fixtures.run_realtime_quality_report` carries
+that fingerprint into the judged report and its COMPARISON §7 rows.
+
+The sweep writes `tests/fixtures/tuning_sweep.json` (git-ignored) and prints paste-ready
+COMPARISON §7 rows. It replays audio in real time, so it refuses more than 200 rows
+without `--yes` and prints an estimated wall-clock instead; narrow it with
+`--limit`/`--only`/`--conditions`/`--snr`. Re-running the same command resumes — rows
+already in `--out` are not measured twice. Export a config from the app's Tuning panel,
+or hand-write one; `tests/fixtures/noisy/SCRIPT.md` explains what each noise condition
+is and why the audio isn't committed.
+
+The panel's model and voice pickers are curated server-side allow-lists served by `GET
+/api/tuning/capabilities` (never free text): a config naming anything outside them is
+rejected with a 400 by the Realtime route and falls back to the default, with a log line,
+on the Cascade WebSocket — add further TTS voice ids with a comma-separated
+`ELEVENLABS_VOICE_IDS_EXTRA` in `backend/.env`.
+
 ## Provider abstractions
 
 Cascade mode's STT/Translation/TTS providers are each a `Protocol`-typed interface
@@ -167,10 +251,11 @@ downstream of the `Protocol` needs to change. Realtime mode has no equivalent sw
 
 | | |
 |---|---|
-| Backend app code | `backend/app/` (`api/` routes, `providers/` vendor boundaries, `orchestrator.py` for Cascade's pipeline, `quality/` for Ticket 8's LLM-judge) |
-| Backend tests | `backend/tests/` (pytest); shared quality dataset + fixture/report scripts at `backend/tests/fixtures/` |
-| Frontend app code | `frontend/src/pages/` (one page per mode, plus shared session/latency/audio logic) |
+| Backend app code | `backend/app/` (`api/` routes, `providers/` vendor boundaries, `orchestrator.py` for Cascade's pipeline, `quality/` for Ticket 8's LLM-judge, `tuning/` for the tuning document's schema, defaults, allow-lists and fingerprint) |
+| Backend tests | `backend/tests/` (pytest); shared quality dataset + fixture/report/benchmark scripts at `backend/tests/fixtures/` |
+| Frontend app code | `frontend/src/pages/` (`WorkbenchPage.tsx` is the one page for both modes, plus the Tuning panel and shared session/latency/audio logic); audio worklets in `frontend/public/` |
 | Frontend tests | co-located `*.test.ts(x)` (Vitest) + `frontend/e2e/` (Playwright) |
+| Cross-language fixtures | `shared/` (the fingerprint golden cases both suites read) |
 | Comparison write-up | [COMPARISON.md](COMPARISON.md) |
 | Agent-usage notes | [AGENTS.md](AGENTS.md) |
-| Architecture decision record | `.scratch/ai-interpreter-workbench/` (wayfinder map + 14 resolved decision tickets + 8 implementation tickets) |
+| Architecture decision record | `.scratch/ai-interpreter-workbench/` (wayfinder map + 14 resolved decision tickets + 9 implementation tickets); `.scratch/tuning-lab/` (the tuning lab's research, story, brief, 18 tickets and build log) |

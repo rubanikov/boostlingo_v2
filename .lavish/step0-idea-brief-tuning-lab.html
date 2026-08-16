@@ -1,0 +1,341 @@
+<title>Step 0 — Idea Brief: Audio Tuning & Denoise Lab</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex) > * { min-width: 0; }
+  :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, td, th, .badge, .label) { overflow-wrap: anywhere; }
+  .mermaid { display: flex; justify-content: center; }
+  html { scroll-behavior: smooth; }
+  code { font-size: 0.85em; }
+</style>
+
+<html data-theme="luxury">
+<body class="bg-base-100 text-base-content min-h-screen">
+<main class="mx-auto max-w-5xl p-6 lg:p-10 space-y-10">
+
+  <header class="space-y-3">
+    <div class="flex flex-wrap items-center gap-3">
+      <span class="badge badge-warning badge-lg">Feature Factory — Step 0 → 0b GATE</span>
+      <span class="badge badge-ghost">Idea brief · grilled, not yet built</span>
+    </div>
+    <h1 class="text-4xl font-bold">Audio Tuning &amp; Denoise Lab</h1>
+    <p class="text-base-content/70 max-w-3xl">
+      Ten grilling questions resolved the fog around "add denoise options and expose all tuning
+      knobs in the app". This page is the <strong>Idea brief</strong> every later factory phase
+      (researcher, story, wireframe, brief, tickets) will receive verbatim. Nothing below has been
+      built. Annotate anything that's wrong, then answer the gate.
+    </p>
+    <div class="stats stats-vertical sm:stats-horizontal shadow bg-base-200 w-full">
+      <div class="stat">
+        <div class="stat-title">Destination</div>
+        <div class="stat-value text-primary text-2xl">Measured tuning</div>
+        <div class="stat-desc">every knob live in the app <em>and</em> scored by WER / judge</div>
+      </div>
+      <div class="stat">
+        <div class="stat-title">Decisions locked</div>
+        <div class="stat-value text-success">10 / 10</div>
+        <div class="stat-desc">no open product questions remain</div>
+      </div>
+      <div class="stat">
+        <div class="stat-title">Priority tiers</div>
+        <div class="stat-value">6</div>
+        <div class="stat-desc">cut from the bottom if time is short</div>
+      </div>
+    </div>
+  </header>
+
+  <nav class="flex flex-wrap gap-2 text-sm">
+    <a href="#today" class="btn btn-xs btn-ghost">Today</a>
+    <a href="#destination" class="btn btn-xs btn-ghost">Destination</a>
+    <a href="#pipeline" class="btn btn-xs btn-ghost">Pipeline</a>
+    <a href="#decisions" class="btn btn-xs btn-ghost">Locked decisions</a>
+    <a href="#inventory" class="btn btn-xs btn-ghost">Knob inventory</a>
+    <a href="#priority" class="btn btn-xs btn-ghost">Priority</a>
+    <a href="#risks" class="btn btn-xs btn-ghost">Risks</a>
+    <a href="#nongoals" class="btn btn-xs btn-ghost">Non-goals</a>
+    <a href="#gate" class="btn btn-xs btn-ghost">Gate</a>
+  </nav>
+
+  <!-- ───────────────────────── TODAY ───────────────────────── -->
+  <section id="today" class="space-y-4">
+    <h2 class="text-2xl font-semibold">What exists today <span class="text-base-content/50 text-base font-normal">(verified in code)</span></h2>
+    <div class="overflow-x-auto rounded-box border border-base-300">
+      <table class="table table-sm">
+        <thead><tr><th>Knob</th><th>Where</th><th>How it's set today</th><th>User-facing?</th></tr></thead>
+        <tbody>
+          <tr><td>echoCancellation / noiseSuppression / autoGainControl</td><td><code>useRealtimeSession.ts:182</code>, <code>useCascadeSession.ts:426</code></td><td>hard-coded <code>true</code></td><td><span class="badge badge-error badge-sm">no</span></td></tr>
+          <tr><td>Realtime <code>silence_duration_ms</code>, <code>interrupt_response</code></td><td><code>app/api/realtime.py:_turn_detection</code>, <code>config.py</code></td><td><code>.env</code> only (uncommitted diff)</td><td><span class="badge badge-error badge-sm">no</span></td></tr>
+          <tr><td>Realtime <code>threshold</code>, <code>prefix_padding_ms</code>, <code>semantic_vad</code>, <code>input_audio_noise_reduction</code></td><td>OpenAI API</td><td>not wired at all</td><td><span class="badge badge-error badge-sm">no</span></td></tr>
+          <tr><td>Deepgram <code>endpointing=500</code>, <code>utterance_end_ms=3000</code></td><td><code>providers/deepgram_stt.py:53-58</code></td><td>module constants</td><td><span class="badge badge-error badge-sm">no</span></td></tr>
+          <tr><td>Segmentation mode (hybrid-race / llm-priority)</td><td><code>segmentation.ts</code></td><td><code>?query</code> override</td><td><span class="badge badge-warning badge-sm">dev only</span></td></tr>
+          <tr><td>RMS threshold / noise gate</td><td>—</td><td><strong>does not exist</strong>; mic meter is peak-level (<code>micLevel.ts</code>), worklet sends every frame</td><td>—</td></tr>
+          <tr><td>Transcript sanity check</td><td>—</td><td><strong>does not exist</strong>; translation prompt is a bare "translate this" (<code>openai_translation.py:55</code>); LLM judge is offline-only</td><td>—</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ───────────────────────── DESTINATION ───────────────────────── -->
+  <section id="destination" class="space-y-4">
+    <h2 class="text-2xl font-semibold">Destination</h2>
+    <div class="grid gap-4 md:grid-cols-3">
+      <div class="card bg-base-200 shadow">
+        <div class="card-body">
+          <h3 class="card-title text-base">1 · In-app Tuning panel</h3>
+          <p class="text-sm">Every audio / turn-taking / segmentation / denoise / transcript-check knob and curated model pickers, per mode, in a collapsible panel. Applied at session start <strong>and live mid-session</strong>. Presets, JSON export/import, localStorage.</p>
+        </div>
+      </div>
+      <div class="card bg-base-200 shadow">
+        <div class="card-body">
+          <h3 class="card-title text-base">2 · New processing stages</h3>
+          <p class="text-sm">Client: RMS noise gate, RNNoise-WASM. Realtime: OpenAI near/far noise reduction. Cascade: DeepFilterNet server denoise, LLM transcript check (<code>off / flag / correct</code>). Offline: Demucs/denoiser, noisereduce.</p>
+        </div>
+      </div>
+      <div class="card bg-base-200 shadow">
+        <div class="card-body">
+          <h3 class="card-title text-base">3 · Benchmark that answers "did it help?"</h3>
+          <p class="text-sm">Noisy corpus (synthetic babble/street/fan at 3 SNRs + your real recordings) run through every config, reporting WER, judge score and added latency per <strong>config fingerprint</strong>. Same <code>TuningConfig</code> JSON drives the app and the harness.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────────────────────── PIPELINE ───────────────────────── -->
+  <section id="pipeline" class="space-y-4">
+    <h2 class="text-2xl font-semibold">Where the new stages sit</h2>
+    <p class="text-sm text-base-content/70">Solid nodes exist today; dashed nodes are new. Realtime has no seam between STT and translation, so it only gets the client stages, OpenAI's own noise reduction/VAD knobs, and a non-blocking <em>flag</em>.</p>
+    <div class="card bg-base-200 shadow"><div class="card-body">
+      <pre class="mermaid">
+flowchart LR
+  subgraph Client["Browser (both modes)"]
+    MIC[getUserMedia<br/>EC / NS / AGC toggles] --> GATE[RMS gate<br/>threshold + hold]:::new --> RNN[RNNoise WASM]:::new
+  end
+  RNN -->|WebRTC track| RT[OpenAI Realtime<br/>server_vad / semantic_vad<br/>near/far noise reduction]:::new
+  RNN -->|WS PCM16| DF[DeepFilterNet<br/>server denoise]:::new --> DG[Deepgram STT<br/>endpointing / utterance_end]
+  DG --> CHK{Transcript check<br/>off / flag / correct}:::new
+  CHK -->|correct| TR[gpt-4o-mini translate] --> TTS[ElevenLabs]
+  CHK -->|flag| TR
+  RT -.->|flag only| CHK
+  classDef new stroke-dasharray: 5 5,stroke-width:2px;
+      </pre>
+    </div></div>
+  </section>
+
+  <!-- ───────────────────────── DECISIONS ───────────────────────── -->
+  <section id="decisions" class="space-y-4">
+    <h2 class="text-2xl font-semibold">Locked decisions <span class="text-base-content/50 text-base font-normal">(from grilling Q1–Q10)</span></h2>
+    <div class="overflow-x-auto rounded-box border border-base-300">
+      <table class="table table-sm">
+        <thead><tr><th class="w-8">#</th><th>Question</th><th>Decision</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>What does "denoise" cover?</td><td>Browser constraint toggles + OpenAI <code>input_audio_noise_reduction</code> + <strong>new RMS gate</strong> + RNNoise + Demucs/denoiser + anything else useful. Goal: check whether WER and other metrics improve. Plus an LLM stage that checks whether the transcript sounds right.</td></tr>
+          <tr><td>2</td><td>Live vs offline denoisers</td><td><strong>Split by latency class.</strong> Live: browser NS, RMS gate, RNNoise-WASM, OpenAI near/far, DeepFilterNet (server, Cascade). Offline benchmark only: Demucs/denoiser, noisereduce, plus every live option. Wave-U-Net only if a maintained package exists.</td></tr>
+          <tr><td>3</td><td>How are knobs exposed?</td><td><strong>In-app Tuning panel with live mid-session apply.</strong> Realtime via <code>session.update</code>; Cascade via new WS control messages (Deepgram reconnect where a param needs it). Values also sent at session start; localStorage persistence; <code>.env</code> becomes server defaults.</td></tr>
+          <tr><td>4</td><td>Transcript-check LLM</td><td>Per-session mode <code>off / flag / correct</code>. Cascade: all three; Realtime: off/flag only. <code>correct</code> rewrites before translation and gets its own latency stage; benchmark reports raw vs corrected WER.</td></tr>
+          <tr><td>5</td><td>Knob inventory</td><td>Full audio/turn/segmentation/check list <strong>plus model pickers</strong> (translation model, segmentation model, TTS voice, Deepgram model, Realtime model/voice) as curated allow-lists validated server-side.</td></tr>
+          <tr><td>6</td><td>Benchmark audio</td><td>Synthetic mixing at ~20/10/5 dB — <strong>babble built from several overlaid TTS speakers</strong> (same + other language), street, fan/white — <strong>plus a small real recording set</strong> you supply (harness self-skips when absent). Results: per-config table + COMPARISON.md section.</td></tr>
+          <tr><td>7</td><td>Priority order</td><td>Panel+plumbing → benchmark harness → client denoise → LLM check → server/offline denoise → model pickers. <strong>Cut from the bottom.</strong></td></tr>
+          <tr><td>8</td><td>Heavy ML deps</td><td><strong>Optional extras</strong> (<code>backend[denoise]</code>) + runtime detection; panel greys out uninstalled options; CPU-only; core CI stays torch-free.</td></tr>
+          <tr><td>9</td><td>Presets &amp; comparability</td><td>One shared <code>TuningConfig</code> JSON schema (UI, backend, harness); built-in + saved presets; export/import; <strong>fingerprint hash</strong> stamped on latency records and report rows.</td></tr>
+          <tr><td>10</td><td>Non-goals</td><td>Confirmed as listed <a class="link" href="#nongoals">below</a>.</td></tr>
+          <tr class="bg-warning/10"><td>11</td><td>Gate feedback: where do the processing steps live?</td><td><strong>Every processing step is a user selection in the Tuning panel</strong> — each denoise stage (browser NS, RMS gate, RNNoise, OpenAI near/far, DeepFilterNet) appears as its own toggle <em>with its own parameters</em> (noise attenuation, thresholds, hold, etc.). Nothing is hidden behind <code>.env</code> or query params. Offline-only denoisers appear in the same section, greyed with a "benchmark only" tag, so the panel is the single inventory of stages.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ───────────────────────── INVENTORY ───────────────────────── -->
+  <section id="inventory" class="space-y-4">
+    <h2 class="text-2xl font-semibold">Knob inventory for the Tuning panel</h2>
+    <div class="card bg-base-200 shadow border border-warning/40"><div class="card-body">
+      <h3 class="card-title text-base">Denoise chain <span class="badge badge-warning badge-sm">every stage user-selectable, with parameters</span></h3>
+      <p class="text-sm text-base-content/70">Rendered in signal order. Each row is a toggle plus its parameters; the "Applies to" column says which mode can run it live. Stages that aren't installed or aren't live-capable stay visible but disabled, so the panel is the one place that lists every processing step.</p>
+      <div class="overflow-x-auto">
+        <table class="table table-sm">
+          <thead><tr><th>Stage</th><th>Runs</th><th>Parameters exposed</th><th>Applies to</th></tr></thead>
+          <tbody>
+            <tr><td>Browser noise suppression / echo cancellation / AGC</td><td>browser</td><td>three on/off toggles</td><td>both, live</td></tr>
+            <tr><td>RMS noise gate <span class="badge badge-outline badge-xs">new</span></td><td>client worklet</td><td>on/off · threshold (dBFS) · hold (ms) · attack/release (ms) · <strong>attenuation (dB, from soft duck to full mute)</strong></td><td>both, live</td></tr>
+            <tr><td>RNNoise <span class="badge badge-outline badge-xs">new</span></td><td>client WASM</td><td>on/off · voice-probability threshold (if the wrapper exposes it)</td><td>both, live</td></tr>
+            <tr><td>OpenAI input noise reduction</td><td>OpenAI Realtime</td><td>off / near_field / far_field</td><td>Realtime, live (<code>session.update</code>)</td></tr>
+            <tr><td>DeepFilterNet <span class="badge badge-outline badge-xs">new</span></td><td>backend (torch extra)</td><td>on/off · <strong>attenuation limit (dB)</strong> · post-filter strength</td><td>Cascade, live; greyed if extra not installed</td></tr>
+            <tr><td>noisereduce (spectral gating)</td><td>backend</td><td>on/off · <code>prop_decrease</code> · stationary/non-stationary</td><td>Cascade, live (cheap) + benchmark</td></tr>
+            <tr class="opacity-60"><td>Demucs / denoiser (DNS)</td><td>offline</td><td>model variant · dry/wet mix</td><td>benchmark only — shown disabled with tag</td></tr>
+            <tr class="opacity-60"><td>Wave-U-Net</td><td>offline</td><td>— (dropped if no maintained package)</td><td>benchmark only — shown disabled with tag</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div></div>
+    <div class="grid gap-4 md:grid-cols-3">
+      <div class="card bg-base-200 shadow"><div class="card-body">
+        <h3 class="card-title text-base">Client · both modes</h3>
+        <ul class="list-disc pl-5 text-sm space-y-1">
+          <li>echoCancellation / noiseSuppression / autoGainControl (live via <code>applyConstraints</code>)</li>
+          <li>RMS gate: on/off, threshold, hold ms <span class="badge badge-outline badge-xs">new</span></li>
+          <li>RNNoise WASM on/off <span class="badge badge-outline badge-xs">new</span></li>
+        </ul>
+      </div></div>
+      <div class="card bg-base-200 shadow"><div class="card-body">
+        <h3 class="card-title text-base">Realtime (OpenAI)</h3>
+        <ul class="list-disc pl-5 text-sm space-y-1">
+          <li>turn detection: <code>server_vad</code> / <code>semantic_vad</code></li>
+          <li><code>threshold</code>, <code>prefix_padding_ms</code>, <code>silence_duration_ms</code>, <code>interrupt_response</code>, semantic <code>eagerness</code></li>
+          <li><code>input_audio_noise_reduction</code>: off / near_field / far_field</li>
+          <li>transcript check: off / flag</li>
+          <li>model picker, voice picker (allow-list)</li>
+        </ul>
+      </div></div>
+      <div class="card bg-base-200 shadow"><div class="card-body">
+        <h3 class="card-title text-base">Cascade</h3>
+        <ul class="list-disc pl-5 text-sm space-y-1">
+          <li>Deepgram <code>endpointing</code>, <code>utterance_end_ms</code>, diarize on/off, model picker</li>
+          <li>segmentation mode: hybrid-race / llm-priority; segmentation model picker</li>
+          <li>server denoise: off / DeepFilterNet <span class="badge badge-outline badge-xs">new</span></li>
+          <li>transcript check: off / flag / correct <span class="badge badge-outline badge-xs">new</span></li>
+          <li>translation model picker, TTS voice picker (allow-list)</li>
+        </ul>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- ───────────────────────── PRIORITY ───────────────────────── -->
+  <section id="priority" class="space-y-4">
+    <h2 class="text-2xl font-semibold">Priority tiers <span class="text-base-content/50 text-base font-normal">(cut from the bottom)</span></h2>
+    <ul class="steps steps-vertical lg:steps-horizontal w-full text-xs">
+      <li class="step step-primary" data-content="1">Tuning panel + <code>TuningConfig</code> plumbing for existing knobs, live apply</li>
+      <li class="step step-primary" data-content="2">Noisy corpus + benchmark harnesses (backend STT + fake-mic)</li>
+      <li class="step step-primary" data-content="3">RMS gate · RNNoise · OpenAI near/far</li>
+      <li class="step" data-content="4">Transcript check off/flag/correct</li>
+      <li class="step" data-content="5">DeepFilterNet + offline denoisers</li>
+      <li class="step" data-content="6">Model pickers</li>
+    </ul>
+    <p class="text-sm text-base-content/70">Tier 2 comes before any new DSP on purpose: every later stage is measured the day it lands.</p>
+  </section>
+
+  <!-- ───────────────────────── RISKS ───────────────────────── -->
+  <section id="risks" class="space-y-4">
+    <h2 class="text-2xl font-semibold">Risks &amp; constraints carried forward</h2>
+    <div class="grid gap-3 md:grid-cols-2">
+      <div class="alert alert-warning alert-soft"><div><div class="font-semibold">Realtime client DSP needs a re-plumbed track</div><div class="text-sm">Today the raw mic track goes straight into <code>RTCPeerConnection</code>. RMS gate / RNNoise require mic → AudioContext → worklet → <code>MediaStreamDestination</code> → WebRTC. Echo/gain constraint semantics may change subtly.</div></div></div>
+      <div class="alert alert-warning alert-soft"><div><div class="font-semibold">Live-apply on Cascade means Deepgram reconnects</div><div class="text-sm"><code>endpointing</code>/<code>utterance_end_ms</code>/model are connection params. Changing them mid-session must reconnect without losing in-flight segments; latency records should note the reconnect.</div></div></div>
+      <div class="alert alert-info alert-soft"><div><div class="font-semibold">Torch is heavy</div><div class="text-sm">DeepFilterNet/Demucs pull PyTorch. Extras group + runtime detection keeps CI light, but the "greyed out" state must be tested.</div></div></div>
+      <div class="alert alert-info alert-soft"><div><div class="font-semibold">Clean corpus can't show gains</div><div class="text-sm">Existing WER ≈ 0 on TTS audio. All denoise claims must come from the noisy variants; the report must show the clean baseline too so regressions are visible.</div></div></div>
+      <div class="alert alert-info alert-soft"><div><div class="font-semibold"><code>correct</code> mode can hurt</div><div class="text-sm">An LLM rewriting ASR output may "fix" correct text. Raw-vs-corrected WER per segment is the guard; <code>flag</code> is the safe default.</div></div></div>
+      <div class="alert alert-info alert-soft"><div><div class="font-semibold">Wave-U-Net may be dropped</div><div class="text-sm">No maintained pip package known; if none is found during research it is replaced by Demucs/denoiser + noisereduce without a new gate.</div></div></div>
+    </div>
+  </section>
+
+  <!-- ───────────────────────── NON-GOALS ───────────────────────── -->
+  <section id="nongoals" class="space-y-3">
+    <h2 class="text-2xl font-semibold">Non-goals <span class="text-base-content/50 text-base font-normal">(confirmed)</span></h2>
+    <ul class="list-disc pl-5 text-sm space-y-1">
+      <li>No server-side / account storage of presets — localStorage + JSON files only</li>
+      <li>No GPU requirement or GPU-specific code paths</li>
+      <li>No Demucs / Wave-U-Net in the live path</li>
+      <li>No <code>correct</code> mode in Realtime (no seam) — flag only</li>
+      <li>No per-device mic calibration wizard</li>
+      <li>No new language pairs — EN↔ES/FR stays</li>
+      <li>Real noisy recordings are supplied by you; harness self-skips that set when absent</li>
+    </ul>
+  </section>
+
+  <!-- ───────────────────────── GATE ───────────────────────── -->
+  <section id="gate" class="card bg-primary text-primary-content shadow-lg">
+    <div class="card-body">
+      <h2 class="card-title">Step 0b gate — is this sharp enough to build?</h2>
+      <p class="text-sm">Annotate anything wrong here, or answer the gate question in the chat: <strong>Proceed to factory</strong> (researcher → story → wireframe → brief → tickets), <strong>Keep grilling</strong>, or <strong>Stop</strong>.</p>
+      <div class="text-xs opacity-80">Next phase if you proceed: <code>codebase-researcher</code> maps the capture / session / provider / quality-suite code this touches, then <code>story-writer</code> drafts the story for Step 3.</div>
+    </div>
+  </section>
+
+  <footer class="text-xs text-base-content/50 pt-6 border-t border-base-300">
+    Idea brief · branch <code>implementation</code> · uncommitted VAD-knob diff in <code>realtime.py</code>/<code>config.py</code> is folded into tier 1 · design: app's own DaisyUI v5 <code>luxury</code> theme.
+  </footer>
+</main>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.15.0/dist/mermaid.esm.min.mjs";
+  const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  const paint = document.createElement("canvas").getContext("2d");
+  function toRgba(color) {
+    paint.clearRect(0, 0, 1, 1);
+    paint.fillStyle = "#000";
+    paint.fillStyle = color;
+    paint.fillRect(0, 0, 1, 1);
+    return paint.getImageData(0, 0, 1, 1).data;
+  }
+  function compositeRgba(foreground, background) {
+    const foregroundAlpha = foreground[3] / 255;
+    const backgroundAlpha = background[3] / 255;
+    const alpha = foregroundAlpha + backgroundAlpha * (1 - foregroundAlpha);
+    if (alpha === 0) return [0, 0, 0, 0];
+    return [
+      (foreground[0] * foregroundAlpha + background[0] * backgroundAlpha * (1 - foregroundAlpha)) / alpha,
+      (foreground[1] * foregroundAlpha + background[1] * backgroundAlpha * (1 - foregroundAlpha)) / alpha,
+      (foreground[2] * foregroundAlpha + background[2] * backgroundAlpha * (1 - foregroundAlpha)) / alpha,
+      alpha * 255,
+    ];
+  }
+  function pageIsDark() {
+    const root = document.documentElement;
+    const rootBackground = toRgba(getComputedStyle(root).backgroundColor);
+    const bodyBackground = document.body ? toRgba(getComputedStyle(document.body).backgroundColor) : [0, 0, 0, 0];
+    const [r, g, b, a] = compositeRgba(bodyBackground, rootBackground);
+    if (a > 0) {
+      return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.5;
+    }
+    const colorScheme = getComputedStyle(root).colorScheme;
+    if (colorScheme.includes("dark") && !colorScheme.includes("light")) return true;
+    if (colorScheme.includes("light") && !colorScheme.includes("dark")) return false;
+    return darkQuery.matches;
+  }
+  const diagrams = [...document.querySelectorAll(".mermaid")].map((el) => ({ el, src: el.textContent }));
+  let applied;
+  let rendering = false;
+  let queued = false;
+  function queueRender() {
+    queued = true;
+    if (rendering) return;
+    void render();
+  }
+  async function render() {
+    rendering = true;
+    try {
+      while (queued) {
+        queued = false;
+        const theme = pageIsDark() ? "dark" : "default";
+        if (theme === applied) continue;
+        mermaid.initialize({ startOnLoad: false, theme, securityLevel: "strict" });
+        for (const { el, src } of diagrams) {
+          el.removeAttribute("data-processed");
+          el.textContent = src;
+        }
+        try {
+          await mermaid.run({ nodes: diagrams.map((d) => d.el) });
+        } catch (error) {
+          console.error("Mermaid diagram render failed:", error);
+          return;
+        }
+        applied = theme;
+      }
+    } finally {
+      rendering = false;
+      if (queued) queueRender();
+    }
+  }
+  if (document.readyState === "complete") queueRender();
+  else window.addEventListener("load", queueRender, { once: true });
+  const themeObserver = new MutationObserver(queueRender);
+  for (const el of [document.documentElement, document.body]) {
+    if (!el) continue;
+    themeObserver.observe(el, { attributes: true, attributeFilter: ["data-theme", "class", "style"] });
+  }
+  document.addEventListener("change", queueRender, true);
+  document.addEventListener("transitionend", ({ propertyName }) => { if (propertyName === "background-color") queueRender(); }, true);
+  darkQuery.addEventListener("change", queueRender);
+</script>
+
+</body>
+</html>

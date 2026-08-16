@@ -265,3 +265,158 @@ The real cost of switching: one session per target language (a 2-way UX needs tw
 concurrent sessions), a smaller 16K context window, and a September 2024 knowledge cutoff.
 For a product whose whole job is translate-only interpretation, none of that outweighs the
 three advantages above.
+
+## 7. Tuning-config comparisons
+
+§2's quality numbers are one configuration each. This section is the same measurements
+taken per `TuningConfig`, joined to that config's fingerprint, across the noise conditions
+of `backend/tests/fixtures/noisy/`. A fingerprint (`cfg:` + 8 hex digits of the canonical
+config's sha256) is the join key between a row here and the exact knob settings that
+produced it.
+
+### What each fingerprint is
+
+<!-- One line per fingerprint measured below: the knobs that differ from the server
+     defaults, not the whole document. Get the config back with the panel's Import
+     button, or read the `configs[].file` entry in tuning_sweep.json. -->
+
+- `cfg:39ace417` — server defaults (`nova-3`, `endpointingMs 500`, `utteranceEndMs 3000`,
+  `diarize`, hybrid segmentation, every denoise stage off, transcript check off).
+- `cfg:9d963847` — defaults but `cascade.deepgram.endpointingMs: 800`.
+- `cfg:dc4da27f` — defaults but `cascade.transcriptCheck.mode: "correct"`.
+- `cfg:b3bb3fbe` — defaults but `cascade.denoise.noisereduce: {enabled: true,
+  propDecrease: 1.0, stationary: false}`.
+- `cfg:4762791b` / `cfg:724ea8f0` — the Realtime smoke pair below: client-side RNNoise on,
+  and the `.env` Realtime defaults with it off.
+
+Cascade fingerprints depend on this machine's `.env` (the two ElevenLabs voice ids are
+hashed in), so re-deriving them elsewhere gives different hex for the same knobs. Derive
+your own from `GET /api/tuning/capabilities` before comparing.
+
+### Results
+
+| fingerprint | mode | condition | SNR | WER | corrected WER | judge acceptance | added latency | provider latency |
+|---|---|---|---|---|---|---|---|---|
+| `cfg:39ace417` | cascade | clean | -- | 1.6% (n=8) | -- | -- | 0.0 ms | 855 ms |
+| `cfg:39ace417` | cascade | babble | 10 dB | 3.6% (n=8) | -- | -- | 0.0 ms | 1170 ms |
+| `cfg:39ace417` | cascade | street | 10 dB | 1.6% (n=8) | -- | -- | 0.0 ms | 1075 ms |
+| `cfg:9d963847` | cascade | clean | -- | 1.6% (n=8) | -- | -- | 0.0 ms | 1295 ms |
+| `cfg:9d963847` | cascade | babble | 10 dB | 3.6% (n=8) | -- | -- | 0.0 ms | 1637 ms |
+| `cfg:9d963847` | cascade | street | 10 dB | 1.6% (n=8) | -- | -- | 0.0 ms | 1557 ms |
+| `cfg:dc4da27f` | cascade | clean | -- | 1.6% (n=8) | 1.6% (n=8) | -- | 0.0 ms | 832 ms |
+| `cfg:dc4da27f` | cascade | babble | 10 dB | 3.6% (n=8) | 3.6% (n=8) | -- | 0.0 ms | 1178 ms |
+| `cfg:dc4da27f` | cascade | street | 10 dB | 1.6% (n=8) | 1.6% (n=8) | -- | 0.0 ms | 1058 ms |
+| `cfg:b3bb3fbe` | cascade | clean | -- | 14.1% (n=8) | -- | -- | 3256.2 ms | 1065 ms |
+| `cfg:b3bb3fbe` | cascade | babble | 10 dB | 3.6% (n=8) | -- | -- | 2742.7 ms | 1679 ms |
+| `cfg:b3bb3fbe` | cascade | street | 10 dB | 1.6% (n=8) | -- | -- | 2653.7 ms | 1509 ms |
+
+Realtime smoke (**n=2, not a WER measurement** — two clips, one config each, from ticket
+13's live A/B): RNNoise on (`cfg:4762791b`) end-to-end 421 ms / 249 ms and an exact
+transcript on the clean clip; RNNoise off (`cfg:724ea8f0`) 487 ms / 171 ms. Two clips
+cannot separate a denoiser from run-to-run variance; this is evidence the client DSP path
+runs end to end, not evidence that it helps.
+
+What was measured: **Deepgram endpointing** (`cfg:9d963847` costs ~440 ms of provider
+latency for no WER change — the endpointing wait is inside `provider latency` by design),
+**transcript check in `correct` mode** (`cfg:dc4da27f`, whose corrected-WER column is
+filled and identical to raw: the checker rewrote nothing it had reason to), and
+**server-side `noisereduce`** (`cfg:b3bb3fbe`). Its clean-condition 14.1% is one bad row,
+not a trend: seven of the eight clean clips scored 0.0–12.5%, and `short-en-01` scored
+100% with 0 ms provider latency — the non-stationary spectral gate emitted NaN
+(`RuntimeWarning: invalid value encountered in divide`, then in the int16 cast in
+`denoise.py`) and Deepgram returned no final result. The ~2.6 s `added latency` is a
+whole-clip figure from a harness that denoises faster than real time; the 8.1 s on that
+first row is library warm-up. `noisereduce` is a benchmark stage, and this is what
+benchmarking it looks like.
+
+What was **not** measured, and why: the client-side stages — microphone constraints, the
+RMS gate, RNNoise — are applied in the browser, and this sweep replays WAV files
+server-side, so no configuration of them can move a Cascade row. They have no WER rows at
+all, and the "identical by construction" result ticket 13 saw for a gate config is a
+property of the harness, not a finding about the gate. Measuring them properly needs the
+browser in the loop (the Playwright capture harness), which yields judge acceptance and
+end-to-end latency rather than WER. **DeepFilterNet was not run**: the `denoise` extra
+(torch + deepfilternet, a ~200 MB CPU wheel) is deliberately not synced into `.venv`, and
+it was smoke-tested in an isolated venv instead. **Judge acceptance is Realtime-only** and is blank on
+every Cascade row: the Cascade sweep scores WER and latency and deliberately does not run
+the LLM judge (that would mean a second key and a second cost per row for a number §2
+already reports per configuration). **Corrected WER** is blank on rows whose config left
+`transcriptCheck.mode` at `off`; a blank there means "not measured", never "no
+improvement". **The noisy rows are report-only**: `test_quality_wer.py`'s
+`WER_THRESHOLD = 0.20` remains a clean-corpus assertion and no noisy result gates CI.
+`added latency` is the time the tuning's own denoise stages cost; `provider latency` is
+what the provider then took, measured from the end of the clip's audio to the final
+result (so it moves with `endpointingMs`, not with the denoise chain). Reported
+separately on purpose — added together they would hide which of the two a config paid.
+
+One more honest caveat on the corpus: at 10 dB SNR the defaults already score 1.6–3.6%,
+so there is very little room for a denoiser to show a win. A config comparison that
+matters would need the 5 dB conditions and more items than the eight these runs used.
+
+### Reproduce
+
+The four Cascade configs above are the server defaults plus one edit each. Dump the
+defaults (they carry *your* `.env`'s voice ids, so do not copy the fingerprints), then
+edit a copy per row:
+
+```bash
+cd backend
+uv run python -c "import json;from fastapi.testclient import TestClient;from app.main \
+import app;print(json.dumps(TestClient(app).get('/api/tuning/capabilities').json()['defaults'],indent=2))" \
+  > /tmp/configs/defaults.json
+# endpointing-800.json : cascade.deepgram.endpointingMs = 800, utteranceEndMs = 3000
+# transcript-correct.json: cascade.transcriptCheck.mode = "correct"
+# noisereduce.json      : cascade.denoise.noisereduce = {enabled:true, propDecrease:1.0, stationary:false}
+```
+
+```bash
+# Cascade half (WER, added latency, provider latency) -- needs DEEPGRAM_API_KEY
+# (and OPENAI_API_KEY for the transcript-check config). 72 rows, ~9 min.
+cd backend
+uv run python -m tests.fixtures.make_noisy_corpus
+uv run python -m tests.fixtures.run_tuning_sweep \
+  --config /tmp/configs/defaults.json \
+  --config /tmp/configs/endpointing-800.json \
+  --config /tmp/configs/transcript-correct.json \
+  --limit 72 --conditions clean,babble,street --snr 10 --yes \
+  --out tests/fixtures/tuning_sweep.json
+
+# noisereduce needs the bench extra, which is never synced into .venv. 24 rows, ~4 min;
+# it resumes into the same file, so the fourth config appends to the three above.
+uv run --with noisereduce --with numpy python -m tests.fixtures.run_tuning_sweep \
+  --config /tmp/configs/noisereduce.json \
+  --limit 24 --conditions clean,babble,street --snr 10 --yes \
+  --out tests/fixtures/tuning_sweep.json
+
+# re-print all four configs' rows without re-measuring anything
+uv run python -m tests.fixtures.run_tuning_sweep \
+  --config /tmp/configs/defaults.json \
+  --config /tmp/configs/endpointing-800.json \
+  --config /tmp/configs/transcript-correct.json \
+  --config /tmp/configs/noisereduce.json \
+  --only short-en-01,short-en-02,short-en-03,short-en-04 \
+  --only short-en-05,short-en-06,short-en-07,short-en-08 \
+  --conditions clean,babble,street --snr 10 --yes --out tests/fixtures/tuning_sweep.json
+# prints the rows above; full results in tests/fixtures/tuning_sweep.json (git-ignored)
+
+# Realtime half (judge acceptance) -- needs a recorded corpus + OPENAI_API_KEY
+cd frontend && npm run capture:realtime-quality -- --tuning /tmp/configs/a.json
+cd backend && uv run python -m tests.fixtures.run_realtime_quality_report
+```
+
+`--limit` counts *rows*, not items: the runner plans item-outer/config-inner, so 72 rows
+across three configs is the first 24 corpus variants (8 source items × clean/babble/
+street) measured against all three.
+
+A caution on the Realtime half, learned the hard way: the report back-fills a capture's
+missing per-item `fingerprint` from the envelope's. A `captures.json` that was *resumed*
+into by a run with a different config therefore reports every older, untagged item under
+the newest fingerprint, and the per-fingerprint rows it prints are an average across
+configs. Capture each config into its own `--out` file rather than resuming, and check
+`captures[].fingerprint` before pasting anything it prints.
+
+The sweep replays audio in real time, so a full corpus against two configs is hours: it
+refuses more than 200 rows without `--yes`, prints an estimated wall-clock, and resumes
+from `--out` on a re-run. `--limit`, `--only`, `--conditions` and `--snr` narrow it. Every
+run reports a `clean` baseline row per item regardless of `--conditions`, because a noisy
+WER means nothing without one.

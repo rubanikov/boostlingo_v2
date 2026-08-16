@@ -1,0 +1,254 @@
+<title>Step 7 Gate — Technical Brief: Audio Tuning & Denoise Lab</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex) > * { min-width: 0; }
+  :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, td, th, .badge, .label) { overflow-wrap: anywhere; }
+  .mermaid { display: flex; justify-content: center; }
+  html { scroll-behavior: smooth; }
+  code { font-size: 0.85em; }
+  pre.code { font-size: 0.75rem; line-height: 1.35; overflow-x: auto; }
+</style>
+
+<html data-theme="luxury">
+<body class="bg-base-100 text-base-content min-h-screen">
+<main class="mx-auto max-w-5xl p-6 lg:p-10 space-y-10">
+
+  <header class="space-y-3">
+    <div class="flex flex-wrap items-center gap-3">
+      <span class="badge badge-warning badge-lg">Feature Factory — Step 7 GATE</span>
+      <span class="badge badge-ghost">Technical brief · awaiting approval</span>
+    </div>
+    <h1 class="text-4xl font-bold">Audio Tuning &amp; Denoise Lab — Technical Brief</h1>
+    <p class="text-base-content/70 max-w-3xl">
+      The spec-writer verified every seam against the code (and the pinned OpenAI SDK types) and produced a 960-line brief:
+      <code>.scratch/tuning-lab/04-brief.md</code>. This page is the review digest — the shared contract, what's new, what deviates, and five open questions with recommendations.
+      Read the full brief for field-level detail.
+    </p>
+    <div class="stats stats-vertical sm:stats-horizontal shadow bg-base-200 w-full">
+      <div class="stat"><div class="stat-title">API surfaces</div><div class="stat-value text-primary">6</div><div class="stat-desc">2 new endpoints, 1 extended, WS +2 msgs, session.update, DeepgramParams</div></div>
+      <div class="stat"><div class="stat-title">Tests specified</div><div class="stat-value">64</div><div class="stat-desc">31 success · 17 failure · 16 edge</div></div>
+      <div class="stat"><div class="stat-title">New deps</div><div class="stat-value text-warning">4</div><div class="stat-desc">torch + deepfilternet (extra) · noisereduce (extra) · rnnoise wasm</div></div>
+      <div class="stat"><div class="stat-title">Open questions</div><div class="stat-value text-warning">5</div><div class="stat-desc">one-sentence answers</div></div>
+    </div>
+  </header>
+
+  <section role="alert" class="alert alert-info alert-soft">
+    <div>
+      <div class="font-semibold">Correction caught by the spec-writer</div>
+      <div class="text-sm">The GA Realtime field is <code>noise_reduction</code> under <code>session.audio.input</code> (typed <code>{type: near_field|far_field} | null</code>), verified in the pinned SDK at <code>realtime_audio_config_input.py:34</code> — <em>not</em> the beta-era <code>input_audio_noise_reduction</code> earlier artifacts used. The brief uses the GA name.</div>
+    </div>
+  </section>
+
+  <nav class="flex flex-wrap gap-2 text-sm">
+    <a href="#tiers" class="btn btn-xs btn-ghost">Tiers</a>
+    <a href="#schema" class="btn btn-xs btn-ghost">TuningConfig</a>
+    <a href="#api" class="btn btn-xs btn-ghost">API contract</a>
+    <a href="#reconnect" class="btn btn-xs btn-ghost">Reconnect flow</a>
+    <a href="#frontend" class="btn btn-xs btn-ghost">Frontend</a>
+    <a href="#bench" class="btn btn-xs btn-ghost">Benchmark</a>
+    <a href="#deps" class="btn btn-xs btn-ghost">Deps</a>
+    <a href="#deviations" class="btn btn-xs btn-ghost">Deviations</a>
+    <a href="#questions" class="btn btn-xs btn-ghost">Open questions</a>
+  </nav>
+
+  <section id="tiers" class="space-y-3">
+    <h2 class="text-2xl font-semibold">Tiers → deliverables (cut from the bottom)</h2>
+    <div class="overflow-x-auto rounded-box border border-base-300"><table class="table table-sm">
+      <thead><tr><th>Tier</th><th>Deliverable</th><th>Story</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge badge-success">1</span></td><td><code>tuningConfig.ts</code> + pydantic mirror + fingerprint; <code>TuningPanel</code>; <code>POST /api/realtime/session</code> gains <code>tuning</code>; <code>GET /api/tuning/capabilities</code>; Cascade <code>start_session.tuning</code> + <code>update_tuning</code>/<code>tuning_applied</code>/<code>tuning_failed</code>; deliberate Deepgram reconnect; <code>SessionHandle.applyTuning</code> + <code>connect(languages, tuning?)</code>; localStorage, presets, export/import, fingerprint chips</td><td>S1</td></tr>
+        <tr><td><span class="badge badge-success">2</span></td><td><code>make_noisy_corpus.py</code> + SCRIPT.md; <code>stt_replay.py</code> extension; <code>run_tuning_sweep.py</code>; <code>--tuning</code> on the capture harness; fingerprint through the report; COMPARISON.md §7</td><td>S2</td></tr>
+        <tr><td><span class="badge badge-info">3</span></td><td>Mic constraint toggles; RMS gate worklet (<code>gate-processor.js</code>, shared by both modes); RNNoise via <code>@sapphi-red/web-noise-suppressor</code>; OpenAI <code>noise_reduction</code>; Realtime client-DSP re-plumbing (mute targets the sent track)</td><td>S3</td></tr>
+        <tr><td><span class="badge badge-info">4</span></td><td><code>TranscriptChecker</code> (off/flag/correct); <code>transcript_check</code> latency stage; <code>flagged</code>/<code>correctedFrom</code> on <code>source_transcript</code>; <code>POST /api/tuning/transcript-check</code> for Realtime flag</td><td>S4</td></tr>
+        <tr><td><span class="badge badge-ghost">5</span></td><td><code>DenoiseStage</code> protocol; <code>NoisereduceStage</code>; <code>DeepFilterNetStage</code>; offline Demucs/DNS64 in the sweep only; capability discovery via <code>find_spec</code></td><td>S5</td></tr>
+        <tr><td><span class="badge badge-ghost">6</span></td><td>Curated model/voice pickers + server-side allow-list validation</td><td>S5</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="schema" class="space-y-3">
+    <h2 class="text-2xl font-semibold">TuningConfig (schemaVersion 1) &amp; fingerprint</h2>
+    <div class="grid gap-4 md:grid-cols-2">
+      <div class="card bg-base-200 shadow"><div class="card-body">
+        <h3 class="card-title text-base">Shape</h3>
+        <pre class="code"><code>TuningConfig {
+  schemaVersion: 1
+  client:   { microphone{EC,NS,AGC}, rmsGate{enabled,thresholdDbfs,holdMs,
+              attackMs,releaseMs,attenuationDb,fullMute}, rnnoise{enabled,voiceProbThreshold} }
+  realtime: { model, voice, turnDetection{type, threshold?, prefixPaddingMs?,
+              silenceDurationMs?, eagerness?, interruptResponse?},
+              noiseReduction?: off|near_field|far_field,
+              transcriptCheck{mode: off|flag, model} }
+  cascade:  { deepgram{model,endpointingMs,utteranceEndMs,diarize}   ← connection-level
+              segmentation{mode,model},
+              denoise{noisereduce{…}, deepfilternet{…}, offline{demucs,dns64}},
+              transcriptCheck{mode: off|flag|correct, model},
+              translationModel, ttsVoiceA, ttsVoiceB }
+}
+// wire + hash document = projectMode(config, mode)  (mode is inside the hash)</code></pre>
+        <p class="text-xs text-base-content/70">Absent = provider default only for the OpenAI pass-through fields; everything else is required-with-default. <code>noiseReduction</code> is three-state + absent (absent → no key; <code>off</code> → <code>null</code>).</p>
+      </div></div>
+      <div class="card bg-base-200 shadow"><div class="card-body">
+        <h3 class="card-title text-base">Fingerprint (byte-exact in TS and Python)</h3>
+        <ol class="list-decimal pl-5 text-sm space-y-1">
+          <li>project to mode (includes <code>schemaVersion</code> + <code>mode</code>)</li>
+          <li>strip <code>undefined</code>/<code>None</code> keys (keep false/0/"")</li>
+          <li>clamp + quantise floats to documented step</li>
+          <li>canonical JSON: sorted keys, no whitespace, integral floats as ints</li>
+          <li>SHA-256 → first 8 hex → <code>cfg:xxxxxxxx</code></li>
+        </ol>
+        <p class="text-xs text-base-content/70">Parity enforced by one committed fixture <code>shared/tuning-fingerprint-cases.json</code> read by both test suites. localStorage keys <code>boostlingo.tuning.v1</code> / <code>boostlingo.tuning.presets.v1</code>, versioned, discarded on mismatch.</p>
+      </div></div>
+    </div>
+  </section>
+
+  <section id="api" class="space-y-3">
+    <h2 class="text-2xl font-semibold">API contract (the parallel backend/frontend seam)</h2>
+    <div class="overflow-x-auto rounded-box border border-base-300"><table class="table table-sm">
+      <thead><tr><th>Surface</th><th>Change</th><th>Validation</th></tr></thead>
+      <tbody>
+        <tr><td><code>POST /api/realtime/session</code></td><td>body gains optional nested <code>tuning</code> (ModeTuningConfig, mode=realtime); mapped into <code>session.model</code>, <code>audio.output.voice</code>, <code>audio.input.turn_detection</code> (absent-key idiom kept; <code>_turn_detection(None)</code> = today's .env behaviour), <code>audio.input.noise_reduction</code>; response gains <code>fingerprint</code> + <code>appliedTuning</code></td><td>400 before any OpenAI call: schemaVersion≠1, model/voice ∉ allow-list, ranges, eagerness with server_vad, correct in Realtime; language check still runs first (harness identity probe intact)</td></tr>
+        <tr><td><code>GET /api/tuning/capabilities</code> <span class="badge badge-outline badge-xs">new</span></td><td><code>{schemaVersion, defaults: TuningConfig (from .env+constants), allowLists{…}, stages{deepfilternet, noisereduce, demucs, dns64: {installed, liveCapable, reason?}}}</code>; <code>find_spec</code> only, never <code>init_df()</code>; weights-failed reported via <code>_last_init_error</code></td><td>always 200; per-stage exceptions → <code>installed:false</code></td></tr>
+        <tr><td><code>POST /api/tuning/transcript-check</code> <span class="badge badge-outline badge-xs">new</span></td><td><code>{text, language, mode, model}</code> → <code>{flagged, correctedText, elapsedMs, failed?}</code>; needed for Realtime <code>flag</code> (browser has no key, backend has no seam)</td><td>mode∈{flag,correct}, model∈TEXT_MODELS, text≤2000 → else 400; provider failure → 200 + <code>failed:true</code></td></tr>
+        <tr><td>Cascade WS</td><td><code>start_session.tuning</code>; client→ <code>update_tuning{requestId, tuning}</code>; server→ <code>tuning_applied{requestId, fingerprint, reconnectedStt}</code> (also unsolicited after <code>session_started</code>), <code>tuning_failed{requestId, attempt, maxAttempts, message}</code>; <code>source_transcript</code> gains <code>flagged</code>/<code>correctedFrom</code>; <code>segment_boundary.trigger</code> gains <code>tuning_reconnect</code>; <code>latency.stage</code> gains <code>transcript_check</code></td><td>tolerant: bad field → default + log, never closes (asymmetric posture preserved)</td></tr>
+        <tr><td>Realtime <code>session.update</code></td><td>client-only over <code>oai-events</code>: <code>{type:"session.update", session:{type:"realtime", audio:{input:{turn_detection, noise_reduction}}}}</code> — verified GA shape; <code>model</code>/<code>voice</code> not live-updatable (panel marks "applies at next connect"); requires <code>dataChannel.onopen</code> readiness + pending slot</td><td>—</td></tr>
+        <tr><td><code>DeepgramSTTProvider</code></td><td><code>DeepgramParams</code> frozen dataclass (defaults = today's constants) passed per <code>stream(..., params=)</code>; <code>_url(params)</code>. Never module-global (multi-session hazard)</td><td>existing URL-substring tests pass unchanged by design</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="reconnect" class="space-y-3">
+    <h2 class="text-2xl font-semibold">Deliberate Deepgram reconnect — no frame lost</h2>
+    <div class="card bg-base-200 shadow"><div class="card-body">
+      <pre class="mermaid">
+sequenceDiagram
+  participant C as Client
+  participant P as _pump_client_messages
+  participant Q as audio_queue (FIFO)
+  participant S as _run_stt / audio_iter
+  participant D as Deepgram
+  C->>P: frames A,B
+  P->>Q: A, B
+  C->>P: update_tuning (connection-level)
+  P->>Q: _RECONNECT sentinel (behind A,B)
+  C->>P: frames C,D
+  P->>Q: C, D
+  S->>D: A, B (stream #1)
+  S-->>S: pops _RECONNECT → audio_iter returns
+  D-->>S: flush + close → StopAsyncIteration
+  S-->>S: pending? cut partial buffer (trigger=tuning_reconnect), swap current/previous
+  S->>D: stream #2 with new DeepgramParams
+  S->>D: C, D (still in queue)
+  D-->>S: first result
+  S-->>C: tuning_applied{reconnectedStt:true}
+      </pre>
+      <p class="text-sm text-base-content/70 mt-2">Coalescing: a second <code>update_tuning</code> before the reconnect completes overwrites the single <code>pending</code> slot; a fresh sentinel is only enqueued if none was pending. Failure: each attempt logs + sends <code>tuning_failed</code>; after the existing 3-attempt/0.5-1-2 s budget the server <strong>reverts to previous params</strong> and the client shows the alert dialog (Retry / Revert). Client-side, Apply during TTS playback / a Realtime reply is held in one <code>pendingTuningRef</code> slot and flushed at the turn boundary.</p>
+    </div></div>
+  </section>
+
+  <section id="frontend" class="space-y-3">
+    <h2 class="text-2xl font-semibold">Frontend design</h2>
+    <div class="grid gap-4 md:grid-cols-2">
+      <div class="card bg-base-200 shadow"><div class="card-body text-sm">
+        <h3 class="card-title text-base">New files (flat in <code>src/pages/</code>)</h3>
+        <ul class="list-disc pl-5 space-y-1">
+          <li><code>tuningConfig.ts</code> (pure: types, defaults, KNOB_METADATA, canonicalize/fingerprint/diff/parseImported/migrate/clamp)</li>
+          <li><code>tuningPresets.ts</code>, <code>tuningCapabilities.ts</code>, <code>useTuningConfig.ts</code></li>
+          <li><code>TuningPanel.tsx</code> (+ optional <code>TuningSection.tsx</code>)</li>
+          <li><code>rmsGate.ts</code>, <code>resample.ts</code> (unit-tested sources of truth, hand-mirrored into worklets)</li>
+          <li><code>public/gate-processor.js</code> (shared gate worklet; <code>processorOptions</code> + <code>port.postMessage</code>)</li>
+        </ul>
+        <p class="text-xs text-base-content/70">SessionHandle: <code>applyTuning?(config): Promise&lt;ApplyResult&gt;</code>, <code>connect(languages, tuning?)</code>, <code>appliedFingerprint?</code>. Fingerprint reaches the latency strip as a plain prop, rendered as a sibling of the badge (harness regex untouched).</p>
+      </div></div>
+      <div class="card bg-base-200 shadow"><div class="card-body text-sm">
+        <h3 class="card-title text-base">Capture graphs</h3>
+        <p><strong>Cascade:</strong> <code>micSource → [gate] → [rnnoise] → pcm worklet → destination</code>; context at 48 kHz only when RNNoise is on, worklet decimates 3:1 back to 16 kHz.</p>
+        <p class="mt-2"><strong>Realtime:</strong> raw track unchanged when no client stage is on; else <code>ctx(48k) → [gate] → [rnnoise] → MediaStreamDestination</code> and <code>addTrack(sentTrack)</code>; <strong>mute logic targets the sent track</strong> (the regression most likely to slip).</p>
+        <p class="mt-2"><strong>RNNoise:</strong> <code>@sapphi-red/web-noise-suppressor</code> (ships a worklet with the 480-sample/48 kHz framing; Vite <code>?url</code> for wasm + worklet).</p>
+      </div></div>
+    </div>
+  </section>
+
+  <section id="bench" class="space-y-3">
+    <h2 class="text-2xl font-semibold">Benchmark flow</h2>
+    <div class="card bg-base-200 shadow"><div class="card-body">
+      <pre class="mermaid">
+flowchart LR
+  A[generate_audio_fixtures.py<br/>33 clean WAVs] --> B[make_noisy_corpus.py<br/>babble/street/fan/white × 20/10/5 dB<br/>+ clean, noisy_manifest.json]
+  B --> C[run_tuning_sweep.py --config a.json --config b.json<br/>stt_replay.transcribe_wav_detailed(tuning, offline_stages)<br/>→ tuning_sweep.json + markdown table]
+  B --> D[realtime-quality-capture.mjs --tuning a.json<br/>imports config in panel before Connect]
+  D --> E[run_realtime_quality_report.py<br/>fingerprint on rows + summary]
+  C --> F[COMPARISON.md §7]
+  E --> F
+      </pre>
+      <p class="text-sm text-base-content/70 mt-2">Report-only on noisy conditions; <code>WER_THRESHOLD = 0.20</code> stays clean-only. Babble = 3–5 overlaid corpus utterances (mixed languages); other noises synthesised with numpy (no external datasets); SNR via RMS matching, ±0.5 dB test. Sweep: <code>_MAX_ROWS_WITHOUT_CONFIRM = 200</code>, <code>--limit/--only/--conditions/--snr</code>, resume by skipping rows already in <code>--out</code>. Real-recording set keeps its self-skip.</p>
+    </div></div>
+  </section>
+
+  <section id="deps" class="space-y-3">
+    <h2 class="text-2xl font-semibold">New dependencies &amp; flags</h2>
+    <div class="grid gap-3 md:grid-cols-2 text-sm">
+      <div class="alert alert-warning alert-soft"><div><div class="font-semibold">torch + deepfilternet → <code>backend[denoise]</code> extra</div><div>CPU wheel index pinned via <code>[[tool.uv.index]]</code>; <code>uv sync --extra denoise</code>; core CI torch-free. First optional-dependencies section in the repo.</div></div></div>
+      <div class="alert alert-warning alert-soft"><div><div class="font-semibold">noisereduce + numpy → <code>backend[bench]</code> extra</div><div>Decision: extra, not main deps (pulls scipy/numba). Consequence: shows "not installed" in a default install. <em>Open question 1.</em></div></div></div>
+      <div class="alert alert-info alert-soft"><div><div class="font-semibold"><code>@sapphi-red/web-noise-suppressor</code> (frontend runtime dep)</div><div>First runtime dep since React. Verify <code>?url</code>-loaded worklet under both <code>vite dev</code> and <code>vite build</code> before building on it.</div></div></div>
+      <div class="alert alert-info alert-soft"><div><div class="font-semibold">No new scheduler / DB / datastore</div><div>Reconnect reuses <code>_run_stt</code>'s outer loop + <code>with_reconnect</code> budget; apply queue is one ref slot; persistence is localStorage.</div></div></div>
+      <div class="alert alert-error alert-soft"><div><div class="font-semibold">Security-relevant default widened</div><div><code>cors_origins</code> default gains <code>http://localhost:5183</code> (Playwright port) so the WS origin guard admits the harness. Repo-owned dev port. <em>Open question 4.</em></div></div></div>
+      <div class="alert alert-error alert-soft"><div><div class="font-semibold">Sharpest edge</div><div>Deepgram params must be per-<code>stream()</code> (<code>DeepgramParams</code>), never mutated module constants — otherwise one tab's Apply re-parameterises every session. Sentinel-in-queue design is deliberate; don't "simplify" to <code>asyncio.wait</code>.</div></div></div>
+    </div>
+  </section>
+
+  <section id="deviations" class="space-y-3">
+    <h2 class="text-2xl font-semibold">Intentional deviations from approved artifacts</h2>
+    <ol class="list-decimal pl-5 text-sm space-y-1">
+      <li><code>transcriptCheck</code> lives per mode (realtime: off/flag; cascade: off/flag/correct), not in the shared client block — type-exact, and a Cascade <code>correct</code> can't leak into a Realtime fingerprint. <em>(Open question 2.)</em></li>
+      <li>RMS gate is one shared <code>gate-processor.js</code> worklet for both modes; <code>cascade-pcm-processor.js</code> only gains the 48k→16k decimator.</li>
+      <li><code>shared/tuning-fingerprint-cases.json</code> introduces a new top-level dir (one file) for the cross-language parity fixture.</li>
+      <li>Realtime <code>flag</code> needs the new <code>POST /api/tuning/transcript-check</code> endpoint. <em>(Open question 5.)</em></li>
+      <li><code>segment_boundary.trigger</code> gains <code>tuning_reconnect</code> (additive-safe; label "reconfig").</li>
+    </ol>
+  </section>
+
+  <section id="questions" class="space-y-3">
+    <h2 class="text-2xl font-semibold">Open questions <span class="text-base-content/50 text-base font-normal">(with recommendations)</span></h2>
+    <div class="grid gap-3 text-sm">
+      <div class="card bg-warning/10 border border-warning/40"><div class="card-body"><h3 class="font-semibold">Q1 · <code>noisereduce</code>+<code>numpy</code>: <code>bench</code> extra or main deps?</h3><p><strong>Recommendation:</strong> keep them in the <code>bench</code> extra as specified — default <code>uv sync</code> stays fast; the panel's "not installed" hint tells you exactly what to run.</p></div></div>
+      <div class="card bg-warning/10 border border-warning/40"><div class="card-body"><h3 class="font-semibold">Q2 · <code>transcriptCheck</code> per mode (deviation 1)?</h3><p><strong>Recommendation:</strong> confirm per-mode — it is the only type-exact shape.</p></div></div>
+      <div class="card bg-warning/10 border border-warning/40"><div class="card-body"><h3 class="font-semibold">Q3 · ElevenLabs voice picker: only the two configured ids + <code>ELEVENLABS_VOICE_IDS_EXTRA</code>, or a curated premade list?</h3><p><strong>Recommendation:</strong> two configured + env extra list, as specified — premade ids differ per account and can't be verified offline.</p></div></div>
+      <div class="card bg-warning/10 border border-warning/40"><div class="card-body"><h3 class="font-semibold">Q4 · Widen <code>cors_origins</code> default to include 5183?</h3><p><strong>Recommendation:</strong> yes — repo-owned dev port, documented in <code>.env.example</code>; simpler than every harness invocation setting <code>CORS_ORIGINS</code>.</p></div></div>
+      <div class="card bg-warning/10 border border-warning/40"><div class="card-body"><h3 class="font-semibold">Q5 · Realtime <code>flag</code> via the extra <code>POST /api/tuning/transcript-check</code> round trip: keep or drop?</h3><p><strong>Recommendation:</strong> keep — it's tier 4, best-effort and non-blocking, and it's the only way Realtime gets any transcript-quality signal at all.</p></div></div>
+    </div>
+  </section>
+
+  <section class="card bg-primary text-primary-content shadow-lg"><div class="card-body">
+    <h2 class="card-title">Step 7 gate</h2>
+    <p class="text-sm">Approve / request changes / reject in chat, plus answers to Q1–Q5 (or "accept recommendations"). Next: <code>ticket-slicer</code> produces vertical tracer-bullet tickets for Step 9.</p>
+  </div></section>
+
+  <footer class="text-xs text-base-content/50 pt-6 border-t border-base-300">
+    Full brief: <code>.scratch/tuning-lab/04-brief.md</code> · design: app's own DaisyUI v5 <code>luxury</code> theme.
+  </footer>
+</main>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.15.0/dist/mermaid.esm.min.mjs";
+  const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  const paint = document.createElement("canvas").getContext("2d");
+  function toRgba(color) { paint.clearRect(0,0,1,1); paint.fillStyle="#000"; paint.fillStyle=color; paint.fillRect(0,0,1,1); return paint.getImageData(0,0,1,1).data; }
+  function compositeRgba(f,b){ const fa=f[3]/255, ba=b[3]/255, a=fa+ba*(1-fa); if(a===0) return [0,0,0,0]; return [(f[0]*fa+b[0]*ba*(1-fa))/a,(f[1]*fa+b[1]*ba*(1-fa))/a,(f[2]*fa+b[2]*ba*(1-fa))/a,a*255]; }
+  function pageIsDark(){ const root=document.documentElement; const rb=toRgba(getComputedStyle(root).backgroundColor); const bb=document.body?toRgba(getComputedStyle(document.body).backgroundColor):[0,0,0,0]; const [r,g,b,a]=compositeRgba(bb,rb); if(a>0) return (0.2126*r+0.7152*g+0.0722*b)/255<0.5; const cs=getComputedStyle(root).colorScheme; if(cs.includes("dark")&&!cs.includes("light")) return true; if(cs.includes("light")&&!cs.includes("dark")) return false; return darkQuery.matches; }
+  const diagrams=[...document.querySelectorAll(".mermaid")].map((el)=>({el,src:el.textContent}));
+  let applied, rendering=false, queued=false;
+  function queueRender(){ queued=true; if(rendering) return; void render(); }
+  async function render(){ rendering=true; try{ while(queued){ queued=false; const theme=pageIsDark()?"dark":"default"; if(theme===applied) continue; mermaid.initialize({startOnLoad:false,theme,securityLevel:"strict"}); for(const {el,src} of diagrams){ el.removeAttribute("data-processed"); el.textContent=src; } try{ await mermaid.run({nodes:diagrams.map(d=>d.el)}); }catch(e){ console.error("Mermaid diagram render failed:",e); return; } applied=theme; } } finally { rendering=false; if(queued) queueRender(); } }
+  if(document.readyState==="complete") queueRender(); else window.addEventListener("load",queueRender,{once:true});
+  const themeObserver=new MutationObserver(queueRender);
+  for(const el of [document.documentElement,document.body]){ if(!el) continue; themeObserver.observe(el,{attributes:true,attributeFilter:["data-theme","class","style"]}); }
+  document.addEventListener("change",queueRender,true);
+  document.addEventListener("transitionend",({propertyName})=>{ if(propertyName==="background-color") queueRender(); },true);
+  darkQuery.addEventListener("change",queueRender);
+</script>
+</body>
+</html>

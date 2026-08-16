@@ -1,0 +1,149 @@
+<title>Step 15 Gate — Final Review: Audio Tuning & Denoise Lab</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex) > * { min-width: 0; }
+  :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, td, th, .badge, .label) { overflow-wrap: anywhere; }
+  html { scroll-behavior: smooth; }
+  code { font-size: 0.85em; }
+</style>
+<html data-theme="luxury">
+<body class="bg-base-100 text-base-content min-h-screen">
+<main class="mx-auto max-w-5xl p-6 lg:p-10 space-y-10">
+
+  <header class="space-y-3">
+    <div class="flex flex-wrap items-center gap-3">
+      <span class="badge badge-warning badge-lg">Feature Factory — Step 15 GATE</span>
+      <span class="badge badge-success">All checks green</span>
+      <span class="badge badge-ghost">Nothing committed</span>
+    </div>
+    <h1 class="text-4xl font-bold">Audio Tuning &amp; Denoise Lab — Final Review</h1>
+    <p class="text-base-content/70 max-w-3xl">The full chain ran: grill → research → story → wireframe → brief → 18 vertical tickets in 6 waves → acceptance tests → validator + security audit → two fix rounds → polish. Everything is in the working tree on branch <code>implementation</code>, uncommitted. Decide: open a PR, keep working, or leave it.</p>
+    <div class="stats stats-vertical sm:stats-horizontal shadow bg-base-200 w-full">
+      <div class="stat"><div class="stat-title">Tickets</div><div class="stat-value text-primary">18 / 18</div><div class="stat-desc">built · reconciled · none escalated</div></div>
+      <div class="stat"><div class="stat-title">Backend</div><div class="stat-value text-success">346</div><div class="stat-desc">passed · 12 skipped (extras/keys) · ruff clean</div></div>
+      <div class="stat"><div class="stat-title">Frontend</div><div class="stat-value text-success">499</div><div class="stat-desc">passed · oxlint + tsc + build clean</div></div>
+      <div class="stat"><div class="stat-title">Diff</div><div class="stat-value">~9.9k</div><div class="stat-desc">lines added · ~87 files (50 modified + new)</div></div>
+    </div>
+  </header>
+
+  <nav class="flex flex-wrap gap-2 text-sm">
+    <a href="#chain" class="btn btn-xs btn-ghost">Chain</a>
+    <a href="#tickets" class="btn btn-xs btn-ghost">Tickets &amp; waves</a>
+    <a href="#delivered" class="btn btn-xs btn-ghost">What you can do now</a>
+    <a href="#evidence" class="btn btn-xs btn-ghost">Measured evidence</a>
+    <a href="#coverage" class="btn btn-xs btn-ghost">Acceptance coverage</a>
+    <a href="#findings" class="btn btn-xs btn-ghost">Remaining findings</a>
+    <a href="#notdone" class="btn btn-xs btn-ghost">Not done</a>
+    <a href="#files" class="btn btn-xs btn-ghost">Files</a>
+    <a href="#gate" class="btn btn-xs btn-ghost">Gate</a>
+  </nav>
+
+  <section id="chain" class="space-y-3">
+    <h2 class="text-2xl font-semibold">The chain</h2>
+    <div class="overflow-x-auto rounded-box border border-base-300"><table class="table table-sm">
+      <thead><tr><th>Step</th><th>Outcome</th><th>Artifact</th></tr></thead>
+      <tbody>
+        <tr><td>0 · Grill</td><td>10 Q&amp;A → 11 locked decisions (denoise scope incl. RMS gate/RNNoise/DFN/noisereduce/offline; live vs offline split; in-app panel with live apply; transcript check off/flag/correct; full knob inventory + model pickers; noisy benchmark; priority tiers 1–6; optional extras; shared TuningConfig + fingerprint; every step a user selection)</td><td><code>.scratch/tuning-lab/00-idea-brief.md</code> · <code>.lavish/step0-…</code></td></tr>
+        <tr><td>1 · Research</td><td>Capture path, wire protocol, providers, harnesses, 16 constraints mapped</td><td><code>01-research.md</code></td></tr>
+        <tr><td>2–3 · Story</td><td>Epic + 5 tiered sub-stories, 42 ACs — <strong>approved</strong>; Q1–Q3 per recommendations + "log every failure, dialog after retries"</td><td><code>02-story.md</code></td></tr>
+        <tr><td>4–5 · Wireframe</td><td>Right-hand collapsible panel in the real page, 6 sections in signal order — <strong>approved</strong>; 3 UX Qs per recommendations</td><td><code>03-wireframe-notes.md</code> · <code>.lavish/step5-…</code></td></tr>
+        <tr><td>6–7 · Brief</td><td>Contract (TuningConfig schema, exact fingerprint algorithm, 6 API surfaces, reconnect flow, 64 tests) — <strong>approved</strong>; 5 Qs per recommendations; caught GA field name <code>noise_reduction</code></td><td><code>04-brief.md</code></td></tr>
+        <tr><td>8–9 · Tickets</td><td>18 vertical tracer bullets, all right-sized (~56.5 h) — <strong>approved</strong>, granularity kept, concurrency cap 5</td><td><code>issues/00-index.md</code> + 18 files</td></tr>
+        <tr><td>10 · Build</td><td>6 waves; backend + frontend in parallel per ticket; 4 reconciles needed rounds (07 ×2, all others clean); one network outage recovered by resuming agents</td><td><code>06-build-log.md</code></td></tr>
+        <tr><td>11 · Tests</td><td>Coverage matrix over 42 ACs + 64 brief ids; +14 acceptance tests; found AC 2.2 defect (fixed)</td><td><code>test_acceptance_tuning_lab.py</code>, <code>tuningLab.acceptance.test.tsx</code></td></tr>
+        <tr><td>12 · Validate</td><td>Validator: 1 critical (AC 3.7 no measured rows), 6 important; Security: 0 critical, 3 important (I1–I3), 8 minor</td><td>build log</td></tr>
+        <tr><td>13 · Fix</td><td>Real sweep → 12 measured rows in COMPARISON §7; <code>noiseReduction</code> 400; docs; NaN guard in noisereduce/DFN; panel comment/chip fixes</td><td>—</td></tr>
+        <tr><td>14 · Polish</td><td>~95 lines removed, docs synced, one authorised behaviour fix (Cascade flush-drop); green</td><td>—</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="tickets" class="space-y-3">
+    <h2 class="text-2xl font-semibold">Tickets &amp; waves — 18 completed, 0 skipped, 0 escalated</h2>
+    <div class="overflow-x-auto rounded-box border border-base-300"><table class="table table-xs">
+      <thead><tr><th>Wave</th><th>Tickets</th><th>Reconcile</th></tr></thead>
+      <tbody>
+        <tr><td>0</td><td>01 fingerprint spine + capabilities · 08 noisy corpus</td><td>01 clean (parity byte-exact on 10 fixture cases; brief amendment: <code>postFilterBeta</code> step 0.01)</td></tr>
+        <tr><td>1</td><td>02 panel shell · 09 sweep runner</td><td>single-sided</td></tr>
+        <tr><td>2</td><td>03 persistence/presets/import · 04 Realtime start tuning · 06 Cascade start + live apply</td><td>04 clean (amendment: two <code>connect()</code> sites) · 06 clean</td></tr>
+        <tr><td>3a</td><td>05 Realtime live apply · 07 Cascade reconnect + dialog · 10 capture <code>--tuning</code> · 18 pickers</td><td>07: 2 rounds (no timeout for reconnect applies; sweep on any parked requestId) → clean</td></tr>
+        <tr><td>3b</td><td>11 mic constraints (+hydration-race fix) · 14 transcript check · 16 server denoise chain</td><td>14 clean · 16 clean</td></tr>
+        <tr><td>4</td><td>12 RMS gate + Realtime DSP · 17 DeepFilterNet + torch extra</td><td>17 clean (real smoke RTF 0.39)</td></tr>
+        <tr><td>5</td><td>13 RNNoise (48 kHz) · 15 Realtime flag endpoint</td><td>15 clean</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="delivered" class="space-y-3">
+    <h2 class="text-2xl font-semibold">What you can do now</h2>
+    <div class="grid gap-3 md:grid-cols-2 text-sm">
+      <div class="card bg-base-200 shadow"><div class="card-body"><h3 class="font-semibold">Tuning panel</h3><ul class="list-disc pl-5 space-y-1"><li>Every knob from decision 5/11 is a user selection: mic EC/NS/AGC; RMS gate (threshold/hold/attack/release/attenuation/full mute); RNNoise; OpenAI noise reduction (off/near/far/provider-default); Realtime turn detection (server/semantic VAD + threshold/prefix/silence/interrupt/eagerness, each with provider-default); Deepgram endpointing/utterance-end/diarize; segmentation mode+model; transcript check off/flag/correct (Realtime off/flag); server denoise noisereduce/DFN (+ offline rows disabled "benchmark only"); model/voice pickers from server allow-lists</li><li>Presets (Provider defaults / Tuned turn-taking / Max denoise + saved), export/import JSON, reset, localStorage; fingerprint chip in navbar + latency strip</li><li>Apply at connect or live: Realtime <code>session.update</code>; Cascade <code>update_tuning</code> with deliberate Deepgram reconnect (no frame lost, coalesced, per-attempt failures logged both sides, revert after budget, alert dialog with Retry/Revert)</li></ul></div></div>
+      <div class="card bg-base-200 shadow"><div class="card-body"><h3 class="font-semibold">Benchmark</h3><ul class="list-disc pl-5 space-y-1"><li><code>uv run python -m tests.fixtures.make_noisy_corpus</code> — babble/street/fan/white × 20/10/5 dB + clean rows (429 WAVs, git-ignored)</li><li><code>uv run python -m tests.fixtures.run_tuning_sweep --config a.json …</code> — rows per fingerprint/condition/SNR with WER, corrected WER, added vs provider latency; resume, cap, paste-ready §7 table</li><li><code>npm run capture:realtime-quality -- --tuning a.json</code> — imports the config through the panel, stamps fingerprint on envelope + items; report carries it through</li><li><code>uv sync --extra bench</code> (noisereduce) · <code>--extra denoise</code> (torch CPU + DeepFilterNet); capabilities endpoint reports installed/not with hints</li></ul></div></div>
+    </div>
+  </section>
+
+  <section id="evidence" class="space-y-3">
+    <h2 class="text-2xl font-semibold">Measured evidence (COMPARISON.md §7, real runs)</h2>
+    <div class="overflow-x-auto rounded-box border border-base-300"><table class="table table-xs">
+      <thead><tr><th>fingerprint</th><th>config</th><th>clean WER</th><th>babble 10 dB</th><th>street 10 dB</th><th>added / provider latency</th></tr></thead>
+      <tbody>
+        <tr><td><code>cfg:39ace417</code></td><td>defaults</td><td>1.6%</td><td>3.6%</td><td>1.6%</td><td>0 / 855–1170 ms</td></tr>
+        <tr><td><code>cfg:9d963847</code></td><td>endpointing 800 ms</td><td>1.6%</td><td>3.6%</td><td>1.6%</td><td>0 / 1295–1637 ms (+~450 ms)</td></tr>
+        <tr><td><code>cfg:dc4da27f</code></td><td>transcript check = correct</td><td>1.6% (corrected 1.6%)</td><td>3.6% (3.6%)</td><td>1.6% (1.6%)</td><td>0 / 832–1178 ms</td></tr>
+        <tr><td><code>cfg:b3bb3fbe</code></td><td>noisereduce</td><td>14.1% (one clip → 100% from a NaN bug, now guarded)</td><td>3.6%</td><td>1.6%</td><td><strong>2.6–3.3 s</strong> / 1065–1679 ms</td></tr>
+      </tbody>
+    </table></div>
+    <p class="text-sm text-base-content/70">n=8 items per cell. Plus a Realtime n=2 A/B smoke: RNNoise on <code>cfg:4762791b</code> (e2e 421/249 ms, exact transcript) vs off <code>cfg:724ea8f0</code> (487/171 ms) — proves the 48 kHz path doesn't destroy the signal; not a WER measurement. <strong>Honest gap:</strong> client-side stages (mic constraints, RMS gate, RNNoise) have no WER rows — the Cascade sweep replays server-side and cannot apply browser DSP; §7 says so explicitly.</p>
+  </section>
+
+  <section id="coverage" class="space-y-3">
+    <h2 class="text-2xl font-semibold">Acceptance coverage</h2>
+    <div class="grid gap-3 md:grid-cols-3 text-sm">
+      <div class="alert alert-success alert-soft"><span><strong>38 / 42 ACs</strong> fully covered by tests (all of S1–S31, F1–F17, E1–E16 mapped)</span></div>
+      <div class="alert alert-warning alert-soft"><span><strong>Partial:</strong> AC 2.3 (harness envelope stamping untested — needs a harness seam), AC 3.4 (non-empty transcript needs live keys; plumbing + parity tested), E10 hollow (clean row exists but can't serve its RNNoise purpose in the Cascade sweep)</span></div>
+      <div class="alert alert-error alert-soft"><span><strong>Not met:</strong> AC 3.7 client-stage half (RMS gate / RNNoise / mic constraints have no benchmarked WER delta — structural: server-side sweep can't apply browser DSP); AC 5.4 half — offline demucs/dns64 are selectable + recorded but <em>never executed</em> by the sweep</span></div>
+    </div>
+  </section>
+
+  <section id="findings" class="space-y-3">
+    <h2 class="text-2xl font-semibold">Remaining findings (none critical)</h2>
+    <div class="grid gap-3 md:grid-cols-2 text-sm">
+      <div class="card bg-base-200 shadow"><div class="card-body"><h3 class="font-semibold">Security — Important (documented in AGENTS.md, not fixed)</h3><ul class="list-disc pl-5 space-y-1"><li><strong>I1</strong> <code>update_tuning</code> connection-level spam → unbounded Deepgram connect churn (no per-session reconnect rate limit; no-Origin clients admitted by design)</li><li><strong>I2</strong> <code>audio_queue</code> unbounded + synchronous denoise <code>process()</code> on the event loop (noisereduce ~2.7 s/clip; DFN init ~2.7 s)</li><li><strong>I3</strong> <code>POST /api/tuning/transcript-check</code> unauthenticated/unmetered LLM proxy (CORS blocks web pages; local processes can hit it)</li><li>Minor: unbounded <code>requestId</code>/rejected-value logging; <code>json.loads</code> non-JSONDecodeError ValueError; client.* ranges + NaN/Infinity accepted server-side; prompt-injection steerability of <code>corrected</code>; harness path traversal (operator-supplied); DFN weights fetched unpinned</li></ul></div></div>
+      <div class="card bg-base-200 shadow"><div class="card-body"><h3 class="font-semibold">Review — Important / design</h3><ul class="list-disc pl-5 space-y-1"><li>Provider-boundary leak: orchestrator builds <code>DeepgramParams</code>; <code>params: Any</code> on the STT Protocol</li><li>Three range tables (fingerprint / orchestrator / realtime) + panel step literals; TS/Py canonicaliser latent divergences (null handling, post-step re-clamp) not exercised by the fixture; <code>schema.py</code> comment still says step 0.05; <code>ttsVoiceA</code> default <code>""</code> server-side</li><li><code>TuningPanel.tsx</code> ~1600 lines / 19 mode switches; stringly knob paths; duplicated §7 renderers; report script hardcodes captures path (per-config <code>--out</code> can't be read back)</li><li>Reconnect applies untimed across an unexpected drop→resume; Cascade DSP ctx is 48 kHz only with RNNoise (AGENTS.md says "always")</li><li>Apply-during-silence leaves the badge amber until speech (by design; copy doesn't say so)</li></ul></div></div>
+    </div>
+  </section>
+
+  <section id="notdone" class="space-y-3">
+    <h2 class="text-2xl font-semibold">Not done / needs your decision</h2>
+    <ul class="list-disc pl-5 text-sm space-y-1">
+      <li><strong>AC 3.7 client-stage WER rows</strong> — either add an offline pre-filter path in the sweep (port the RMS gate math to Python; RNNoise has no Python runtime → would need the browser fake-mic harness for Cascade) or re-scope AC 3.7 to server-side stages. §7 currently states the gap.</li>
+      <li><strong>Offline demucs/dns64 execution</strong> in the sweep (needs the <code>denoise</code> extra + demucs/denoiser code) — currently recorded as "unavailable" per row.</li>
+      <li><strong>DeepFilterNet rows</strong> — extra not installed in this env (~200 MB CPU torch); stage verified in an isolated venv (RTF 0.39).</li>
+      <li><strong>Per-fingerprint Realtime report</strong> — needs a fresh per-config re-capture (existing <code>captures.json</code> back-fills the envelope fingerprint onto untagged items; trap documented).</li>
+      <li>Security I1–I3 remediations (rate-limit reconnects; bounded queue + <code>to_thread</code>; token bucket on the LLM route).</li>
+      <li>Proposed docs (not created): CONTRIBUTING.md, docs/api.md, glossary, ADR home; LICENSE is a human choice.</li>
+      <li>Repo hygiene: git warns LF→CRLF on many files (pre-existing autocrlf setting) — consider <code>.gitattributes</code> before a PR.</li>
+    </ul>
+  </section>
+
+  <section id="files" class="space-y-3">
+    <h2 class="text-2xl font-semibold">Files changed</h2>
+    <div class="grid gap-3 md:grid-cols-2 text-sm">
+      <div class="card bg-base-200 shadow"><div class="card-body"><h3 class="font-semibold">Backend (20 modified + new)</h3><p><code>app/tuning/{schema,fingerprint,allowlists,defaults}.py</code>, <code>app/api/tuning.py</code>, <code>app/api/realtime.py</code>, <code>app/orchestrator.py</code>, <code>app/providers/{denoise,transcript_check,deepgram_stt,base,openai_translation,segmentation_checker}.py</code>, <code>app/{config,main}.py</code>, <code>pyproject.toml</code> + <code>uv.lock</code> (extras <code>bench</code>, <code>denoise</code>), <code>.env.example</code>; fixtures <code>make_noisy_corpus.py</code>, <code>run_tuning_sweep.py</code>, <code>stt_replay.py</code>, <code>run_realtime_quality_report.py</code>, <code>noisy/SCRIPT.md</code>; tests: 11 new files + 8 extended (346 total)</p></div></div>
+      <div class="card bg-base-200 shadow"><div class="card-body"><h3 class="font-semibold">Frontend (26 modified + new)</h3><p><code>TuningPanel.tsx</code>, <code>TuningSection.tsx</code>, <code>tuningConfig.ts</code>, <code>tuningPresets.ts</code>, <code>tuningCapabilities.ts</code>, <code>useTuningConfig.ts</code>, <code>rmsGate.ts</code>, <code>resample.ts</code>, <code>rnnoiseConfig.ts</code>, <code>gateConfig.ts</code>, <code>public/{gate-processor,cascade-pcm-processor}.js</code>, <code>useCascadeSession.ts</code>, <code>useRealtimeSession.ts</code>, <code>WorkbenchPage.tsx</code>, <code>sessionHandle.ts</code>, <code>latencyTracking.ts</code>, <code>transcriptPane.ts</code>, <code>segmentation.ts</code>, configs, test fakes; <code>package.json</code> (+<code>@sapphi-red/web-noise-suppressor</code>); e2e harness <code>--tuning</code> + <code>tuning-import.spec.ts</code>; tests 18 files (499 total)</p></div></div>
+    </div>
+    <p class="text-sm text-base-content/70">Repo root: <code>shared/tuning-fingerprint-cases.json</code>, <code>.gitignore</code>, <code>README.md</code>, <code>AGENTS.md</code> (Phase 3 section), <code>COMPARISON.md</code> §7. Planning artifacts under <code>.scratch/tuning-lab/</code> and <code>.lavish/</code>.</p>
+  </section>
+
+  <section id="gate" class="card bg-primary text-primary-content shadow-lg"><div class="card-body">
+    <h2 class="card-title">Step 15 gate — your call</h2>
+    <p class="text-sm">Open a PR (I will not commit/push until you say so), keep working (e.g. the AC 3.7 offline pre-filter path, security I1–I3, offline demucs), or leave it as-is in the working tree.</p>
+  </div></section>
+
+  <footer class="text-xs text-base-content/50 pt-6 border-t border-base-300">Build log: <code>.scratch/tuning-lab/06-build-log.md</code> · design: app's own DaisyUI v5 <code>luxury</code> theme.</footer>
+</main>
+</body>
+</html>

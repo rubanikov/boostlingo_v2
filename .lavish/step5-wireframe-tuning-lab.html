@@ -1,0 +1,1216 @@
+<title>Step 5 — Wireframe: Audio Tuning &amp; Denoise Lab</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex) > * { min-width: 0; }
+  html { scroll-behavior: smooth; }
+  code { font-size: 0.85em; }
+
+  /* Copied verbatim from frontend/src/index.css so the mock's diarized
+     speaker treatment matches the real app. */
+  .speakerA { border-left: 3px solid #38bdf8; }
+  .speakerB { border-left: 3px solid #fb923c; }
+  .speakerA-badge { background: #0c4a6e; color: #e0f2fe; }
+  .speakerB-badge { background: #7c2d12; color: #ffedd5; }
+
+  /* Wireframe-only chrome: the dashed frame + caption around each mock.
+     Not part of the app. */
+  .mockframe { border: 1px dashed color-mix(in oklab, currentColor 25%, transparent); border-radius: 1rem; padding: .75rem; }
+  .mockcap { font-size: .7rem; letter-spacing: .08em; text-transform: uppercase; opacity: .55; }
+  /* Marks a row that has an unapplied change (see notes: pending diff). */
+  .pending { box-shadow: inset 3px 0 0 var(--color-warning); }
+</style>
+
+<html data-theme="luxury">
+<body class="bg-base-100 text-base-content min-h-screen">
+<main class="mx-auto max-w-[1400px] p-6 lg:p-8 space-y-10">
+
+  <!-- ══════════════════════════ HEADER ══════════════════════════ -->
+  <header class="space-y-3">
+    <div class="flex flex-wrap items-center gap-3">
+      <span class="badge badge-warning badge-lg">Feature Factory — Step 5 GATE</span>
+      <span class="badge badge-ghost">UX wireframe · nothing built yet</span>
+      <span class="badge badge-ghost font-mono">cfg:7f3a9c21</span>
+    </div>
+    <h1 class="text-4xl font-bold">Audio Tuning &amp; Denoise Lab — wireframe</h1>
+    <p class="text-base-content/70 max-w-4xl">
+      The real <code>WorkbenchPage</code> layout (navbar, mode tabs, language select, connection badge,
+      latency strip, dual transcript cards, mic level bar, mic button, toasts) reproduced with the new
+      <strong>Tuning panel</strong> added. Every DaisyUI class below is one the page already uses.
+      Notes for the spec-writer and frontend-builder:
+      <code>.scratch/tuning-lab/03-wireframe-notes.md</code>.
+    </p>
+    <nav class="flex flex-wrap gap-2 text-sm">
+      <a href="#placement" class="btn btn-xs btn-ghost">Placement</a>
+      <a href="#collapsed" class="btn btn-xs btn-ghost">1 · Collapsed</a>
+      <a href="#expanded" class="btn btn-xs btn-ghost">2 · Expanded (Cascade)</a>
+      <a href="#realtime" class="btn btn-xs btn-ghost">3 · Realtime variant</a>
+      <a href="#states" class="btn btn-xs btn-ghost">4 · States</a>
+      <a href="#testids" class="btn btn-xs btn-ghost">5 · data-testids</a>
+      <a href="#questions" class="btn btn-xs btn-ghost">Open questions</a>
+    </nav>
+  </header>
+
+  <!-- ══════════════════════════ PLACEMENT ══════════════════════════ -->
+  <section id="placement" class="space-y-4">
+    <h2 class="text-2xl font-semibold">Placement decision</h2>
+    <div class="grid lg:grid-cols-3 gap-4">
+      <div class="card card-border bg-base-100 border-success">
+        <div class="card-body p-4 gap-2">
+          <div class="flex items-center gap-2">
+            <span class="badge badge-success badge-sm">Chosen</span>
+            <h3 class="font-semibold">Right-hand collapsible side panel</h3>
+          </div>
+          <p class="text-sm text-base-content/70">
+            Toggled by a <strong>Tuning</strong> button in <code>navbar-end</code>, next to the connection badge.
+            Open, it takes a fixed 400&nbsp;px column and the transcript grid collapses from
+            <code>sm:grid-cols-2</code> to a single column — <em>transcripts stay on screen the whole time you tune</em>,
+            which is the entire point of a lab: turn a knob, press Apply, watch the very next segment.
+          </p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body p-4 gap-2">
+          <div class="flex items-center gap-2">
+            <span class="badge badge-ghost badge-sm">Rejected</span>
+            <h3 class="font-semibold">Collapsible section under the navbar</h3>
+          </div>
+          <p class="text-sm text-base-content/70">
+            Six accordion sections stacked full-width push the transcript cards below the fold. You'd
+            scroll away from the thing you're measuring every time you change a knob. Only wins on
+            implementation cost.
+          </p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body p-4 gap-2">
+          <div class="flex items-center gap-2">
+            <span class="badge badge-ghost badge-sm">Rejected</span>
+            <h3 class="font-semibold">Modal dialog</h3>
+          </div>
+          <p class="text-sm text-base-content/70">
+            A modal hides the transcripts and the latency strip completely, and the app already reserves
+            the modal treatment for the one blocking case (apply-failed dialog, mock 4c). Two modals
+            with different urgency reads badly.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════ 1 · COLLAPSED ══════════════════════════ -->
+  <section id="collapsed" class="space-y-3">
+    <h2 class="text-2xl font-semibold">1 · Collapsed — the panel is shut, the navbar carries the state</h2>
+    <p class="text-sm text-base-content/70 max-w-4xl">
+      Default. The only new pixels on the page are the <strong>Tuning</strong> button, its monospace
+      fingerprint chip, the amber pending-count badge, and the fingerprint chip that now rides on the end
+      of the latency strip. Fingerprint chip and pending badge are the whole collapsed-state contract:
+      <em>which config am I running, and is what I see on screen actually what's applied?</em>
+    </p>
+    <p class="mockcap">Mock 1 — desktop, Cascade mode, connected, 3 unapplied changes</p>
+    <div class="mockframe">
+      <div class="mx-auto max-w-6xl px-4 py-4 space-y-4">
+
+        <div class="navbar bg-base-200 rounded-box">
+          <div class="navbar-start gap-3">
+            <div role="tablist" class="tabs tabs-box tabs-sm">
+              <button type="button" role="tab" aria-selected="true" class="tab tab-active">Cascade</button>
+              <button type="button" role="tab" aria-selected="false" class="tab">Realtime</button>
+            </div>
+            <select class="select select-sm w-40" aria-label="Language pair">
+              <option>English ↔ Spanish</option>
+              <option>English ↔ French</option>
+            </select>
+          </div>
+          <div class="navbar-end gap-2">
+            <!-- NEW: tuning toggle. Sits before the connection badge so the badge
+                 stays the right-most, highest-salience element (unchanged). -->
+            <button type="button" class="btn btn-sm btn-ghost gap-2"
+                    aria-expanded="false" aria-controls="tuning-panel" data-testid="tuning-toggle">
+              <span aria-hidden="true">🎛</span>
+              Tuning
+              <span class="badge badge-ghost badge-xs font-mono" data-testid="tuning-fingerprint">cfg:7f3a9c21</span>
+              <span class="badge badge-warning badge-xs" data-testid="tuning-pending-count">3 pending</span>
+            </button>
+            <span class="badge badge-success badge-soft gap-1" role="status">
+              <span class="w-2 h-2 rounded-full bg-success"></span>
+              Connected
+            </span>
+          </div>
+        </div>
+
+        <!-- Latency strip — unchanged except for the trailing fingerprint chip. -->
+        <div class="card card-border bg-base-100">
+          <div class="card-body p-3">
+            <div class="flex items-center gap-4 text-xs overflow-x-auto" data-testid="cascade-latency-strip">
+              <span class="font-medium text-base-content/60 shrink-0">Latency</span>
+              <span class="badge badge-ghost">STT 210ms</span>
+              <span class="text-base-content/30">→</span>
+              <span class="badge badge-ghost">speech end 340ms</span>
+              <span class="text-base-content/30">→</span>
+              <span class="badge badge-warning badge-soft">MT first token 880ms</span>
+              <span class="text-base-content/30">→</span>
+              <span class="badge badge-ghost">MT done 1120ms</span>
+              <span class="text-base-content/30">→</span>
+              <span class="badge badge-ghost">TTS 1290ms</span>
+              <span class="text-base-content/30">→</span>
+              <span class="badge badge-primary">playback 1465ms</span>
+              <!-- NEW: which config produced these numbers. -->
+              <span class="badge badge-ghost badge-xs font-mono shrink-0"
+                    title="Applied tuning config" data-testid="tuning-fingerprint-latency">cfg:7f3a9c21</span>
+              <progress class="progress progress-success w-32 ml-auto shrink-0" value="1465" max="2000"></progress>
+              <span class="text-base-content/50 shrink-0">/ 2000ms target</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div class="card card-border bg-base-100 h-[260px] flex flex-col">
+            <div class="card-body p-4 flex flex-col gap-3 overflow-y-auto">
+              <h3 class="text-xs uppercase tracking-wide text-base-content/50">Source</h3>
+              <div data-testid="source-transcript">
+                <div class="speakerA pl-3 py-1">
+                  <span class="badge speakerA-badge badge-xs mb-1">Speaker A</span>
+                  <p class="text-sm">The compressor on line two is running hot again.<span class="text-base-content/40 text-[10px]"> (pause)</span></p>
+                </div>
+                <div class="speakerB pl-3 py-1">
+                  <span class="badge speakerB-badge badge-xs mb-1">Speaker B</span>
+                  <p class="text-sm">¿Desde cuándo?<span class="text-base-content/40 text-[10px]"> (llm)</span></p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="card card-border bg-base-100 h-[260px] flex flex-col">
+            <div class="card-body p-4 flex flex-col gap-3 overflow-y-auto">
+              <h3 class="text-xs uppercase tracking-wide text-base-content/50">Target</h3>
+              <div data-testid="target-transcript">
+                <div class="speakerA pl-3 py-1">
+                  <span class="badge speakerA-badge badge-xs mb-1">Speaker A</span>
+                  <p class="text-sm">El compresor de la línea dos está calentándose otra vez.</p>
+                </div>
+                <div class="speakerB pl-3 py-1">
+                  <span class="badge speakerB-badge badge-xs mb-1">Speaker B</span>
+                  <p class="text-sm">Since when?</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-center gap-4 py-2">
+          <div class="w-40 h-2 rounded-full bg-base-300 overflow-hidden">
+            <div class="h-full bg-success" data-testid="mic-level-bar" style="width: 46%"></div>
+          </div>
+          <button type="button" aria-label="Disconnect microphone" class="btn btn-circle btn-lg btn-success">🎙️</button>
+          <span class="badge badge-success badge-soft">Listening</span>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════ 2 · EXPANDED (CASCADE) ══════════════════════════ -->
+  <section id="expanded" class="space-y-3">
+    <h2 class="text-2xl font-semibold">2 · Expanded — Cascade variant, the full panel</h2>
+    <p class="text-sm text-base-content/70 max-w-4xl">
+      Sections are in <strong>signal order</strong> — the order a sample actually travels: microphone
+      constraints → denoise chain → turn detection → segmentation → transcript check → models. Each is a
+      DaisyUI <code>collapse collapse-arrow</code> built on native <code>&lt;details&gt;/&lt;summary&gt;</code>
+      so it is keyboard-operable with no JS. Three rows carry a pending-change dot
+      (amber left rule + amber dot next to the label), matching the "3 pending" badge in the navbar.
+    </p>
+    <p class="mockcap">Mock 2 — desktop, Cascade mode, connected, panel open</p>
+    <div class="mockframe">
+      <div class="mx-auto max-w-[1180px] px-4 py-4 space-y-4">
+
+        <div class="navbar bg-base-200 rounded-box">
+          <div class="navbar-start gap-3">
+            <div role="tablist" class="tabs tabs-box tabs-sm">
+              <button type="button" role="tab" aria-selected="true" class="tab tab-active">Cascade</button>
+              <button type="button" role="tab" aria-selected="false" class="tab">Realtime</button>
+            </div>
+            <select class="select select-sm w-40" aria-label="Language pair">
+              <option>English ↔ Spanish</option>
+            </select>
+          </div>
+          <div class="navbar-end gap-2">
+            <button type="button" class="btn btn-sm btn-active btn-ghost gap-2" aria-expanded="true" aria-controls="tuning-panel">
+              <span aria-hidden="true">🎛</span> Tuning
+              <span class="badge badge-ghost badge-xs font-mono">cfg:7f3a9c21</span>
+              <span class="badge badge-warning badge-xs">3 pending</span>
+            </button>
+            <span class="badge badge-success badge-soft gap-1" role="status">
+              <span class="w-2 h-2 rounded-full bg-success"></span> Connected
+            </span>
+          </div>
+        </div>
+
+        <!-- Two-column shell: page content shrinks, panel takes a fixed column. -->
+        <div class="flex gap-4 items-start">
+
+          <!-- ─── LEFT: the existing page, now single-column ─── -->
+          <div class="flex-1 min-w-0 space-y-4">
+            <div class="card card-border bg-base-100">
+              <div class="card-body p-3">
+                <div class="flex items-center gap-3 text-xs overflow-x-auto">
+                  <span class="font-medium text-base-content/60 shrink-0">Latency</span>
+                  <span class="badge badge-ghost">STT 210ms</span>
+                  <span class="text-base-content/30">→</span>
+                  <span class="badge badge-warning badge-soft">MT first token 880ms</span>
+                  <span class="text-base-content/30">→</span>
+                  <span class="badge badge-primary">playback 1465ms</span>
+                  <span class="badge badge-ghost badge-xs font-mono shrink-0">cfg:7f3a9c21</span>
+                </div>
+              </div>
+            </div>
+            <div class="card card-border bg-base-100 h-[300px] flex flex-col">
+              <div class="card-body p-4 flex flex-col gap-3 overflow-y-auto">
+                <h3 class="text-xs uppercase tracking-wide text-base-content/50">Source</h3>
+                <div>
+                  <div class="speakerA pl-3 py-1">
+                    <span class="badge speakerA-badge badge-xs mb-1">Speaker A</span>
+                    <p class="text-sm">The compressor on line two is running hot again.<span class="text-base-content/40 text-[10px]"> (pause)</span></p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="card card-border bg-base-100 h-[300px] flex flex-col">
+              <div class="card-body p-4 flex flex-col gap-3 overflow-y-auto">
+                <h3 class="text-xs uppercase tracking-wide text-base-content/50">Target</h3>
+                <div>
+                  <div class="speakerA pl-3 py-1">
+                    <span class="badge speakerA-badge badge-xs mb-1">Speaker A</span>
+                    <p class="text-sm">El compresor de la línea dos está calentándose otra vez.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center justify-center gap-4 py-2">
+              <div class="w-40 h-2 rounded-full bg-base-300 overflow-hidden">
+                <div class="h-full bg-success" style="width: 46%"></div>
+              </div>
+              <button type="button" aria-label="Disconnect microphone" class="btn btn-circle btn-lg btn-success">🎙️</button>
+              <span class="badge badge-success badge-soft">Listening</span>
+            </div>
+          </div>
+
+          <!-- ─── RIGHT: the Tuning panel ─── -->
+          <aside id="tuning-panel" class="w-[400px] shrink-0 card card-border bg-base-100 sticky top-4"
+                 aria-label="Tuning panel" data-testid="tuning-panel">
+            <div class="card-body p-0">
+
+              <!-- ── Panel header ── -->
+              <div class="p-3 border-b border-base-300 space-y-2">
+                <div class="flex items-center gap-2">
+                  <h2 class="font-semibold text-sm flex-1">Tuning
+                    <span class="badge badge-ghost badge-sm ml-1">Cascade</span>
+                  </h2>
+                  <span class="badge badge-ghost badge-sm font-mono">cfg:7f3a9c21</span>
+                  <button type="button" class="btn btn-xs btn-ghost btn-circle" aria-label="Close tuning panel" data-testid="tuning-close">✕</button>
+                </div>
+                <div class="flex items-center gap-2">
+                  <label for="preset" class="sr-only">Preset</label>
+                  <select id="preset" class="select select-xs flex-1" data-testid="tuning-preset">
+                    <optgroup label="Built-in">
+                      <option>Provider defaults</option>
+                      <option selected>Tuned turn-taking</option>
+                      <option>Max denoise</option>
+                    </optgroup>
+                    <optgroup label="My presets">
+                      <option>babble-5db-v3</option>
+                      <option>gate-only</option>
+                    </optgroup>
+                    <option value="__save">Save as…</option>
+                  </select>
+                  <button type="button" class="btn btn-xs" data-testid="tuning-export">Export</button>
+                  <button type="button" class="btn btn-xs" data-testid="tuning-import">Import</button>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button type="button" class="btn btn-xs btn-ghost" data-testid="tuning-reset">Reset to defaults</button>
+                  <span class="text-[11px] text-base-content/50 ml-auto">Preset modified</span>
+                </div>
+              </div>
+
+              <!-- ── Scrolling section stack ── -->
+              <div class="overflow-y-auto max-h-[560px] p-2 space-y-2">
+
+                <!-- ─────── MICROPHONE ─────── -->
+                <details class="collapse collapse-arrow bg-base-200 rounded-box" open data-testid="tuning-section-microphone">
+                  <summary class="collapse-title text-sm font-medium min-h-0 py-2">
+                    Microphone
+                    <span class="badge badge-ghost badge-xs ml-1">browser</span>
+                  </summary>
+                  <div class="collapse-content text-sm space-y-1">
+                    <div class="flex items-center gap-2 py-1">
+                      <input type="checkbox" id="k-ec" class="toggle toggle-xs toggle-primary" checked data-testid="tuning-mic-ec">
+                      <label for="k-ec" class="flex-1 cursor-pointer">Echo cancellation</label>
+                      <span class="text-[11px] text-base-content/40 font-mono">echoCancellation</span>
+                    </div>
+                    <div class="flex items-center gap-2 py-1 pending pl-2 rounded">
+                      <span class="w-1.5 h-1.5 rounded-full bg-warning shrink-0" title="Changed, not applied"></span>
+                      <input type="checkbox" id="k-ns" class="toggle toggle-xs toggle-primary" data-testid="tuning-mic-ns">
+                      <label for="k-ns" class="flex-1 cursor-pointer">Noise suppression</label>
+                      <span class="text-[11px] text-base-content/40 font-mono">noiseSuppression</span>
+                    </div>
+                    <div class="flex items-center gap-2 py-1">
+                      <input type="checkbox" id="k-agc" class="toggle toggle-xs toggle-primary" checked data-testid="tuning-mic-agc">
+                      <label for="k-agc" class="flex-1 cursor-pointer">Auto gain control</label>
+                      <span class="text-[11px] text-base-content/40 font-mono">autoGainControl</span>
+                    </div>
+                    <p class="text-[11px] text-base-content/50 pt-1">
+                      Applied at <code>getUserMedia</code> time — takes effect on the next connect.
+                    </p>
+                  </div>
+                </details>
+
+                <!-- ─────── DENOISE CHAIN ─────── -->
+                <details class="collapse collapse-arrow bg-base-200 rounded-box" open data-testid="tuning-section-denoise">
+                  <summary class="collapse-title text-sm font-medium min-h-0 py-2">
+                    Denoise chain
+                    <span class="badge badge-primary badge-xs ml-1">2 on</span>
+                  </summary>
+                  <div class="collapse-content text-sm space-y-2">
+                    <p class="text-[11px] text-base-content/50">Stages run top to bottom, in signal order.</p>
+
+                    <!-- RMS gate -->
+                    <div class="rounded-box border border-base-300 p-2 space-y-2 pending">
+                      <div class="flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 rounded-full bg-warning shrink-0" title="Changed, not applied"></span>
+                        <input type="checkbox" id="k-rms" class="toggle toggle-xs toggle-primary" checked data-testid="tuning-rms-enabled">
+                        <label for="k-rms" class="font-medium cursor-pointer flex-1">RMS noise gate</label>
+                        <span class="badge badge-ghost badge-xs">runs in: browser</span>
+                      </div>
+                      <div class="grid grid-cols-2 gap-x-3 gap-y-2 pl-6">
+                        <div class="col-span-2">
+                          <label for="k-rms-thr" class="text-[11px] text-base-content/60 flex justify-between">
+                            <span>Threshold</span><span class="font-mono">−45 dBFS</span>
+                          </label>
+                          <input type="range" id="k-rms-thr" class="range range-xs range-primary" min="-80" max="0" value="-45" data-testid="tuning-rms-threshold">
+                        </div>
+                        <div>
+                          <label for="k-rms-hold" class="text-[11px] text-base-content/60">Hold (ms)</label>
+                          <input type="number" id="k-rms-hold" class="input input-xs w-full" value="200" data-testid="tuning-rms-hold">
+                        </div>
+                        <div>
+                          <label for="k-rms-atk" class="text-[11px] text-base-content/60">Attack (ms)</label>
+                          <input type="number" id="k-rms-atk" class="input input-xs w-full" value="5" data-testid="tuning-rms-attack">
+                        </div>
+                        <div>
+                          <label for="k-rms-rel" class="text-[11px] text-base-content/60">Release (ms)</label>
+                          <input type="number" id="k-rms-rel" class="input input-xs w-full" value="80" data-testid="tuning-rms-release">
+                        </div>
+                        <div class="flex items-end">
+                          <label class="label cursor-pointer gap-2 py-0">
+                            <input type="checkbox" class="checkbox checkbox-xs" data-testid="tuning-rms-mute">
+                            <span class="label-text text-[11px]">Full mute</span>
+                          </label>
+                        </div>
+                        <div class="col-span-2">
+                          <label for="k-rms-att" class="text-[11px] text-base-content/60 flex justify-between">
+                            <span>Attenuation</span><span class="font-mono">12 dB duck</span>
+                          </label>
+                          <input type="range" id="k-rms-att" class="range range-xs range-primary" min="0" max="60" value="12" data-testid="tuning-rms-attenuation">
+                          <div class="flex justify-between text-[10px] text-base-content/40"><span>0 dB (off)</span><span>60 dB</span><span>mute</span></div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- RNNoise -->
+                    <div class="rounded-box border border-base-300 p-2 space-y-2">
+                      <div class="flex items-center gap-2">
+                        <input type="checkbox" id="k-rnn" class="toggle toggle-xs toggle-primary" checked data-testid="tuning-rnnoise-enabled">
+                        <label for="k-rnn" class="font-medium cursor-pointer flex-1">RNNoise (WASM)</label>
+                        <span class="badge badge-ghost badge-xs">runs in: browser</span>
+                      </div>
+                      <div class="pl-6">
+                        <label for="k-rnn-vp" class="text-[11px] text-base-content/60 flex justify-between">
+                          <span>Voice-probability threshold</span><span class="font-mono">0.50</span>
+                        </label>
+                        <input type="range" id="k-rnn-vp" class="range range-xs range-primary" min="0" max="100" value="50" data-testid="tuning-rnnoise-voice-prob">
+                        <p class="text-[10px] text-base-content/40">Resamples to 48 kHz / 480-sample frames internally.</p>
+                      </div>
+                    </div>
+
+                    <!-- OpenAI noise reduction — Realtime only, shown disabled here -->
+                    <div class="rounded-box border border-base-300 border-dashed p-2 space-y-2 opacity-50">
+                      <div class="flex items-center gap-2">
+                        <input type="checkbox" class="toggle toggle-xs" disabled>
+                        <span class="font-medium flex-1">OpenAI noise reduction</span>
+                        <span class="badge badge-ghost badge-xs">Realtime only</span>
+                      </div>
+                      <div class="join pl-6">
+                        <input type="radio" name="oai-nr-c" class="join-item btn btn-xs" aria-label="off" disabled checked>
+                        <input type="radio" name="oai-nr-c" class="join-item btn btn-xs" aria-label="near_field" disabled>
+                        <input type="radio" name="oai-nr-c" class="join-item btn btn-xs" aria-label="far_field" disabled>
+                      </div>
+                    </div>
+
+                    <!-- DeepFilterNet — Cascade only, "not installed" variant -->
+                    <div class="rounded-box border border-base-300 p-2 space-y-2">
+                      <div class="flex items-center gap-2 opacity-60">
+                        <input type="checkbox" id="k-dfn" class="toggle toggle-xs" disabled data-testid="tuning-dfn-enabled">
+                        <label for="k-dfn" class="font-medium flex-1">DeepFilterNet</label>
+                        <span class="badge badge-ghost badge-xs">runs in: server</span>
+                        <span class="badge badge-warning badge-soft badge-xs" data-testid="tuning-dfn-unavailable">not installed</span>
+                      </div>
+                      <p class="text-[11px] text-base-content/50 pl-6">
+                        Install with <code>uv sync --extra denoise</code> in <code>backend/</code>, then reconnect.
+                      </p>
+                      <div class="grid grid-cols-2 gap-x-3 pl-6 opacity-40">
+                        <div>
+                          <label for="k-dfn-lim" class="text-[11px]">Attenuation limit (dB)</label>
+                          <input type="number" id="k-dfn-lim" class="input input-xs w-full" value="24" disabled data-testid="tuning-dfn-attenuation-limit">
+                        </div>
+                        <div>
+                          <label for="k-dfn-pf" class="text-[11px]">Post-filter strength</label>
+                          <input type="number" id="k-dfn-pf" class="input input-xs w-full" value="0.02" step="0.01" disabled data-testid="tuning-dfn-post-filter">
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- noisereduce -->
+                    <div class="rounded-box border border-base-300 p-2 space-y-2">
+                      <div class="flex items-center gap-2">
+                        <input type="checkbox" id="k-nr" class="toggle toggle-xs toggle-primary" data-testid="tuning-noisereduce-enabled">
+                        <label for="k-nr" class="font-medium cursor-pointer flex-1">noisereduce</label>
+                        <span class="badge badge-ghost badge-xs">runs in: server</span>
+                      </div>
+                      <div class="grid grid-cols-2 gap-x-3 gap-y-1 pl-6">
+                        <div>
+                          <label for="k-nr-pd" class="text-[11px] text-base-content/60 flex justify-between">
+                            <span>prop_decrease</span><span class="font-mono">0.80</span>
+                          </label>
+                          <input type="range" id="k-nr-pd" class="range range-xs" min="0" max="100" value="80" data-testid="tuning-noisereduce-prop-decrease">
+                        </div>
+                        <div>
+                          <span class="text-[11px] text-base-content/60">Noise model</span>
+                          <div class="join w-full">
+                            <input type="radio" name="nr-stat" class="join-item btn btn-xs flex-1" aria-label="stationary" checked data-testid="tuning-noisereduce-stationary">
+                            <input type="radio" name="nr-stat" class="join-item btn btn-xs flex-1" aria-label="non-stationary">
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Offline-only -->
+                    <div class="rounded-box border border-base-300 border-dashed p-2 space-y-1 opacity-60">
+                      <div class="flex items-center gap-2">
+                        <input type="checkbox" class="toggle toggle-xs" disabled data-testid="tuning-demucs-enabled">
+                        <span class="font-medium flex-1">Demucs</span>
+                        <span class="badge badge-neutral badge-xs">benchmark only</span>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <input type="checkbox" class="toggle toggle-xs" disabled data-testid="tuning-dns-enabled">
+                        <span class="font-medium flex-1">denoiser (DNS64)</span>
+                        <span class="badge badge-neutral badge-xs">benchmark only</span>
+                      </div>
+                      <p class="text-[11px] text-base-content/50">
+                        Too slow for the live path. Selectable in a benchmark config file; listed here so
+                        the panel stays the complete inventory of processing steps.
+                      </p>
+                    </div>
+                  </div>
+                </details>
+
+                <!-- ─────── TURN DETECTION / ENDPOINTING ─────── -->
+                <details class="collapse collapse-arrow bg-base-200 rounded-box" open data-testid="tuning-section-turn">
+                  <summary class="collapse-title text-sm font-medium min-h-0 py-2">
+                    Endpointing
+                    <span class="badge badge-ghost badge-xs ml-1">Deepgram</span>
+                    <span class="badge badge-warning badge-soft badge-xs ml-1">reconnects STT</span>
+                  </summary>
+                  <div class="collapse-content text-sm space-y-2">
+                    <div class="grid grid-cols-2 gap-3">
+                      <div class="pending pl-2 rounded">
+                        <label for="k-dg-ep" class="text-[11px] text-base-content/60 flex items-center gap-1">
+                          <span class="w-1.5 h-1.5 rounded-full bg-warning"></span> endpointing (ms)
+                        </label>
+                        <input type="number" id="k-dg-ep" class="input input-xs w-full" value="300" data-testid="tuning-dg-endpointing">
+                      </div>
+                      <div>
+                        <label for="k-dg-ue" class="text-[11px] text-base-content/60">utterance_end_ms</label>
+                        <input type="number" id="k-dg-ue" class="input input-xs w-full" value="3000" data-testid="tuning-dg-utterance-end">
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <input type="checkbox" id="k-dg-di" class="toggle toggle-xs toggle-primary" checked data-testid="tuning-dg-diarize">
+                      <label for="k-dg-di" class="flex-1 cursor-pointer">Diarize (Speaker A / B)</label>
+                    </div>
+                    <p class="text-[11px] text-base-content/50">
+                      All three are Deepgram connection-level. Applying reopens the STT socket; queued audio is
+                      replayed, no segment is lost.
+                    </p>
+                  </div>
+                </details>
+
+                <!-- ─────── SEGMENTATION ─────── -->
+                <details class="collapse collapse-arrow bg-base-200 rounded-box" data-testid="tuning-section-segmentation">
+                  <summary class="collapse-title text-sm font-medium min-h-0 py-2">
+                    Segmentation
+                    <span class="badge badge-ghost badge-xs ml-1">hybrid-race</span>
+                  </summary>
+                  <div class="collapse-content text-sm space-y-2">
+                    <div>
+                      <span class="text-[11px] text-base-content/60">Mode</span>
+                      <div class="join w-full">
+                        <input type="radio" name="segmode" class="join-item btn btn-xs flex-1" aria-label="hybrid-race" checked data-testid="tuning-segmentation-mode-hybrid">
+                        <input type="radio" name="segmode" class="join-item btn btn-xs flex-1" aria-label="llm-priority" data-testid="tuning-segmentation-mode-llm">
+                      </div>
+                    </div>
+                    <div>
+                      <label for="k-seg-model" class="text-[11px] text-base-content/60">Segmentation model</label>
+                      <select id="k-seg-model" class="select select-xs w-full" data-testid="tuning-segmentation-model">
+                        <option selected>gpt-4o-mini</option>
+                        <option>gpt-4.1-mini</option>
+                        <option>gpt-4.1-nano</option>
+                      </select>
+                    </div>
+                  </div>
+                </details>
+
+                <!-- ─────── TRANSCRIPT CHECK ─────── -->
+                <details class="collapse collapse-arrow bg-base-200 rounded-box" open data-testid="tuning-section-transcript-check">
+                  <summary class="collapse-title text-sm font-medium min-h-0 py-2">
+                    Transcript check
+                    <span class="badge badge-warning badge-soft badge-xs ml-1">flag</span>
+                  </summary>
+                  <div class="collapse-content text-sm space-y-2">
+                    <div class="join w-full">
+                      <input type="radio" name="tcheck-c" class="join-item btn btn-xs flex-1" aria-label="off" data-testid="tuning-transcript-check-off">
+                      <input type="radio" name="tcheck-c" class="join-item btn btn-xs flex-1" aria-label="flag" checked data-testid="tuning-transcript-check-flag">
+                      <input type="radio" name="tcheck-c" class="join-item btn btn-xs flex-1" aria-label="correct" data-testid="tuning-transcript-check-correct">
+                    </div>
+                    <p class="text-[11px] text-base-content/50">
+                      <strong>flag</strong> — non-blocking; a suspicious segment gets a badge, translation proceeds
+                      on the original text. <strong>correct</strong> — rewrites the source before translation and
+                      adds its own latency stage.
+                    </p>
+                    <div>
+                      <label for="k-tc-model" class="text-[11px] text-base-content/60">Check model</label>
+                      <select id="k-tc-model" class="select select-xs w-full" data-testid="tuning-transcript-check-model">
+                        <option selected>gpt-4o-mini</option>
+                        <option>gpt-4.1-mini</option>
+                      </select>
+                    </div>
+                  </div>
+                </details>
+
+                <!-- ─────── MODELS ─────── -->
+                <details class="collapse collapse-arrow bg-base-200 rounded-box" data-testid="tuning-section-models">
+                  <summary class="collapse-title text-sm font-medium min-h-0 py-2">
+                    Models &amp; voices
+                    <span class="badge badge-warning badge-soft badge-xs ml-1">reconnects STT</span>
+                  </summary>
+                  <div class="collapse-content text-sm space-y-2">
+                    <div>
+                      <label for="k-m-dg" class="text-[11px] text-base-content/60">Deepgram model</label>
+                      <select id="k-m-dg" class="select select-xs w-full" data-testid="tuning-model-deepgram">
+                        <option selected>nova-3</option>
+                        <option>nova-2</option>
+                        <option>nova-3-general</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label for="k-m-mt" class="text-[11px] text-base-content/60">Translation model</label>
+                      <select id="k-m-mt" class="select select-xs w-full" data-testid="tuning-model-translation">
+                        <option selected>gpt-4o-mini</option>
+                        <option>gpt-4.1-mini</option>
+                        <option>gpt-4o</option>
+                      </select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                      <div>
+                        <label for="k-v-a" class="text-[11px] text-base-content/60">TTS voice A</label>
+                        <select id="k-v-a" class="select select-xs w-full" data-testid="tuning-voice-a">
+                          <option selected>Rachel</option><option>Bella</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label for="k-v-b" class="text-[11px] text-base-content/60">TTS voice B</label>
+                        <select id="k-v-b" class="select select-xs w-full" data-testid="tuning-voice-b">
+                          <option selected>Antoni</option><option>Josh</option>
+                        </select>
+                      </div>
+                    </div>
+                    <p class="text-[11px] text-base-content/50">Curated allow-lists — no free text; the backend rejects anything outside them.</p>
+                  </div>
+                </details>
+
+              </div>
+
+              <!-- ── Panel footer ── -->
+              <div class="p-3 border-t border-base-300 space-y-2 bg-base-200 rounded-b-box">
+                <div class="flex items-center gap-2">
+                  <button type="button" class="btn btn-sm btn-primary flex-1" data-testid="tuning-apply">
+                    Apply (reconnects STT)
+                  </button>
+                  <button type="button" class="btn btn-sm btn-ghost" data-testid="tuning-revert">Revert</button>
+                </div>
+                <p class="text-[11px] text-base-content/60" role="status" aria-live="polite" data-testid="tuning-status">
+                  Applied · <span class="font-mono">cfg:7f3a9c21</span> · 12:04:31
+                </p>
+              </div>
+
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════ 3 · REALTIME VARIANT ══════════════════════════ -->
+  <section id="realtime" class="space-y-3">
+    <h2 class="text-2xl font-semibold">3 · Realtime variant — only what differs</h2>
+    <p class="text-sm text-base-content/70 max-w-4xl">
+      The panel is <strong>mode-scoped</strong>: it renders the knobs for whichever mode tab is active, and
+      switching tabs never carries the other mode's values across. Microphone stays identical.
+      Below: the Realtime panel (left) beside a diff table (right).
+    </p>
+    <div class="grid lg:grid-cols-2 gap-4 items-start">
+
+      <div class="mockframe">
+        <p class="mockcap mb-2">Mock 3 — Realtime panel, disconnected, 1 pending change</p>
+        <aside class="w-full max-w-[400px] card card-border bg-base-100" aria-label="Tuning panel">
+          <div class="card-body p-0">
+            <div class="p-3 border-b border-base-300 space-y-2">
+              <div class="flex items-center gap-2">
+                <h2 class="font-semibold text-sm flex-1">Tuning
+                  <span class="badge badge-ghost badge-sm ml-1">Realtime</span></h2>
+                <span class="badge badge-ghost badge-sm font-mono">cfg:b104e8d2</span>
+                <button type="button" class="btn btn-xs btn-ghost btn-circle" aria-label="Close tuning panel">✕</button>
+              </div>
+              <div class="flex items-center gap-2">
+                <select class="select select-xs flex-1" aria-label="Preset">
+                  <optgroup label="Built-in">
+                    <option selected>Provider defaults</option><option>Tuned turn-taking</option><option>Max denoise</option>
+                  </optgroup>
+                  <optgroup label="My presets"><option>semantic-eager</option></optgroup>
+                  <option>Save as…</option>
+                </select>
+                <button type="button" class="btn btn-xs">Export</button>
+                <button type="button" class="btn btn-xs">Import</button>
+              </div>
+              <button type="button" class="btn btn-xs btn-ghost">Reset to defaults</button>
+            </div>
+
+            <div class="overflow-y-auto max-h-[620px] p-2 space-y-2">
+
+              <details class="collapse collapse-arrow bg-base-200 rounded-box">
+                <summary class="collapse-title text-sm font-medium min-h-0 py-2">Microphone <span class="badge badge-ghost badge-xs ml-1">same as Cascade</span></summary>
+                <div class="collapse-content text-sm text-base-content/60 text-[11px]">EC / NS / AGC toggles — identical.</div>
+              </details>
+
+              <details class="collapse collapse-arrow bg-base-200 rounded-box" open>
+                <summary class="collapse-title text-sm font-medium min-h-0 py-2">Denoise chain</summary>
+                <div class="collapse-content text-sm space-y-2">
+                  <div class="rounded-box border border-base-300 p-2 flex items-center gap-2">
+                    <input type="checkbox" id="r-rms" class="toggle toggle-xs toggle-primary" checked>
+                    <label for="r-rms" class="font-medium flex-1 cursor-pointer">RMS noise gate</label>
+                    <span class="badge badge-ghost badge-xs">browser</span>
+                  </div>
+                  <div class="rounded-box border border-base-300 p-2 flex items-center gap-2">
+                    <input type="checkbox" id="r-rnn" class="toggle toggle-xs toggle-primary">
+                    <label for="r-rnn" class="font-medium flex-1 cursor-pointer">RNNoise (WASM)</label>
+                    <span class="badge badge-ghost badge-xs">browser</span>
+                  </div>
+                  <!-- The Realtime-only stage -->
+                  <div class="rounded-box border border-base-300 p-2 space-y-2 pending">
+                    <div class="flex items-center gap-2">
+                      <span class="w-1.5 h-1.5 rounded-full bg-warning shrink-0"></span>
+                      <span class="font-medium flex-1">OpenAI noise reduction</span>
+                      <span class="badge badge-ghost badge-xs">runs in: provider</span>
+                    </div>
+                    <div class="join w-full pl-4" role="radiogroup" aria-label="OpenAI input noise reduction">
+                      <input type="radio" name="oai-nr" class="join-item btn btn-xs flex-1" aria-label="off" data-testid="tuning-openai-noise-reduction-off">
+                      <input type="radio" name="oai-nr" class="join-item btn btn-xs flex-1" aria-label="near_field" checked data-testid="tuning-openai-noise-reduction-near">
+                      <input type="radio" name="oai-nr" class="join-item btn btn-xs flex-1" aria-label="far_field" data-testid="tuning-openai-noise-reduction-far">
+                    </div>
+                    <p class="text-[10px] text-base-content/40 pl-4"><code>off</code> sends the key explicitly; unset the row to omit it entirely.</p>
+                  </div>
+                  <div class="rounded-box border border-base-300 border-dashed p-2 opacity-50 space-y-1">
+                    <div class="flex items-center gap-2"><input type="checkbox" class="toggle toggle-xs" disabled><span class="flex-1">DeepFilterNet</span><span class="badge badge-ghost badge-xs">Cascade only</span></div>
+                    <div class="flex items-center gap-2"><input type="checkbox" class="toggle toggle-xs" disabled><span class="flex-1">noisereduce</span><span class="badge badge-ghost badge-xs">Cascade only</span></div>
+                    <div class="flex items-center gap-2"><input type="checkbox" class="toggle toggle-xs" disabled><span class="flex-1">Demucs / denoiser (DNS64)</span><span class="badge badge-neutral badge-xs">benchmark only</span></div>
+                  </div>
+                </div>
+              </details>
+
+              <!-- Turn detection with the "Provider default" pattern -->
+              <details class="collapse collapse-arrow bg-base-200 rounded-box" open>
+                <summary class="collapse-title text-sm font-medium min-h-0 py-2">Turn detection <span class="badge badge-ghost badge-xs ml-1">server_vad</span></summary>
+                <div class="collapse-content text-sm space-y-2">
+                  <div role="radiogroup" aria-label="Turn detection type" class="flex gap-4">
+                    <label class="label cursor-pointer gap-2 py-0">
+                      <input type="radio" name="vadtype" class="radio radio-xs" checked data-testid="tuning-vad-type-server">
+                      <span class="label-text text-xs">server_vad</span>
+                    </label>
+                    <label class="label cursor-pointer gap-2 py-0">
+                      <input type="radio" name="vadtype" class="radio radio-xs" data-testid="tuning-vad-type-semantic">
+                      <span class="label-text text-xs">semantic_vad</span>
+                    </label>
+                  </div>
+
+                  <!-- UNSET row: "Provider default" checked → input greyed, key omitted -->
+                  <div class="grid grid-cols-[1fr_auto] gap-2 items-end">
+                    <div class="opacity-40">
+                      <label for="r-thr" class="text-[11px] text-base-content/60 flex justify-between"><span>threshold</span><span class="font-mono">—</span></label>
+                      <input type="range" id="r-thr" class="range range-xs" min="0" max="100" value="50" disabled data-testid="tuning-vad-threshold">
+                    </div>
+                    <label class="label cursor-pointer gap-1 py-0">
+                      <input type="checkbox" class="checkbox checkbox-xs" checked data-testid="tuning-vad-threshold-default">
+                      <span class="label-text text-[10px]">Provider default</span>
+                    </label>
+                  </div>
+
+                  <div class="grid grid-cols-[1fr_auto] gap-2 items-end">
+                    <div class="opacity-40">
+                      <label for="r-pp" class="text-[11px] text-base-content/60">prefix_padding_ms</label>
+                      <input type="number" id="r-pp" class="input input-xs w-full" placeholder="—" disabled data-testid="tuning-vad-prefix-padding">
+                    </div>
+                    <label class="label cursor-pointer gap-1 py-0">
+                      <input type="checkbox" class="checkbox checkbox-xs" checked data-testid="tuning-vad-prefix-padding-default">
+                      <span class="label-text text-[10px]">Provider default</span>
+                    </label>
+                  </div>
+
+                  <!-- SET row -->
+                  <div class="grid grid-cols-[1fr_auto] gap-2 items-end">
+                    <div>
+                      <label for="r-sd" class="text-[11px] text-base-content/60">silence_duration_ms</label>
+                      <input type="number" id="r-sd" class="input input-xs w-full" value="300" data-testid="tuning-vad-silence-duration">
+                    </div>
+                    <label class="label cursor-pointer gap-1 py-0">
+                      <input type="checkbox" class="checkbox checkbox-xs" data-testid="tuning-vad-silence-duration-default">
+                      <span class="label-text text-[10px]">Provider default</span>
+                    </label>
+                  </div>
+
+                  <div class="grid grid-cols-[1fr_auto] gap-2 items-end">
+                    <div class="flex items-center gap-2">
+                      <input type="checkbox" id="r-ir" class="toggle toggle-xs toggle-primary" checked data-testid="tuning-vad-interrupt-response">
+                      <label for="r-ir" class="text-[11px] cursor-pointer">interrupt_response</label>
+                    </div>
+                    <label class="label cursor-pointer gap-1 py-0">
+                      <input type="checkbox" class="checkbox checkbox-xs" data-testid="tuning-vad-interrupt-response-default">
+                      <span class="label-text text-[10px]">Provider default</span>
+                    </label>
+                  </div>
+
+                  <!-- semantic_vad-only knob, greyed while server_vad is selected -->
+                  <div class="grid grid-cols-[1fr_auto] gap-2 items-end opacity-40">
+                    <div>
+                      <label for="r-eag" class="text-[11px] text-base-content/60">eagerness</label>
+                      <select id="r-eag" class="select select-xs w-full" disabled data-testid="tuning-vad-eagerness">
+                        <option>low</option><option selected>auto</option><option>high</option>
+                      </select>
+                    </div>
+                    <span class="text-[10px] text-base-content/50">semantic_vad only</span>
+                  </div>
+
+                  <p class="text-[11px] text-base-content/50">
+                    A greyed field is <strong>unset</strong> — the key is omitted from the OpenAI payload entirely,
+                    so the provider's own default applies. It is not the same as sending the default value.
+                  </p>
+                </div>
+              </details>
+
+              <details class="collapse collapse-arrow bg-base-200 rounded-box" open>
+                <summary class="collapse-title text-sm font-medium min-h-0 py-2">Transcript check <span class="badge badge-ghost badge-xs ml-1">off</span></summary>
+                <div class="collapse-content text-sm space-y-2">
+                  <div class="join w-full">
+                    <input type="radio" name="tcheck-r" class="join-item btn btn-xs flex-1" aria-label="off" checked>
+                    <input type="radio" name="tcheck-r" class="join-item btn btn-xs flex-1" aria-label="flag">
+                    <span class="join-item btn btn-xs flex-1 btn-disabled" role="presentation"
+                          title="No seam in Realtime — the model produces the translation directly, so there is nothing to rewrite before translating.">
+                      correct 🚫
+                    </span>
+                  </div>
+                  <p class="text-[11px] text-base-content/50">
+                    <code>correct</code> is unavailable: no seam in Realtime.
+                  </p>
+                </div>
+              </details>
+
+              <details class="collapse collapse-arrow bg-base-200 rounded-box">
+                <summary class="collapse-title text-sm font-medium min-h-0 py-2">Models &amp; voices</summary>
+                <div class="collapse-content text-sm space-y-2">
+                  <div>
+                    <label for="r-m" class="text-[11px] text-base-content/60">Realtime model</label>
+                    <select id="r-m" class="select select-xs w-full" data-testid="tuning-model-realtime">
+                      <option selected>gpt-realtime</option><option>gpt-realtime-mini</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label for="r-v" class="text-[11px] text-base-content/60">Realtime voice</label>
+                    <select id="r-v" class="select select-xs w-full" data-testid="tuning-voice-realtime">
+                      <option selected>alloy</option><option>marin</option><option>cedar</option>
+                    </select>
+                  </div>
+                  <p class="text-[11px] text-base-content/50">Both are session-creation parameters — changing them applies at next connect.</p>
+                </div>
+              </details>
+            </div>
+
+            <!-- Disconnected footer variant -->
+            <div class="p-3 border-t border-base-300 space-y-2 bg-base-200 rounded-b-box">
+              <div class="flex items-center gap-2">
+                <button type="button" class="btn btn-sm btn-primary btn-outline flex-1">Apply at next connect</button>
+                <button type="button" class="btn btn-sm btn-ghost">Revert</button>
+              </div>
+              <p class="text-[11px] text-base-content/60" role="status" aria-live="polite">
+                Not connected · 1 change will be sent when you connect
+              </p>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <div class="card card-border bg-base-100">
+        <div class="card-body p-4">
+          <h3 class="font-semibold">Cascade → Realtime diff</h3>
+          <div class="overflow-x-auto">
+            <table class="table table-xs">
+              <thead><tr><th>Section</th><th>Cascade</th><th>Realtime</th></tr></thead>
+              <tbody>
+                <tr><td>Microphone</td><td colspan="2" class="text-base-content/60">Identical — EC / NS / AGC</td></tr>
+                <tr><td>Denoise · RMS gate, RNNoise</td><td colspan="2" class="text-base-content/60">Identical — both client-side</td></tr>
+                <tr><td>Denoise · OpenAI NR</td><td><span class="badge badge-ghost badge-xs">hidden/disabled</span></td><td><span class="badge badge-success badge-soft badge-xs">off / near / far</span></td></tr>
+                <tr><td>Denoise · DeepFilterNet, noisereduce</td><td><span class="badge badge-success badge-soft badge-xs">present</span></td><td><span class="badge badge-ghost badge-xs">disabled "Cascade only"</span></td></tr>
+                <tr><td>Denoise · Demucs / DNS64</td><td colspan="2" class="text-base-content/60">Disabled "benchmark only" in both</td></tr>
+                <tr><td>Turn detection</td><td>endpointing, utterance_end_ms, diarize</td><td>server_vad / semantic_vad + threshold, prefix_padding_ms, silence_duration_ms, interrupt_response, eagerness</td></tr>
+                <tr><td>Segmentation</td><td>hybrid-race / llm-priority + model</td><td><span class="badge badge-ghost badge-xs">section absent</span></td></tr>
+                <tr><td>Transcript check</td><td>off / flag / correct</td><td>off / flag (<code>correct</code> disabled)</td></tr>
+                <tr><td>Models</td><td>Deepgram, translation, TTS voice A/B</td><td>Realtime model, Realtime voice</td></tr>
+                <tr><td>Apply semantics</td><td>may reconnect Deepgram</td><td><code>session.update</code>, never tears down</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════ 4 · STATES ══════════════════════════ -->
+  <section id="states" class="space-y-4">
+    <h2 class="text-2xl font-semibold">4 · States</h2>
+
+    <div class="grid lg:grid-cols-2 gap-4 items-start">
+
+      <!-- 4a — Apply button variants -->
+      <div class="card card-border bg-base-100">
+        <div class="card-body p-4 gap-3">
+          <h3 class="font-semibold text-sm">4a · Apply button, four states</h3>
+          <div class="space-y-3">
+            <div class="rounded-box bg-base-200 p-3 space-y-1">
+              <button type="button" class="btn btn-sm btn-primary w-full" disabled>Apply</button>
+              <p class="text-[11px] text-base-content/60" role="status" aria-live="polite">Applied · <span class="font-mono">cfg:7f3a9c21</span> · 12:04:31</p>
+              <p class="text-[11px] text-base-content/40">No pending changes — draft equals applied.</p>
+            </div>
+            <div class="rounded-box bg-base-200 p-3 space-y-1">
+              <button type="button" class="btn btn-sm btn-primary w-full">Apply</button>
+              <p class="text-[11px] text-base-content/60" role="status" aria-live="polite">2 changes pending</p>
+              <p class="text-[11px] text-base-content/40">Connected, nothing connection-level changed → live update only.</p>
+            </div>
+            <div class="rounded-box bg-base-200 p-3 space-y-1">
+              <button type="button" class="btn btn-sm btn-primary w-full">Apply (reconnects STT)</button>
+              <p class="text-[11px] text-base-content/60" role="status" aria-live="polite">3 changes pending · 1 reopens the Deepgram connection</p>
+              <p class="text-[11px] text-base-content/40">No confirmation dialog — it just reconnects, and the badge says so.</p>
+            </div>
+            <div class="rounded-box bg-base-200 p-3 space-y-1">
+              <button type="button" class="btn btn-sm btn-primary btn-outline w-full">Apply at next connect</button>
+              <p class="text-[11px] text-base-content/60" role="status" aria-live="polite">Not connected · 3 changes will be sent when you connect</p>
+              <p class="text-[11px] text-base-content/40">
+                Disconnected. Apply stays <strong>enabled</strong> (it commits the draft, stamps a new fingerprint
+                and persists it) rather than being disabled — see notes, "Apply semantics".
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4b — reconnecting -->
+      <div class="card card-border bg-base-100">
+        <div class="card-body p-4 gap-3">
+          <h3 class="font-semibold text-sm">4b · Reconnecting after a connection-level Apply</h3>
+          <div class="navbar bg-base-200 rounded-box">
+            <div class="navbar-start gap-3">
+              <div role="tablist" class="tabs tabs-box tabs-sm">
+                <button type="button" role="tab" aria-selected="true" class="tab tab-active">Cascade</button>
+                <button type="button" role="tab" aria-selected="false" class="tab">Realtime</button>
+              </div>
+            </div>
+            <div class="navbar-end gap-2">
+              <button type="button" class="btn btn-sm btn-ghost gap-2">
+                🎛 Tuning <span class="badge badge-ghost badge-xs font-mono">cfg:3ba0d517</span>
+              </button>
+              <span class="badge badge-warning badge-soft gap-1" role="status">
+                <span class="w-2 h-2 rounded-full bg-warning"></span> Reconnecting…
+              </span>
+            </div>
+          </div>
+          <div class="rounded-box bg-base-200 p-3 space-y-1">
+            <button type="button" class="btn btn-sm btn-primary w-full"><span class="loading loading-spinner loading-xs"></span> Applying…</button>
+            <p class="text-[11px] text-base-content/60" role="status" aria-live="polite">
+              Reconnecting STT with the new parameters… (attempt 2 of 3)
+            </p>
+          </div>
+          <p class="text-[11px] text-base-content/50">
+            The existing <code>reconnecting</code> connection badge is reused — the same amber treatment as an
+            unexpected WebSocket drop, because from the user's side it is the same thing: audio is still being
+            captured, transcripts pause for a moment. Every failed attempt is logged (backend log line +
+            browser console) before the dialog below appears.
+          </p>
+        </div>
+      </div>
+
+      <!-- 4c — failure dialog -->
+      <div class="card card-border bg-base-100">
+        <div class="card-body p-4 gap-3">
+          <h3 class="font-semibold text-sm">4c · Apply failed after the retry budget — blocking dialog</h3>
+          <div class="rounded-box bg-base-300/40 p-6 flex justify-center">
+            <div class="modal-box max-w-md bg-base-100 shadow-xl" role="alertdialog"
+                 aria-modal="true" aria-labelledby="af-title" aria-describedby="af-body"
+                 data-testid="tuning-apply-failed-dialog">
+              <h3 id="af-title" class="text-lg font-bold">Couldn't apply the new settings</h3>
+              <p id="af-body" class="py-3 text-sm">
+                The speech-to-text connection failed to reopen with the new parameters after 3 attempts.
+                The session is still running on the previously applied config
+                (<span class="font-mono">cfg:7f3a9c21</span>).
+              </p>
+              <div class="rounded-box bg-base-200 p-2 text-[11px] font-mono space-y-0.5">
+                <div>12:07:02 attempt 1 — deepgram: connection closed (1011)</div>
+                <div>12:07:04 attempt 2 — deepgram: connection closed (1011)</div>
+                <div>12:07:08 attempt 3 — deepgram: connection closed (1011)</div>
+              </div>
+              <div class="modal-action">
+                <button type="button" class="btn btn-sm btn-ghost" data-testid="tuning-apply-revert">Revert to previous</button>
+                <button type="button" class="btn btn-sm btn-primary" data-testid="tuning-apply-retry">Retry</button>
+              </div>
+            </div>
+          </div>
+          <p class="text-[11px] text-base-content/50">
+            A dialog, not a toast — per the Step 3 gate. It blocks because you are now looking at numbers that
+            do not belong to the config on screen, and that is the one failure the whole feature cannot tolerate.
+            <strong>Revert to previous</strong> restores the last applied config into the draft so the panel and
+            reality agree again.
+          </p>
+        </div>
+      </div>
+
+      <!-- 4d — flag badge -->
+      <div class="card card-border bg-base-100">
+        <div class="card-body p-4 gap-3">
+          <h3 class="font-semibold text-sm">4d · <code>flag</code> mode — suspicious segment badge (no toast)</h3>
+          <div class="card card-border bg-base-100">
+            <div class="card-body p-4 gap-3">
+              <h3 class="text-xs uppercase tracking-wide text-base-content/50">Source</h3>
+              <div data-testid="source-transcript">
+                <div class="speakerA pl-3 py-1">
+                  <span class="badge speakerA-badge badge-xs mb-1">Speaker A</span>
+                  <p class="text-sm">The compressor on line two is running hot again.<span class="text-base-content/40 text-[10px]"> (pause)</span></p>
+                </div>
+                <div class="speakerB pl-3 py-1">
+                  <span class="badge speakerB-badge badge-xs mb-1">Speaker B</span>
+                  <p class="text-sm">
+                    Since when the sea pressure ran high?
+                    <span class="text-base-content/40 text-[10px]"> (pause)</span>
+                    <span class="badge badge-warning badge-soft badge-xs align-middle ml-1"
+                          title="Transcript check flagged this segment as likely misrecognised"
+                          data-testid="segment-suspicious-badge">⚑ check</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="text-[11px] text-base-content/50">
+            The badge sits immediately after the existing <code>(pause)</code>/<code>(llm)</code> trigger
+            annotation, same size class (<code>badge-xs</code>), amber to match every other "worth a look, not
+            broken" signal in the app. Non-blocking: the translation already went out on the original text.
+          </p>
+        </div>
+      </div>
+
+      <!-- 4e — pending diff detail -->
+      <div class="card card-border bg-base-100 lg:col-span-2">
+        <div class="card-body p-4 gap-3">
+          <h3 class="font-semibold text-sm">4e · Pending-changes treatment, close up</h3>
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="space-y-2 max-w-md">
+              <div class="rounded-box border border-base-300 p-2 flex items-center gap-2">
+                <input type="checkbox" id="s-a" class="toggle toggle-xs toggle-primary" checked>
+                <label for="s-a" class="flex-1 cursor-pointer text-sm">Applied — no marker</label>
+              </div>
+              <div class="rounded-box border border-base-300 p-2 flex items-center gap-2 pending">
+                <span class="w-1.5 h-1.5 rounded-full bg-warning shrink-0"></span>
+                <input type="checkbox" id="s-b" class="toggle toggle-xs toggle-primary">
+                <label for="s-b" class="flex-1 cursor-pointer text-sm">Changed, not applied</label>
+                <span class="badge badge-warning badge-soft badge-xs">was: on</span>
+              </div>
+              <div class="rounded-box border border-base-300 p-2 flex items-center gap-2 pending">
+                <span class="w-1.5 h-1.5 rounded-full bg-warning shrink-0"></span>
+                <input type="number" id="s-c" class="input input-xs w-24" value="300">
+                <label for="s-c" class="flex-1 cursor-pointer text-sm">endpointing (ms)</label>
+                <span class="badge badge-warning badge-soft badge-xs">was: 500</span>
+                <span class="badge badge-ghost badge-xs">reconnects</span>
+              </div>
+            </div>
+            <div class="text-sm text-base-content/70 space-y-2">
+              <p>Three layers, cheapest first:</p>
+              <ul class="list-disc pl-5 space-y-1 text-[13px]">
+                <li>A 1.5&nbsp;px amber left rule on the row — scannable at a glance while scrolling six sections.</li>
+                <li>An amber dot before the control — survives the left rule being clipped inside a nested card.</li>
+                <li>A <code>was: …</code> badge with the previous applied value — the actual answer to "what did I change?" without opening a diff view.</li>
+              </ul>
+              <p>
+                Rows whose knob is Deepgram-connection-level additionally carry a
+                <span class="badge badge-ghost badge-xs">reconnects</span> chip, which is what flips the
+                Apply label to <em>Apply (reconnects STT)</em>.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4f — mobile -->
+      <div class="card card-border bg-base-100 lg:col-span-2">
+        <div class="card-body p-4 gap-3">
+          <h3 class="font-semibold text-sm">4f · Mobile — the panel becomes a full-width bottom-anchored drawer</h3>
+          <div class="flex flex-wrap gap-6 items-start">
+            <div class="mockframe w-[320px] shrink-0">
+              <p class="mockcap mb-2">&lt; 640 px</p>
+              <div class="space-y-2">
+                <div class="navbar bg-base-200 rounded-box min-h-0 p-1 gap-1">
+                  <div role="tablist" class="tabs tabs-box tabs-xs">
+                    <button role="tab" aria-selected="true" class="tab tab-active">Cascade</button>
+                    <button role="tab" aria-selected="false" class="tab">Realtime</button>
+                  </div>
+                  <div class="ml-auto flex gap-1">
+                    <button class="btn btn-xs btn-ghost">🎛<span class="badge badge-warning badge-xs">3</span></button>
+                    <span class="badge badge-success badge-soft badge-xs">●</span>
+                  </div>
+                </div>
+                <div class="card card-border bg-base-100 h-16"><div class="card-body p-2"><span class="text-[10px] uppercase text-base-content/40">Source</span></div></div>
+                <div class="rounded-box bg-base-200 border border-base-300 p-2 space-y-2">
+                  <div class="flex items-center gap-2">
+                    <span class="w-8 h-1 rounded-full bg-base-content/20 mx-auto"></span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="font-semibold text-xs flex-1">Tuning <span class="badge badge-ghost badge-xs">Cascade</span></span>
+                    <span class="badge badge-ghost badge-xs font-mono">cfg:7f3a9c21</span>
+                    <button class="btn btn-xs btn-ghost btn-circle" aria-label="Close">✕</button>
+                  </div>
+                  <div class="collapse collapse-arrow bg-base-100 rounded-box"><div class="collapse-title text-xs font-medium min-h-0 py-1.5">Microphone</div></div>
+                  <div class="collapse collapse-arrow bg-base-100 rounded-box"><div class="collapse-title text-xs font-medium min-h-0 py-1.5">Denoise chain</div></div>
+                  <div class="collapse collapse-arrow bg-base-100 rounded-box"><div class="collapse-title text-xs font-medium min-h-0 py-1.5">Endpointing</div></div>
+                  <div class="flex gap-2 pt-1">
+                    <button class="btn btn-xs btn-primary flex-1">Apply (reconnects STT)</button>
+                    <button class="btn btn-xs btn-ghost">Revert</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <ul class="list-disc pl-5 space-y-1 text-[13px] text-base-content/70 max-w-xl">
+              <li>Below <code>sm</code> the aside becomes a bottom sheet at <code>max-h-[85vh]</code>, over the page rather than beside it — the transcripts are already single-column there, so there is no side room to give up.</li>
+              <li>All sections start <strong>collapsed</strong> on mobile (desktop opens Microphone / Denoise / the mode's turn-detection section by default).</li>
+              <li>The footer (Apply / Revert / status line) is <code>sticky bottom-0</code> inside the sheet so Apply is always one thumb away.</li>
+              <li>The navbar button drops its fingerprint chip and keeps just the count badge; the fingerprint stays visible in the panel header and the latency strip.</li>
+              <li>Sliders keep a numeric input beside them at all widths — a <code>range</code> alone is unusable for entering “−45&nbsp;dBFS exactly”.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ══════════════════════════ 5 · TESTIDS ══════════════════════════ -->
+  <section id="testids" class="space-y-3">
+    <h2 class="text-2xl font-semibold">5 · <code>data-testid</code> contract</h2>
+    <p class="text-sm text-base-content/70 max-w-4xl">
+      The capture harness (<code>frontend/e2e/realtime-quality-capture.mjs</code>) must set a whole config from
+      a JSON file before it clicks Connect. Rather than drive 30 controls, it uses
+      <code>tuning-import</code> — but every individual control still carries an id so a single-knob e2e test
+      can exist. Full table in the notes file; the naming rule:
+      <code>tuning-&lt;section&gt;-&lt;knob&gt;</code>, with <code>-default</code> appended for the
+      "Provider default" checkbox and <code>-off</code>/<code>-near</code>/… appended for segmented options.
+    </p>
+    <div class="overflow-x-auto rounded-box border border-base-300">
+      <table class="table table-xs">
+        <thead><tr><th>Purpose</th><th>testid</th><th>Element</th></tr></thead>
+        <tbody>
+          <tr><td>Open/close the panel</td><td><code>tuning-toggle</code></td><td>navbar button</td></tr>
+          <tr><td>Panel root</td><td><code>tuning-panel</code></td><td><code>&lt;aside&gt;</code></td></tr>
+          <tr><td>Fingerprint (panel header)</td><td><code>tuning-fingerprint</code></td><td>badge</td></tr>
+          <tr><td>Fingerprint (latency strip)</td><td><code>tuning-fingerprint-latency</code></td><td>badge — <strong>the one the harness scrapes</strong></td></tr>
+          <tr><td>Pending count</td><td><code>tuning-pending-count</code></td><td>badge</td></tr>
+          <tr><td>Preset select</td><td><code>tuning-preset</code></td><td>select</td></tr>
+          <tr><td>Export / Import JSON</td><td><code>tuning-export</code> / <code>tuning-import</code></td><td>buttons</td></tr>
+          <tr><td>Apply / Revert / status</td><td><code>tuning-apply</code> / <code>tuning-revert</code> / <code>tuning-status</code></td><td>buttons + <code>aria-live</code> line</td></tr>
+          <tr><td>Failure dialog</td><td><code>tuning-apply-failed-dialog</code>, <code>-retry</code>, <code>-revert</code></td><td>modal + buttons</td></tr>
+          <tr><td>Flagged segment</td><td><code>segment-suspicious-badge</code></td><td>badge inside the transcript pane</td></tr>
+          <tr><td>Every knob</td><td><code>tuning-rms-threshold</code>, <code>tuning-vad-silence-duration</code>, …</td><td>see notes table</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════ QUESTIONS ══════════════════════════ -->
+  <section id="questions" class="space-y-3">
+    <h2 class="text-2xl font-semibold">Open UX questions</h2>
+    <div class="space-y-3">
+      <div class="card card-border bg-base-100 border-warning">
+        <div class="card-body p-4 gap-2">
+          <h3 class="font-semibold text-sm">1 · Does the panel stay open across a mode switch, and what happens to unapplied changes in the mode you left?</h3>
+          <p class="text-sm text-base-content/70">
+            Switching tabs already tears down the live session. The draft config is mode-scoped, so
+            Cascade's pending edits are still sitting there when you come back.
+          </p>
+          <p class="text-sm"><span class="badge badge-success badge-sm mr-2">Recommendation</span>
+            Panel stays open; each mode keeps its own draft; pending changes survive the switch untouched and
+            the pending badge reflects the <em>current</em> mode only. No prompt, no discard — losing a
+            carefully-typed set of five VAD numbers because you glanced at the other tab would be the worst
+            thing this panel could do.</p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100 border-warning">
+        <div class="card-body p-4 gap-2">
+          <h3 class="font-semibold text-sm">2 · Should Apply be blocked while TTS playback is active (Cascade) or a Realtime reply is streaming?</h3>
+          <p class="text-sm text-base-content/70">
+            Cascade withholds mic frames during playback; Realtime disables the mic track mid-response.
+            An Apply landing in that window either strands queued audio or gets ignored by the model.
+          </p>
+          <p class="text-sm"><span class="badge badge-success badge-sm mr-2">Recommendation</span>
+            Don't block the button — <strong>queue it</strong>. Apply is accepted immediately, the status line
+            reads "Applying after the current reply…", and the actual <code>session.update</code> / reconnect
+            fires at the next turn boundary. Blocking a button for reasons the user can't see is worse than a
+            one-turn delay they're told about. Same mechanism debounces rapid repeated Applies.</p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100 border-warning">
+        <div class="card-body p-4 gap-2">
+          <h3 class="font-semibold text-sm">3 · How much of the config does the collapsed navbar chip need to communicate?</h3>
+          <p class="text-sm text-base-content/70">
+            "cfg:7f3a9c21" is precise and comparable to a report row, but it says nothing about what is
+            actually on. A named-preset chip ("Max denoise") reads instantly but goes stale the moment you
+            nudge one slider.
+          </p>
+          <p class="text-sm"><span class="badge badge-success badge-sm mr-2">Recommendation</span>
+            Show the fingerprint, and put the preset name in the panel header only, with "Preset modified"
+            beside it once the draft diverges. The fingerprint is the join key to every benchmark row — that is
+            the thing you need to read off the screen and paste into <code>COMPARISON.md</code>. Optionally add
+            a native <code>title</code> tooltip on the chip listing the enabled stages.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="text-xs text-base-content/40 pt-6 border-t border-base-300">
+    Wireframe only — no app source touched. DaisyUI 5.5.19 + Tailwind 4 via CDN, <code>data-theme="luxury"</code>,
+    matching <code>frontend/src/index.css</code>.
+  </footer>
+
+</main>
+</body>
+</html>
