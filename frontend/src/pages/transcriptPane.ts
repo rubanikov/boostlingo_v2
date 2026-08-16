@@ -22,14 +22,14 @@ export const EMPTY_TRANSCRIPT_PANE: TranscriptPaneState = {
 };
 
 /**
- * Appends an incoming transcript update to a pane's segment list.
+ * Applies an incoming transcript update to a pane's segment list.
  *
- * STT/translation providers differ in whether repeated updates for the same
- * segment resend the *whole* text-so-far (Deepgram-style interim results) or
- * just the newly produced chunk (token-by-token streaming). This diffs the
- * incoming text against the segment's last known text and appends only the
- * suffix that's actually new, so both styles render as smooth incremental
- * text without duplicated words either way.
+ * Every `source_transcript` / `target_transcript` message carries the
+ * segment's *whole* text so far (the orchestrator sends its running buffer
+ * for STT and the accumulated translation for MT), so an update replaces
+ * the segment's text. That matters for Deepgram interim results, which
+ * routinely revise an earlier word ("hi are you heard" → "hi i ordered"):
+ * diffing and appending would tack the revision on after the stale text.
  *
  * A segment's `speaker` is set from the first message that names one and
  * kept on later updates that omit it (interim updates for the same segment
@@ -42,22 +42,21 @@ export function appendTranscriptSegment(
 ): TranscriptPaneState {
   const isNewSegment = !(event.segmentId in state.lastTextBySegment);
   const previousText = state.lastTextBySegment[event.segmentId] ?? '';
-  const delta = event.text.startsWith(previousText) ? event.text.slice(previousText.length) : event.text;
 
-  if (delta === '' && !isNewSegment) {
+  if (event.text === previousText && !isNewSegment) {
     return state;
   }
 
   const lastTextBySegment = { ...state.lastTextBySegment, [event.segmentId]: event.text };
 
   if (isNewSegment) {
-    const segment: TranscriptSegment = { id: event.segmentId, text: delta, speaker: event.speaker ?? null };
+    const segment: TranscriptSegment = { id: event.segmentId, text: event.text, speaker: event.speaker ?? null };
     return { segments: [...state.segments, segment], lastTextBySegment };
   }
 
   const segments = state.segments.map((segment) =>
     segment.id === event.segmentId
-      ? { ...segment, text: segment.text + delta, speaker: event.speaker === undefined ? segment.speaker : event.speaker }
+      ? { ...segment, text: event.text, speaker: event.speaker === undefined ? segment.speaker : event.speaker }
       : segment,
   );
   return { segments, lastTextBySegment };

@@ -7,7 +7,7 @@ describe('appendTranscriptSegment', () => {
     expect(paneText(next)).toBe('Hello');
   });
 
-  it('appends only the new suffix for cumulative (Deepgram-style) interim updates', () => {
+  it('shows the whole text-so-far for cumulative (Deepgram-style) interim updates', () => {
     let state = EMPTY_TRANSCRIPT_PANE;
     state = appendTranscriptSegment(state, { segmentId: 'a', text: 'Hello' });
     state = appendTranscriptSegment(state, { segmentId: 'a', text: 'Hello there' });
@@ -16,13 +16,16 @@ describe('appendTranscriptSegment', () => {
     expect(paneText(state)).toBe('Hello there, how are you');
   });
 
-  it('appends each chunk directly for token-by-token (non-extending) delta updates', () => {
+  it('replaces the text when an interim update revises earlier words instead of extending them', () => {
+    // Deepgram interim results re-decode the whole utterance, so a later one
+    // can rewrite what an earlier one said; the pane must show the revision,
+    // not the stale text with the revision appended after it.
     let state = EMPTY_TRANSCRIPT_PANE;
-    state = appendTranscriptSegment(state, { segmentId: 'a', text: 'Hola' });
-    state = appendTranscriptSegment(state, { segmentId: 'a', text: ', ' });
-    state = appendTranscriptSegment(state, { segmentId: 'a', text: 'como estas' });
+    state = appendTranscriptSegment(state, { segmentId: 'a', text: 'hi are you heard something' });
+    state = appendTranscriptSegment(state, { segmentId: 'a', text: 'hi i ordered something over a week ago' });
+    state = appendTranscriptSegment(state, { segmentId: 'a', text: "hi i ordered something over a week ago and it still hasn't arrived" });
 
-    expect(paneText(state)).toBe('Hola, como estas');
+    expect(paneText(state)).toBe("hi i ordered something over a week ago and it still hasn't arrived");
   });
 
   it('separates a new segment from prior text with a single space', () => {

@@ -229,6 +229,10 @@ export function useRealtimeSession(): UseRealtimeSessionResult {
   // re-parameterise turn detection underneath a reply the user is listening
   // to. The Cascade equivalent is `isPlaybackActiveRef`.
   const isReplyActiveRef = useRef(false);
+  // Set by `response.done`, consumed by the next output transcript delta: the
+  // target pane is one running string, and this is what puts a space between
+  // one reply and the next.
+  const targetNeedsSeparatorRef = useRef(false);
   // ticket 05 live tuning: an apply that can't go out yet (mid-reply, or the
   // data channel hasn't opened) waits here. One slot, so two Applies 200 ms
   // apart coalesce into a single session.update carrying the later config —
@@ -499,10 +503,13 @@ export function useRealtimeSession(): UseRealtimeSessionResult {
         }
         break;
       // The user is talking again: whatever the last turn was flagged for is no
-      // longer what the pane is about.
+      // longer what the pane is about. The pane is one running string with no
+      // segment boundaries, so this is also where turns get a space between
+      // them ("…desde aquí? Sure…" rather than "…desde aquí?Sure…").
       case 'input_audio_buffer.speech_started':
         turnSeqRef.current += 1;
         setSourceFlagged(false);
+        setSourceText((text) => (text && !text.endsWith(' ') ? `${text} ` : text));
         break;
       // The user stopped talking: our "speech end" reference point for the
       // end-to-end latency measurement (ticket 06). There is no backend
@@ -529,12 +536,18 @@ export function useRealtimeSession(): UseRealtimeSessionResult {
           unmuteTimeoutRef.current = null;
         }
         if (typeof message.delta === 'string') {
-          setTargetText((text) => text + message.delta);
+          // Same running-string join as the source pane: the first delta of a
+          // new response follows the previous one with a space.
+          const delta = message.delta;
+          const separator = targetNeedsSeparatorRef.current ? ' ' : '';
+          targetNeedsSeparatorRef.current = false;
+          setTargetText((text) => (text ? `${text}${separator}${delta}` : delta));
         }
         setLatencyState((state) => onResponseAudioTranscriptDelta(state, Date.now()));
         break;
       }
       case 'response.done':
+        targetNeedsSeparatorRef.current = true;
         unmuteTimeoutRef.current = setTimeout(() => {
           const sentTrack = sentTrackRef.current;
           if (sentTrack) sentTrack.enabled = true;

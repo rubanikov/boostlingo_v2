@@ -257,7 +257,7 @@ function CascadeLatencyStrip({
     <div className="card card-border bg-base-100">
       <div className="card-body p-3 flex-row items-center gap-3">
         <div
-          className="flex flex-1 min-w-0 items-center gap-4 text-xs overflow-x-auto"
+          className="flex flex-1 min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs"
           data-testid="cascade-latency-strip"
         >
           <span className="font-medium text-base-content/60 shrink-0">Latency</span>
@@ -270,8 +270,11 @@ function CascadeLatencyStrip({
                 </span>,
               );
             }
+            // `shrink-0 whitespace-nowrap`: when the row is too narrow the
+            // strip wraps *between* badges (flex-wrap above); a badge that
+            // shrinks would break "translation 844ms" onto two lines instead.
             nodes.push(
-              <span key={badge.stage} className={LATENCY_BADGE_TONE_CLASS[badge.tone]}>
+              <span key={badge.stage} className={`${LATENCY_BADGE_TONE_CLASS[badge.tone]} shrink-0 whitespace-nowrap`}>
                 {badge.label} {badge.ms}ms
               </span>,
             );
@@ -491,7 +494,7 @@ export function WorkbenchPage() {
           column and the page shrinks beside it, so the transcripts and the
           latency strip stay on screen the whole time you are tuning — turn a
           knob, press Apply, watch the very next segment. `min-w-0` matters:
-          without it the latency strip's `overflow-x-auto` will not shrink. */}
+          without it the latency strip will not shrink (and so never wraps). */}
       <div className="flex gap-4 items-start">
         <div className="flex-1 min-w-0 space-y-4">
           {session.cascadeLatency ? (
