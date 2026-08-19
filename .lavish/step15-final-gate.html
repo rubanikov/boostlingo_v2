@@ -1,0 +1,313 @@
+<title>Step 15 Final Gate — AI Interpreter Workbench</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex) > * { min-width: 0; }
+  :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, td, th, .badge, .label) { overflow-wrap: anywhere; }
+  .mermaid { display: flex; justify-content: center; }
+</style>
+
+<html data-theme="luxury">
+<body class="bg-base-100 text-base-content min-h-screen">
+<main class="mx-auto max-w-5xl p-6 lg:p-10 space-y-10">
+
+  <header class="space-y-3">
+    <div class="flex flex-wrap items-center gap-3">
+      <span class="badge badge-success badge-lg">Feature Factory — Step 15 Final Gate</span>
+      <span class="badge badge-ghost">All 9 tickets built, validated, fixed, polished</span>
+    </div>
+    <h1 class="text-4xl font-bold">AI Interpreter Workbench — Build Complete</h1>
+    <p class="text-base-content/70 max-w-3xl">
+      Realtime (WebRTC direct to OpenAI) and Cascade (Deepgram → OpenAI → ElevenLabs) modes
+      both work end to end in one unified React shell, with diarization, LLM-hybrid
+      segmentation, latency instrumentation, and retry/circuit-breaker resilience. Everything
+      below is what actually happened this session, including the things that went wrong and
+      got fixed.
+    </p>
+    <div class="stats stats-vertical sm:stats-horizontal shadow bg-base-200 w-full">
+      <div class="stat">
+        <div class="stat-title">Backend tests</div>
+        <div class="stat-value text-success text-3xl">86</div>
+        <div class="stat-desc">passed · 33 skipped (need live keys) · ruff clean</div>
+      </div>
+      <div class="stat">
+        <div class="stat-title">Frontend tests</div>
+        <div class="stat-value text-success text-3xl">131</div>
+        <div class="stat-desc">vitest passed · tsc/oxlint clean</div>
+      </div>
+      <div class="stat">
+        <div class="stat-title">E2E</div>
+        <div class="stat-value text-success text-3xl">3/3</div>
+        <div class="stat-desc">Playwright passed · 3 skipped (need live keys)</div>
+      </div>
+      <div class="stat">
+        <div class="stat-title">Security review</div>
+        <div class="stat-value text-3xl">0</div>
+        <div class="stat-desc">Critical findings · 2 Important, both fixed</div>
+      </div>
+    </div>
+  </header>
+
+  <section class="space-y-3">
+    <h2 class="text-2xl font-bold">What got built — 6 waves, 9 tickets</h2>
+    <div class="mermaid">
+flowchart TD
+  subgraph W0["Wave 0 - parallel"]
+    T1["Ticket 1 Realtime MVP"]
+    T2["Ticket 2 Cascade MVP + providers"]
+  end
+  subgraph W1["Wave 1"]
+    T3["Ticket 3 Unified workbench shell"]
+  end
+  subgraph W2["Wave 2 - parallel"]
+    T4["Ticket 4 Diarization"]
+    T6["Ticket 6 Latency instrumentation"]
+    T7["Ticket 7 Error handling and resilience"]
+  end
+  subgraph W3["Wave 3"]
+    T5["Ticket 5 LLM-hybrid segmentation"]
+  end
+  subgraph W4["Wave 4"]
+    T8["Ticket 8 Quality validation suite"]
+  end
+  subgraph W5["Wave 5 - capstone"]
+    T9["Ticket 9 Comparison write-up"]
+  end
+  T1 --> T3
+  T2 --> T3
+  T3 --> T4
+  T3 --> T6
+  T3 --> T7
+  T4 --> T5
+  T4 --> T8
+  T5 --> T8
+  T6 --> T8
+  T7 --> T8
+  T6 --> T9
+  T8 --> T9
+
+  classDef done fill:#166534,stroke:#22c55e,color:#fff
+  class T1,T2,T3,T4,T5,T6,T7,T8,T9 done
+    </div>
+    <p class="text-sm text-base-content/60">Every ticket ran as parallel backend + frontend subagents against a shared contract I dictated up front, reconciled after both reported back. Tickets 4/6/7 (Wave 2) were built one at a time rather than fully parallel, since all three touch the same central files (<code>orchestrator.py</code>, the session hooks) and Wave 0's shared-test-file collisions showed that's a real risk worth avoiding.</p>
+  </section>
+
+  <section class="space-y-3">
+    <h2 class="text-2xl font-bold">Two real design corrections mid-build</h2>
+    <p class="text-base-content/70">Both caught before shipping, both documented in <a class="link link-primary" href="AGENTS.md">AGENTS.md</a>, neither silently patched over.</p>
+    <div class="grid sm:grid-cols-2 gap-4">
+      <div class="card card-border bg-base-100">
+        <div class="card-body">
+          <h3 class="card-title text-base">Deepgram's <code>detect_language</code> doesn't support streaming</h3>
+          <p class="text-sm">The approved wayfinder design (ticket 06) assumed it would. Deepgram's own docs say plainly it's pre-recorded-audio-only. Verified replacement: Nova-3's <code>language=multi</code> mode, which tags each word with its own language directly in the streaming results.</p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body">
+          <h3 class="card-title text-base">OpenAI Realtime session payload was beta-shaped</h3>
+          <p class="text-sm">Ticket 1's original session config used the flat, pre-GA shape. Ticket 3's build verified the current shape against the pinned SDK's own generated types: nested under <code>session.audio.&#123;input,output&#125;</code>, corrected before it shipped.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="space-y-3">
+    <h2 class="text-2xl font-bold">Validation, fix round, and polish (Steps 11-14)</h2>
+    <div class="space-y-2">
+      <div class="collapse collapse-arrow bg-base-200">
+        <input type="checkbox" checked />
+        <div class="collapse-title font-medium">Step 11 — acceptance verification: all 8 functional requirements traced to real code</div>
+        <div class="collapse-content text-sm">
+          <p>Every FR from the brief was traced to actual implementation, not just a ticket's claim. Audio round-trips and real latency/quality numbers are honestly marked as unverifiable without live provider keys, since none exist in this build environment, but the plumbing for all of it is real and tested.</p>
+        </div>
+      </div>
+      <div class="collapse collapse-arrow bg-base-200">
+        <input type="checkbox" />
+        <div class="collapse-title font-medium">Step 12 — implementation-validator + security-auditor: no Critical findings</div>
+        <div class="collapse-content text-sm space-y-2">
+          <p><strong>Implementation-validator</strong>: circuit breaker trips at exactly 5 failures (tested), speaker→voice wraparound handled correctly, no undisclosed scope creep. Two Important findings: malformed WS frames from Deepgram/ElevenLabs could silently hang a session; a malformed 2xx OpenAI response raised an unguarded <code>KeyError</code>.</p>
+          <p><strong>Security-auditor</strong>: no leaked secrets, no XSS, API-key handling solid. One real gap: the <code>/ws/cascade</code> WebSocket had no Origin check, so any webpage open in the same browser could open a session against real API keys with no mic permission needed. A second: the Cascade <code>languages</code> field wasn't validated the way Realtime's already was.</p>
+        </div>
+      </div>
+      <div class="collapse collapse-arrow bg-base-200">
+        <input type="checkbox" />
+        <div class="collapse-title font-medium">Step 13 — fix round: all four Important findings closed</div>
+        <div class="collapse-content text-sm">
+          <ul class="list-disc list-inside space-y-1">
+            <li>WebSocket Origin validation added, rejecting disallowed origins before <code>.accept()</code></li>
+            <li>Cascade <code>languages</code> now validated against the same allow-list Realtime already used</li>
+            <li><code>json.JSONDecodeError</code> now caught in both providers' receive loops, converted to the existing retry/circuit-breaker path instead of hanging</li>
+            <li>Malformed 2xx OpenAI responses now return a clean 502 instead of crashing</li>
+          </ul>
+          <p class="mt-2">All four shipped with regression tests confirmed red before the fix, green after. 86 backend tests passing.</p>
+        </div>
+      </div>
+      <div class="collapse collapse-arrow bg-base-200">
+        <input type="checkbox" />
+        <div class="collapse-title font-medium">Step 14 — polish: deslop, humanize, code-review, cleanup</div>
+        <div class="collapse-content text-sm">
+          <ul class="list-disc list-inside space-y-1">
+            <li>Deslop + code-humanizer pass: removed comment banners, one dead indirection layer, one duplicated language-name dict</li>
+            <li>Humanize pass: ~190 em/en dashes removed across 26 files (comments, docstrings, README, AGENTS.md)</li>
+            <li>Two-axis code review (Standards + Spec): no Critical findings; one genuine duplication fixed (mic-permission handling, now shared between both session hooks)</li>
+            <li>Deleted two inert placeholder pages left over from Tickets 1/2, fully superseded by Ticket 3's real UI</li>
+            <li>COMPARISON.md trimmed from ~5 pages to ~2, per the brief's explicit length ask</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section role="alert" class="alert alert-warning alert-soft">
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0 stroke-current" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
+    <div>
+      <div class="font-semibold">Two honest gaps, both by design, neither hidden</div>
+      <ul class="list-disc list-inside text-sm mt-1 space-y-1">
+        <li><strong>No live provider API keys existed anywhere in this build.</strong> Every provider boundary is tested against mocks; real latency and quality numbers in <a class="link" href="COMPARISON.md">COMPARISON.md</a> are explicit placeholders with exact fill-in commands, not fabricated figures.</li>
+        <li><strong><code>backend/</code> and <code>frontend/</code> are still untracked in git.</strong> The wayfinder planning phase has 31 real commits; none of the 9 implementation tickets' code has been committed yet, since I don't commit without being asked. Bulk-committing everything as one dump now would repeat exactly the anti-pattern the brief warns against ("no single initial-commit dumps") — see the decision below.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="space-y-3">
+    <h2 class="text-2xl font-bold">Where things live</h2>
+    <div class="grid sm:grid-cols-2 gap-3 text-sm">
+      <a href="README.md" class="card card-border bg-base-100 hover:border-primary transition-colors"><div class="card-body p-4"><span class="font-medium">README.md</span><span class="text-base-content/60">Setup, run, architecture overview</span></div></a>
+      <a href="COMPARISON.md" class="card card-border bg-base-100 hover:border-primary transition-colors"><div class="card-body p-4"><span class="font-medium">COMPARISON.md</span><span class="text-base-content/60">Latency, quality, cost, controllability, recommendation</span></div></a>
+      <a href="AGENTS.md" class="card card-border bg-base-100 hover:border-primary transition-colors"><div class="card-body p-4"><span class="font-medium">AGENTS.md</span><span class="text-base-content/60">How this was built, corrections made along the way</span></div></a>
+      <a href=".scratch/ai-interpreter-workbench/tickets/00-index.md" class="card card-border bg-base-100 hover:border-primary transition-colors"><div class="card-body p-4"><span class="font-medium">tickets/00-index.md</span><span class="text-base-content/60">All 9 tickets, acceptance criteria, build notes</span></div></a>
+    </div>
+  </section>
+
+  <section id="decision" class="space-y-4">
+    <div class="divider"></div>
+    <h2 class="text-2xl font-bold">Your decision</h2>
+    <p class="text-base-content/70">Per the feature-factory process, this final gate needs an explicit answer. I will not commit, push, or open a PR without you saying so here.</p>
+
+    <form id="decisionForm" class="card card-border bg-base-200" onsubmit="event.preventDefault(); submitDecision();">
+      <div class="card-body space-y-6">
+
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend text-base font-semibold">What should happen next?</legend>
+          <div class="flex flex-col gap-2">
+            <label class="flex items-start gap-2 cursor-pointer">
+              <input type="radio" name="decision" value="Commit in logical increments (one per ticket, matching the wayfinder phase's convention), then open a PR" class="radio radio-primary mt-1">
+              <span>Commit in logical increments (one per ticket, matching the wayfinder phase's own convention), then push and open a PR</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="decision" value="Commit in logical increments, but don't push or open a PR yet" class="radio radio-primary">
+              <span>Commit in logical increments only, no push or PR yet</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="decision" value="Keep working" class="radio radio-primary" checked>
+              <span>Keep working, see notes below</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="decision" value="Leave it as-is, nothing further right now" class="radio radio-primary">
+              <span>Leave it as-is for now</span>
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend text-base font-semibold">If "keep working" — what specifically? (optional otherwise)</legend>
+          <textarea id="notes" class="textarea w-full" rows="3" placeholder="e.g. run this locally with real API keys and fill in COMPARISON.md's latency/quality numbers, or split orchestrator.py per the code-review's architectural note, or something else entirely..."></textarea>
+        </fieldset>
+
+        <div class="card-actions justify-end">
+          <span id="queuedHint" class="text-sm text-base-content/60 self-center hidden">Queued, press Send to Agent to deliver.</span>
+          <button type="submit" class="btn btn-primary">Queue my decision</button>
+        </div>
+      </div>
+    </form>
+  </section>
+
+</main>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.15.0/dist/mermaid.esm.min.mjs";
+  const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  const paint = document.createElement("canvas").getContext("2d");
+  function toRgba(color) {
+    paint.clearRect(0, 0, 1, 1);
+    paint.fillStyle = "#000";
+    paint.fillStyle = color;
+    paint.fillRect(0, 0, 1, 1);
+    return paint.getImageData(0, 0, 1, 1).data;
+  }
+  function compositeRgba(fg, bg) {
+    const fa = fg[3] / 255, ba = bg[3] / 255;
+    const a = fa + ba * (1 - fa);
+    if (a === 0) return [0, 0, 0, 0];
+    return [
+      (fg[0]*fa + bg[0]*ba*(1-fa)) / a,
+      (fg[1]*fa + bg[1]*ba*(1-fa)) / a,
+      (fg[2]*fa + bg[2]*ba*(1-fa)) / a,
+      a * 255,
+    ];
+  }
+  function pageIsDark() {
+    const root = document.documentElement;
+    const rootBg = toRgba(getComputedStyle(root).backgroundColor);
+    const bodyBg = document.body ? toRgba(getComputedStyle(document.body).backgroundColor) : [0,0,0,0];
+    const [r,g,b,a] = compositeRgba(bodyBg, rootBg);
+    if (a > 0) return (0.2126*r + 0.7152*g + 0.0722*b) / 255 < 0.5;
+    const cs = getComputedStyle(root).colorScheme;
+    if (cs.includes("dark") && !cs.includes("light")) return true;
+    if (cs.includes("light") && !cs.includes("dark")) return false;
+    return darkQuery.matches;
+  }
+  const diagrams = [...document.querySelectorAll(".mermaid")].map((el) => ({ el, src: el.textContent }));
+  let applied, rendering = false, queued = false;
+  function queueRender() { queued = true; if (!rendering) void render(); }
+  async function render() {
+    rendering = true;
+    try {
+      while (queued) {
+        queued = false;
+        const theme = pageIsDark() ? "dark" : "default";
+        if (theme === applied) continue;
+        mermaid.initialize({ startOnLoad: false, theme, securityLevel: "strict" });
+        for (const { el, src } of diagrams) { el.removeAttribute("data-processed"); el.textContent = src; }
+        try { await mermaid.run({ nodes: diagrams.map((d) => d.el) }); }
+        catch (e) { console.error("Mermaid render failed:", e); return; }
+        applied = theme;
+      }
+    } finally { rendering = false; if (queued) queueRender(); }
+  }
+  if (document.readyState === "complete") queueRender();
+  else window.addEventListener("load", queueRender, { once: true });
+  const themeObserver = new MutationObserver(queueRender);
+  for (const el of [document.documentElement, document.body]) {
+    if (!el) continue;
+    themeObserver.observe(el, { attributes: true, attributeFilter: ["data-theme", "class", "style"] });
+  }
+  document.addEventListener("change", queueRender, true);
+  document.addEventListener("transitionend", ({ propertyName }) => { if (propertyName === "background-color") queueRender(); }, true);
+  darkQuery.addEventListener("change", queueRender);
+</script>
+
+<script>
+  function submitDecision() {
+    const form = document.getElementById('decisionForm');
+    const decision = new FormData(form).get('decision');
+    const notes = document.getElementById('notes').value.trim();
+
+    let msg = `Step 15 final gate decision: ${decision}.`;
+    if (notes) msg += ` Notes: ${notes}`;
+
+    window.lavish.queuePrompt(msg, {
+      tag: 'decision',
+      text: decision,
+      element: form,
+      data: { decision, notes }
+    });
+
+    document.getElementById('queuedHint').classList.remove('hidden');
+  }
+</script>
+
+</body>
+</html>

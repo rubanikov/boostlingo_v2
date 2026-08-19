@@ -1,0 +1,15 @@
+{
+  "name": "ai-interpreter-workbench-demo",
+  "private": true,
+  "type": "module",
+  "description": "Scripted, narrated demo video of the workbench: node tts.mjs && node record.mjs && node assemble.mjs",
+  "scripts": {
+    "tts": "node tts.mjs",
+    "record": "node record.mjs",
+    "assemble": "node assemble.mjs",
+    "demo": "node tts.mjs && node record.mjs && node assemble.mjs"
+  },
+  "devDependencies": {
+    "ffmpeg-static": "^5.2.0"
+  }
+}

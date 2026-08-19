@@ -1,0 +1,213 @@
+<title>Step 3 Gate — Story: Audio Tuning & Denoise Lab</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex) > * { min-width: 0; }
+  :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, td, th, .badge, .label) { overflow-wrap: anywhere; }
+  html { scroll-behavior: smooth; }
+  code { font-size: 0.85em; }
+  .ac { display: grid; grid-template-columns: 3.2rem minmax(0,1fr); gap: .5rem .75rem; align-items: start; }
+</style>
+
+<html data-theme="luxury">
+<body class="bg-base-100 text-base-content min-h-screen">
+<main class="mx-auto max-w-5xl p-6 lg:p-10 space-y-10">
+
+  <header class="space-y-3">
+    <div class="flex flex-wrap items-center gap-3">
+      <span class="badge badge-warning badge-lg">Feature Factory — Step 3 GATE</span>
+      <span class="badge badge-ghost">Story draft · awaiting approval</span>
+    </div>
+    <h1 class="text-4xl font-bold">Audio Tuning &amp; Denoise Lab — User Story</h1>
+    <p class="text-base-content/70 max-w-3xl">
+      The story-writer turned the approved <a class="link link-primary" href="step0-idea-brief-tuning-lab.html">Idea brief</a> and the researcher's map into one epic with five tiered sub-stories.
+      Read the narrative and acceptance criteria; the three open questions at the end each carry a recommended answer.
+      Approve / request changes / reject in chat.
+    </p>
+    <div class="stats stats-vertical sm:stats-horizontal shadow bg-base-200 w-full">
+      <div class="stat"><div class="stat-title">Sub-stories</div><div class="stat-value text-primary">5</div><div class="stat-desc">tiers 1–6, cut from the bottom</div></div>
+      <div class="stat"><div class="stat-title">Acceptance criteria</div><div class="stat-value">42</div><div class="stat-desc">Given / When / Then, tier-tagged</div></div>
+      <div class="stat"><div class="stat-title">Open questions</div><div class="stat-value text-warning">3</div><div class="stat-desc">product-level, recommendations below</div></div>
+    </div>
+  </header>
+
+  <nav class="flex flex-wrap gap-2 text-sm">
+    <a href="#epic" class="btn btn-xs btn-ghost">Epic</a>
+    <a href="#s1" class="btn btn-xs btn-ghost">S1 Panel</a>
+    <a href="#s2" class="btn btn-xs btn-ghost">S2 Benchmark</a>
+    <a href="#s3" class="btn btn-xs btn-ghost">S3 Client denoise</a>
+    <a href="#s4" class="btn btn-xs btn-ghost">S4 Transcript check</a>
+    <a href="#s5" class="btn btn-xs btn-ghost">S5 Server denoise + models</a>
+    <a href="#edges" class="btn btn-xs btn-ghost">Edge cases</a>
+    <a href="#oos" class="btn btn-xs btn-ghost">Out of scope</a>
+    <a href="#assumptions" class="btn btn-xs btn-ghost">Assumptions</a>
+    <a href="#questions" class="btn btn-xs btn-ghost">Open questions</a>
+  </nav>
+
+  <section id="epic" class="card bg-base-200 shadow"><div class="card-body space-y-3">
+    <h2 class="card-title text-2xl">Epic narrative</h2>
+    <p><strong>As</strong> the single developer/researcher running the AI Interpreter Workbench as a lab,<br>
+    <strong>I want</strong> every audio, turn-taking, segmentation, denoise and transcript-check processing step exposed as a selection in an in-app Tuning panel, applied both at session start and live mid-session, and measurable against a noisy corpus,<br>
+    <strong>so that</strong> I can answer "does this processing step improve WER, judge score or latency?" with a number per configuration instead of a guess.</p>
+    <div class="flex flex-wrap gap-2 text-xs">
+      <span class="badge badge-success">Tier 1–2 must-have</span>
+      <span class="badge badge-info">Tier 3–4 should-have</span>
+      <span class="badge badge-ghost">Tier 5–6 first to cut</span>
+    </div>
+    <p class="text-sm text-base-content/70"><strong>Fingerprint</strong>: a short, stable hash of the canonical <code>TuningConfig</code> JSON, computed by shared code so UI, backend and harnesses derive the same string. It is the join key between a run and its numbers.</p>
+  </div></section>
+
+  <!-- S1 -->
+  <section id="s1" class="space-y-3">
+    <h2 class="text-2xl font-semibold">Story 1 — Tuning panel &amp; config plumbing <span class="badge badge-success">Tier 1</span></h2>
+    <p class="text-sm"><strong>As</strong> the researcher, <strong>I want</strong> a Tuning panel in <code>WorkbenchPage</code> that owns every existing knob and pushes it into the session at start and live mid-session, <strong>so that</strong> I can change one variable at a time without editing <code>.env</code> or restarting the server.</p>
+    <div class="card bg-base-200 shadow"><div class="card-body text-sm ac">
+      <span class="badge badge-outline">1.1</span><span><strong>Panel is the single inventory.</strong> Sections per processing step — Microphone constraints, Denoise chain, Turn detection, Segmentation, Transcript check, Models — every knob in decision 5 for the current mode appears. No knob the app reads is settable only via <code>.env</code> or a query param.</span>
+      <span class="badge badge-outline">1.2</span><span><strong>Realtime start-of-session apply.</strong> Set <code>server_vad</code> + <code>silence_duration_ms</code>=300 → Connect → <code>POST /api/realtime/session</code> body carries them → backend puts them under <code>session.audio.input.turn_detection</code>.</span>
+      <span class="badge badge-outline">1.3</span><span><strong>Unset stays unset.</strong> A field left at "Provider default" is absent from the outbound OpenAI payload (existing <code>_turn_detection()</code> idiom).</span>
+      <span class="badge badge-outline">1.4</span><span><strong>Cascade start-of-session apply.</strong> <code>llm_priority</code> + <code>endpointing</code>=300 ride inside <code>start_session</code>; the Deepgram connection URL reflects them under test.</span>
+      <span class="badge badge-outline">1.5</span><span><strong>Realtime live apply.</strong> Change <code>silence_duration_ms</code> → Apply → <code>session.update</code> sent on the <code>oai-events</code> data channel; session not torn down; panel shows "applied".</span>
+      <span class="badge badge-outline">1.6</span><span><strong>Cascade live apply, non-connection-level.</strong> e.g. segmentation mode → new WS control message; Deepgram not restarted; effective for the next segment.</span>
+      <span class="badge badge-outline">1.7</span><span><strong>Cascade live apply, connection-level.</strong> <code>endpointing</code>/<code>utterance_end_ms</code>/diarize/model → deliberate Deepgram reconnect; every frame sent before/during/after appears in the transcript — no frame dropped, no segment lost.</span>
+      <span class="badge badge-outline">1.8</span><span><strong>Persistence.</strong> Reload → same values (localStorage); nothing stored server-side.</span>
+      <span class="badge badge-outline">1.9</span><span><strong>Presets.</strong> Built-ins "Provider defaults", "Tuned turn-taking", "Max denoise" set every knob in one action; user-saved presets survive reload.</span>
+      <span class="badge badge-outline">1.10</span><span><strong>Export / import.</strong> Export gives the <code>TuningConfig</code> JSON; importing it restores exactly that config.</span>
+      <span class="badge badge-outline">1.11</span><span><strong>Backend defaults still apply.</strong> Fresh browser → session uses <code>.env</code>-derived defaults and the panel displays those values, not blanks.</span>
+      <span class="badge badge-outline">1.12</span><span><strong>Fingerprint is visible.</strong> Displayed in the panel; changes when any knob changes; identical for configs differing only in field order.</span>
+      <span class="badge badge-outline">1.13</span><span><strong>Mode-scoped.</strong> Switching Realtime ↔ Cascade shows only that mode's knobs and never silently applies the other mode's values.</span>
+    </div></div>
+  </section>
+
+  <!-- S2 -->
+  <section id="s2" class="space-y-3">
+    <h2 class="text-2xl font-semibold">Story 2 — Noisy corpus &amp; per-config benchmark <span class="badge badge-success">Tier 2</span></h2>
+    <p class="text-sm"><strong>As</strong> the researcher, <strong>I want</strong> a noisy version of the 33-item corpus and harnesses that run any <code>TuningConfig</code> end to end, <strong>so that</strong> every knob claim is backed by WER, judge score and latency keyed by fingerprint.</p>
+    <div class="card bg-base-200 shadow"><div class="card-body text-sm ac">
+      <span class="badge badge-outline">2.1</span><span><strong>Noise synthesis.</strong> Per item: babble (several overlaid TTS speakers, same + other language), street, fan/white — each at 20/10/5 dB SNR — mono 16-bit 16 kHz; audio git-ignored, script + SCRIPT.md committed.</span>
+      <span class="badge badge-outline">2.2</span><span><strong>Cascade STT sweep.</strong> Extended <code>stt_replay.py</code>: one row per (item, condition, SNR) with WER + fingerprint.</span>
+      <span class="badge badge-outline">2.3</span><span><strong>Realtime sweep.</strong> <code>realtime-quality-capture.mjs</code> applies the config in the UI before connecting; items + envelope carry the fingerprint.</span>
+      <span class="badge badge-outline">2.4</span><span><strong>Report.</strong> <code>run_realtime_quality_report.py</code>: every row + summary carry the fingerprint; WER, judge acceptance, E2E latency.</span>
+      <span class="badge badge-outline">2.5</span><span><strong>Clean baseline always shown</strong> beside noisy conditions.</span>
+      <span class="badge badge-outline">2.6</span><span><strong>Comparison output.</strong> ≥2 fingerprints → paste-ready markdown table, one row per fingerprint; COMPARISON.md gains a tuning-config section.</span>
+      <span class="badge badge-outline">2.7</span><span><strong>Added latency attributed</strong> separately from provider latency ("this stage cost N ms").</span>
+      <span class="badge badge-outline">2.8</span><span><strong>Real-recording set self-skips</strong> with a friendly message and exit 0 (as <code>run_real_audio_report.py</code>).</span>
+    </div></div>
+  </section>
+
+  <!-- S3 -->
+  <section id="s3" class="space-y-3">
+    <h2 class="text-2xl font-semibold">Story 3 — Client-side denoise stages <span class="badge badge-info">Tier 3</span></h2>
+    <p class="text-sm"><strong>As</strong> the researcher, <strong>I want</strong> browser constraint toggles, an RMS noise gate, RNNoise and OpenAI input noise reduction selectable per session, <strong>so that</strong> I can measure whether live-path denoising improves WER.</p>
+    <div class="card bg-base-200 shadow"><div class="card-body text-sm ac">
+      <span class="badge badge-outline">3.1</span><span><strong>Mic constraints.</strong> EC/NS/AGC off in the panel → <code>getUserMedia</code> called with exactly those values in either mode.</span>
+      <span class="badge badge-outline">3.2</span><span><strong>RMS gate parameters.</strong> threshold −45 dBFS, hold 200 ms, attack 5 ms, release 80 ms, attenuation 12 dB → sub-threshold audio attenuated by 12 dB (not muted), above passes unchanged; attenuation = full mute → silenced.</span>
+      <span class="badge badge-outline">3.3</span><span><strong>Gate is live-adjustable</strong> without reconnecting.</span>
+      <span class="badge badge-outline">3.4</span><span><strong>RNNoise.</strong> Mic audio passes through RNNoise before the transcript path in both modes; a clean clip still yields a non-empty transcript (48 kHz / 480-sample resampling doesn't destroy the signal).</span>
+      <span class="badge badge-outline">3.5</span><span><strong>Realtime client DSP plumbing.</strong> WebRTC track carries processed audio; mic-mute-during-reply still mutes the track actually being sent.</span>
+      <span class="badge badge-outline">3.6</span><span><strong>OpenAI noise reduction.</strong> off / near_field / far_field sent under <code>session.audio.input.input_audio_noise_reduction</code>; "off" follows the unset-means-provider-default rule as stated in the panel.</span>
+      <span class="badge badge-outline">3.7</span><span><strong>Measured, not asserted.</strong> Each stage has ≥1 benchmarked fingerprint on the noisy corpus with its WER delta vs the same config with the stage off.</span>
+    </div></div>
+  </section>
+
+  <!-- S4 -->
+  <section id="s4" class="space-y-3">
+    <h2 class="text-2xl font-semibold">Story 4 — Transcript-check LLM stage <span class="badge badge-info">Tier 4</span></h2>
+    <p class="text-sm"><strong>As</strong> the researcher, <strong>I want</strong> a per-session transcript check that can flag or correct the source transcript before translation, <strong>so that</strong> I can measure whether an LLM sanity pass reduces effective error rate.</p>
+    <div class="card bg-base-200 shadow"><div class="card-body text-sm ac">
+      <span class="badge badge-outline">4.1</span><span><strong>Cascade modes:</strong> off / flag / correct.</span>
+      <span class="badge badge-outline">4.2</span><span><strong>Realtime modes:</strong> off / flag only; correct not selectable.</span>
+      <span class="badge badge-outline">4.3</span><span><strong>Flag is non-blocking.</strong> Suspicious segment annotated in the UI; translation proceeds with original text without waiting.</span>
+      <span class="badge badge-outline">4.4</span><span><strong>Correct rewrites before translation.</strong> Rewritten text goes to translation; displayed source updated; a dedicated latency stage records the check's cost.</span>
+      <span class="badge badge-outline">4.5</span><span><strong>Raw vs corrected WER</strong> per item in the report.</span>
+      <span class="badge badge-outline">4.6</span><span><strong>Off means no call</strong> and no extra latency stage.</span>
+      <span class="badge badge-outline">4.7</span><span><strong>Check failure is safe.</strong> Original transcript used, session continues, non-fatal toast.</span>
+    </div></div>
+  </section>
+
+  <!-- S5 -->
+  <section id="s5" class="space-y-3">
+    <h2 class="text-2xl font-semibold">Story 5 — Server/offline denoise + curated model pickers <span class="badge badge-ghost">Tiers 5–6</span></h2>
+    <p class="text-sm"><strong>As</strong> the researcher, <strong>I want</strong> the server-side and offline-only denoisers plus curated model/voice pickers in the same panel, <strong>so that</strong> the panel is the complete inventory of processing steps and I can sweep models the same way I sweep denoisers.</p>
+    <div class="card bg-base-200 shadow"><div class="card-body text-sm ac">
+      <span class="badge badge-outline">5.1</span><span><strong>[T5] Server denoise selection.</strong> off / DeepFilterNet (attenuation limit dB, post-filter strength) / noisereduce (<code>prop_decrease</code>, stationary/non-stationary), each with its parameters visible.</span>
+      <span class="badge badge-outline">5.2</span><span><strong>[T5] Applied on the server path</strong> — every mic frame processed before Deepgram.</span>
+      <span class="badge badge-outline">5.3</span><span><strong>[T5] Capability discovery.</strong> Without <code>backend[denoise]</code>: torch stages disabled with "not installed" hint; with it: enabled. Core CI torch-free.</span>
+      <span class="badge badge-outline">5.4</span><span><strong>[T5] Offline-only stages visible but disabled</strong> ("benchmark only"), selectable in a benchmark config file.</span>
+      <span class="badge badge-outline">5.5</span><span><strong>[T5] Wave-U-Net</strong> absent if no maintained package — no placeholder, no new decision.</span>
+      <span class="badge badge-outline">5.6</span><span><strong>[T6] Model pickers are allow-lists</strong> — Realtime model, segmentation model, Deepgram model, translation model, voices; no free text.</span>
+      <span class="badge badge-outline">5.7</span><span><strong>[T6] Server-side validation.</strong> Out-of-list id → HTTP 400 on the Realtime route; Cascade WS falls back to default (asymmetric posture).</span>
+    </div></div>
+  </section>
+
+  <section id="edges" class="space-y-3">
+    <h2 class="text-2xl font-semibold">Edge cases the brief must decide</h2>
+    <div class="grid gap-2 md:grid-cols-2 text-sm">
+      <div class="alert alert-soft"><span>Apply during Cascade TTS playback — a Deepgram reconnect must not strand withheld frames.</span></div>
+      <div class="alert alert-soft"><span>Apply during a Realtime reply — <code>session.update</code> mid-response; defer to next turn?</span></div>
+      <div class="alert alert-soft"><span>Apply while disconnected — queue for next connect vs disabled.</span></div>
+      <div class="alert alert-soft"><span>Rapid repeated Apply — no overlapping Deepgram reconnects.</span></div>
+      <div class="alert alert-soft"><span>Reconnect fails after a param change — revert vs surface error.</span></div>
+      <div class="alert alert-soft"><span>Extra installed but weights missing — different hint than "not installed".</span></div>
+      <div class="alert alert-soft"><span>Retired model id in a stored/imported config.</span></div>
+      <div class="alert alert-soft"><span>Malformed JSON import / unknown keys from a newer build.</span></div>
+      <div class="alert alert-soft"><span>Corpus WAV missing or wrong format — per-item skip + ffmpeg hint.</span></div>
+      <div class="alert alert-soft"><span>Real-recording manifest present but files missing.</span></div>
+      <div class="alert alert-soft"><span>Sweep size — N×M browser launches; cap or resume.</span></div>
+      <div class="alert alert-soft"><span>Fingerprint collisions / schema-version drift.</span></div>
+      <div class="alert alert-soft"><span>"Max denoise" stacking may cancel out or add latency.</span></div>
+      <div class="alert alert-soft"><span>Gate threshold at 0 dBFS / −∞ must not crash the worklet.</span></div>
+      <div class="alert alert-soft"><span>RNNoise 16k→48k→16k round-trip may itself degrade WER.</span></div>
+      <div class="alert alert-soft"><span>Playwright on 5183 vs <code>cors_origins</code> 5173 — WS origin guard.</span></div>
+    </div>
+  </section>
+
+  <section id="oos" class="space-y-2">
+    <h2 class="text-2xl font-semibold">Out of scope</h2>
+    <ul class="list-disc pl-5 text-sm space-y-1">
+      <li>Server-side / account preset storage; GPU paths; Demucs / DNS / Wave-U-Net in the live path; <code>correct</code> in Realtime; mic calibration wizard; new language pairs; supplying the real recording set; auto-generating COMPARISON.md prose; multi-user / auth.</li>
+    </ul>
+  </section>
+
+  <section id="assumptions" class="space-y-2">
+    <h2 class="text-2xl font-semibold">Assumptions (flag if wrong)</h2>
+    <ol class="list-decimal pl-5 text-sm space-y-1">
+      <li>Wire key names are a build detail (camelCase on the wire, snake_case in Python).</li>
+      <li>Fingerprint = short hash (e.g. first 8 hex of SHA-256 over canonical JSON); algorithm is a build detail as long as identical everywhere.</li>
+      <li>"Live apply" is an explicit <strong>Apply</strong> action, not auto-apply per keystroke.</li>
+      <li>Panel is a new component under <code>frontend/src/pages/</code>, backed by a pure <code>tuningConfig.ts</code> module + tests; harness-driven controls carry <code>data-testid</code>.</li>
+      <li>The uncommitted <code>_turn_detection()</code> / <code>realtime_vad_*</code> work is absorbed; <code>.env</code> stays as server defaults.</li>
+      <li>Generated noisy audio git-ignored; script + SCRIPT.md committed.</li>
+    </ol>
+  </section>
+
+  <section id="questions" class="space-y-3">
+    <h2 class="text-2xl font-semibold">Open questions <span class="text-base-content/50 text-base font-normal">(with recommendations)</span></h2>
+    <div class="grid gap-3">
+      <div class="card bg-warning/10 border border-warning/40"><div class="card-body text-sm">
+        <h3 class="font-semibold">Q1 · Connection-level Cascade change → deliberate Deepgram reconnect: warn first, or do it silently?</h3>
+        <p><strong>Recommendation:</strong> no confirmation dialog — Apply reconnects immediately, and the connection badge briefly shows "reconnecting STT" (reusing the existing <code>reconnecting</code> status) so the cost is visible without blocking the lab loop.</p>
+      </div></div>
+      <div class="card bg-warning/10 border border-warning/40"><div class="card-body text-sm">
+        <h3 class="font-semibold">Q2 · Does the <code>WER_THRESHOLD = 0.20</code> pass/fail gate apply to noisy variants?</h3>
+        <p><strong>Recommendation:</strong> no — noisy runs are report-only (numbers, no assertion); the 0.20 gate keeps applying to the clean corpus only, so a denoise experiment can never turn CI red.</p>
+      </div></div>
+      <div class="card bg-warning/10 border border-warning/40"><div class="card-body text-sm">
+        <h3 class="font-semibold">Q3 · In <code>flag</code> mode, how is a suspicious segment marked?</h3>
+        <p><strong>Recommendation:</strong> a small badge on the segment (next to the existing trigger annotation), no toast — toasts are reserved for errors today and a flag per segment would be noisy.</p>
+      </div></div>
+    </div>
+  </section>
+
+  <section class="card bg-primary text-primary-content shadow-lg"><div class="card-body">
+    <h2 class="card-title">Step 3 gate</h2>
+    <p class="text-sm">Approve, request changes, or reject in chat. Answers to Q1–Q3 (or "accept recommendations") get carried into the wireframe and brief.</p>
+  </div></section>
+
+  <footer class="text-xs text-base-content/50 pt-6 border-t border-base-300">
+    Source: <code>.scratch/tuning-lab/02-story.md</code> · design: app's own DaisyUI v5 <code>luxury</code> theme.
+  </footer>
+</main>
+</body>
+</html>

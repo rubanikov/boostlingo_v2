@@ -1,0 +1,1037 @@
+<title>Step 9 Gate — Tickets: Audio Tuning & Denoise Lab</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex) > * { min-width: 0; }
+  :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, td, th, .badge, .label) { overflow-wrap: anywhere; }
+  html { scroll-behavior: smooth; }
+  code { font-size: 0.85em; }
+  pre.waves { font-size: 0.7rem; line-height: 1.3; overflow-x: auto; }
+</style>
+<html data-theme="luxury">
+<body class="bg-base-100 text-base-content min-h-screen">
+<main class="mx-auto max-w-5xl p-6 lg:p-10 space-y-10">
+  <header class="space-y-3">
+    <div class="flex flex-wrap items-center gap-3">
+      <span class="badge badge-warning badge-lg">Feature Factory — Step 9 GATE</span>
+      <span class="badge badge-ghost">Draft tickets · not yet published</span>
+    </div>
+    <h1 class="text-4xl font-bold">Audio Tuning &amp; Denoise Lab — Vertical Ticket Breakdown</h1>
+    <p class="text-base-content/70 max-w-3xl">The ticket-slicer cut the approved story + brief into <strong>18 vertical tracer-bullet tickets</strong> (~56.5 hrs), every one Right-sized (1.5–4.5 hrs). Nothing is published yet — approving here makes the slicer write <code>.scratch/tuning-lab/issues/*.md</code>. Source: <code>.scratch/tuning-lab/05-tickets-draft.md</code>.</p>
+    <div class="stats stats-vertical sm:stats-horizontal shadow bg-base-200 w-full">
+      <div class="stat"><div class="stat-title">Tickets</div><div class="stat-value text-primary">18</div><div class="stat-desc">2 start immediately (01, 08)</div></div>
+      <div class="stat"><div class="stat-title">Estimated effort</div><div class="stat-value text-warning">~56.5 hrs</div><div class="stat-desc">honest minimum 01–09 ≈ 29 hrs</div></div>
+      <div class="stat"><div class="stat-title">Waves</div><div class="stat-value">6</div><div class="stat-desc">Wave 3 is wide (up to 7 parallel)</div></div>
+      <div class="stat"><div class="stat-title">Sizing</div><div class="stat-value text-success">18 / 18</div><div class="stat-desc">Right-sized · none thin/thick</div></div>
+    </div>
+  </header>
+  <section role="alert" class="alert alert-info alert-soft"><div>
+    <div class="font-semibold">Cut protocol (locked decision 11 preserved)</div>
+    <div class="text-sm">Cutting any ticket flips the knob rows it owns to the panel's <code>disabled</code> + visible-reason treatment (built once in ticket 02). No dead controls, no half-built seams. Tiers 1–2 (01–10) are not cuttable without losing the feature's point.</div>
+  </div></section>
+  <nav class="flex flex-wrap gap-2 text-sm">
+    <a href="#waves" class="btn btn-xs btn-ghost">Waves</a>
+    <a href="#table" class="btn btn-xs btn-ghost">Table</a>
+    <a href="#tickets" class="btn btn-xs btn-ghost">Tickets</a>
+    <a href="#cuts" class="btn btn-xs btn-ghost">Cut candidates</a>
+    <a href="#choices" class="btn btn-xs btn-ghost">Builder choices</a>
+    <a href="#gate" class="btn btn-xs btn-ghost">Gate</a>
+  </nav>
+
+  <section id="waves" class="space-y-3">
+    <h2 class="text-2xl font-semibold">Waves (parallel frontier)</h2>
+    <div class="card bg-base-200 shadow"><div class="card-body"><pre class="waves"><code>Wave 0 (start now, parallel):   [01] Fingerprint spine + capabilities      [08] Noisy corpus
+                                     + fingerprint chip                          generator
+                                          |                        \                 |
+Wave 1:                              [02] Tuning panel shell         `------.        |
+                                          |                                  \       |
+                                          |                              [09] Cascade sweep runner
+                                     _____|_____________                       + COMPARISON §7
+                                    /      |            \
+Wave 2 (parallel):        [03] Persist  [04] Realtime   [06] Cascade start-of-session
+                          presets I/O        start          + non-connection-level apply
+                                 |    \      |    \             |          \        \
+                                 |     \     |     \            |           \        \
+Wave 3 (wide, parallel):   [10] Capture  [05] Realtime    [07] Cascade   [11] Mic   [14] Cascade
+                             --tuning      live apply      reconnect     constraints  transcript
+                                                           + dialog          |          check
+                                                                             |            |
+                                          [16] Server denoise chain          |            |
+                                          [18] Model/voice pickers           |            |
+                                                     |                       |            |
+Wave 4:                          [17] DeepFilterNet  |          [12] RMS gate + Realtime   |
+                                          + torch extra              client-DSP plumbing   |
+                                                                             |     [15] Realtime
+Wave 5:                                                              [13] RNNoise      flag endpoint
+</code></pre>
+    <p class="text-sm text-base-content/70">Critical path: <strong>01 → 02 → 06 → 07</strong> (tier 1 complete) and <strong>01 → 02 → 04 → 12 → 13</strong> (tier 3 complete). Ticket 08 has no dependencies and starts on day one alongside 01. Orchestrator note: the factory asks before running more than 3 tickets concurrently — Wave 3 will be batched.</p></div></div>
+  </section>
+  <section id="table" class="space-y-3">
+    <h2 class="text-2xl font-semibold">Summary</h2>
+    <div class="overflow-x-auto rounded-box border border-base-300"><table class="table table-sm">
+      <thead><tr><th>#</th><th>Title</th><th>Tier</th><th>Depends on</th><th>Size (hrs)</th></tr></thead>
+      <tbody><tr><td><a class="link" href="#t01">01</a></td><td>Fingerprint spine, <code>/api/tuning/capabilities</code>, fingerprint chip</td><td>1</td><td>none</td><td>~3.5</td></tr><tr><td><a class="link" href="#t02">02</a></td><td>Tuning panel shell: sections, knob primitives, Apply/Revert, disabled inventory rows</td><td>1</td><td>01</td><td>~3.5</td></tr><tr><td><a class="link" href="#t03">03</a></td><td>Persistence, presets, export/import, reset</td><td>1</td><td>02</td><td>~3</td></tr><tr><td><a class="link" href="#t04">04</a></td><td>Realtime start-of-session tuning (+ OpenAI <code>noise_reduction</code>)</td><td>1</td><td>01, 02</td><td>~4</td></tr><tr><td><a class="link" href="#t05">05</a></td><td>Realtime live apply (<code>session.update</code>, deferral, coalescing)</td><td>1</td><td>04</td><td>~2.5</td></tr><tr><td><a class="link" href="#t06">06</a></td><td>Cascade start-of-session tuning + non-connection-level live apply</td><td>1</td><td>01, 02</td><td>~4.5</td></tr><tr><td><a class="link" href="#t07">07</a></td><td>Cascade connection-level apply: deliberate Deepgram reconnect + failure dialog</td><td>1</td><td>06</td><td>~4.5</td></tr><tr><td><a class="link" href="#t08">08</a></td><td>Noisy corpus generator + manifest</td><td>2</td><td>none</td><td>~2.5</td></tr><tr><td><a class="link" href="#t09">09</a></td><td>Cascade tuning sweep runner + paste-ready table + COMPARISON §7</td><td>2</td><td>01, 08</td><td>~3.5</td></tr><tr><td><a class="link" href="#t10">10</a></td><td>Realtime capture harness <code>--tuning</code> + fingerprint through the report</td><td>2</td><td>01, 02, 03, 04</td><td>~2</td></tr><tr><td><a class="link" href="#t11">11</a></td><td>Microphone constraint toggles, both modes</td><td>3</td><td>04, 06</td><td>~1.5</td></tr><tr><td><a class="link" href="#t12">12</a></td><td>RMS noise gate + Realtime client-DSP re-plumbing</td><td>3</td><td>05, 06, 11</td><td>~4</td></tr><tr><td><a class="link" href="#t13">13</a></td><td>RNNoise (48 kHz contexts, 3:1 decimator)</td><td>3</td><td>12</td><td>~3.5</td></tr><tr><td><a class="link" href="#t14">14</a></td><td>Cascade transcript check: off / flag / correct</td><td>4</td><td>06</td><td>~3.5</td></tr><tr><td><a class="link" href="#t15">15</a></td><td>Realtime transcript check <code>flag</code> via <code>POST /api/tuning/transcript-check</code></td><td>4</td><td>04, 05, 14</td><td>~2</td></tr><tr><td><a class="link" href="#t16">16</a></td><td>Server denoise chain: protocol + noisereduce + capability gating</td><td>5</td><td>02, 06</td><td>~3.5</td></tr><tr><td><a class="link" href="#t17">17</a></td><td>DeepFilterNet stage + optional <code>denoise</code> torch extra</td><td>5</td><td>16</td><td>~2.5</td></tr><tr><td><a class="link" href="#t18">18</a></td><td>Model / voice pickers wired through both transports + allow-list validation</td><td>6</td><td>02, 04, 06</td><td>~2.5</td></tr></tbody></table></div>
+  </section>
+  <section id="tickets" class="space-y-3">
+    <h2 class="text-2xl font-semibold">Tickets <span class="text-base-content/50 text-base font-normal">(expand each: what to build · acceptance criteria · out of scope)</span></h2>
+    <div class="space-y-2">
+<details class="collapse collapse-arrow bg-base-200 rounded-box" id="t01">
+  <summary class="collapse-title font-semibold flex flex-wrap items-center gap-2"><span class="badge badge-outline">01</span> Fingerprint spine, capabilities endpoint, fingerprint chip <span class="badge badge-success badge-sm">Tier 1</span> <span class="badge badge-ghost badge-sm">right-sized (~3.5 hrs).</span> <span class="text-xs text-base-content/60">depends on: none</span></summary>
+  <div class="collapse-content text-sm space-y-3">
+    <h4 class="font-semibold">What to build</h4><p>The tracer bullet: *open the app and read <code>cfg:7f3a9c21</code> off the navbar; change</p>
+<p><code>REALTIME_VAD_SILENCE_MS</code> in <code>backend/.env</code>, restart, watch the chip change.* UI → HTTP → backend,</p>
+<p>with the hash computed identically in TypeScript and Python.</p>
+<p><strong>Backend scope</strong></p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>backend/app/tuning/__init__.py</code>, <code>schema.py</code> (pydantic mirror of <code>ClientTuning</code> /</li>
+</ul>
+<p>  <code>RealtimeTuning</code> / <code>CascadeTuning</code> / <code>TuningConfig</code> / <code>ModeTuningConfig</code>, camelCase aliases +</p>
+<p>  <code>populate_by_name</code> + <code>extra=&quot;ignore&quot;</code>, brief &quot;Data model changes&quot;), <code>fingerprint.py</code></p>
+<p>  (<code>canonicalize()</code> + <code>fingerprint()</code> exactly per the brief&#x27;s 6-step algorithm), <code>allowlists.py</code></p>
+<p>  (<code>REALTIME_MODELS</code>, <code>REALTIME_VOICES</code>, <code>DEEPGRAM_MODELS</code>, <code>TEXT_MODELS</code>, <code>elevenlabs_voices()</code>,</p>
+<p>  <code>DEEPGRAM_CONNECTION_LEVEL_FIELDS</code>), <code>defaults.py</code> (effective <code>TuningConfig</code> from <code>settings</code> +</p>
+<p>  provider constants).</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>backend/app/api/tuning.py</code> — <strong><code>GET /api/tuning/capabilities</code> only</strong> (the transcript-check route</li>
+</ul>
+<p>  is ticket 15). Returns <code>{schemaVersion, defaults, allowLists, stages}</code> exactly as in the brief.</p>
+<p>  <code>stages</code> uses <code>importlib.util.find_spec</code> only — at this point all four report</p>
+<p>  <code>installed: false</code> with their <code>reason</code> strings, which is honest (no extras exist yet).</p>
+<p>  Per-stage exception caught → <code>{&quot;installed&quot;: false, &quot;reason&quot;: &quot;&lt;ExcClass&gt;&quot;}</code>; the route is <code>200</code></p>
+<p>  always. Registered in <code>backend/app/main.py</code>.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>backend/app/config.py</code> — <code>cors_origins</code> default gains <code>http://localhost:5183</code>; new optional</li>
+</ul>
+<p>  <code>elevenlabs_voice_ids_extra: list[str] = []</code>. Documented in <code>backend/.env.example</code>.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li>Absorb (do <strong>not</strong> revert) the uncommitted <code>_turn_detection()</code> / <code>realtime_vad_*</code> work.</li>
+</ul>
+<p><strong>Frontend scope</strong></p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>frontend/src/pages/tuningConfig.ts</code> (+ <code>.test.ts</code>) — types, <code>TUNING_SCHEMA_VERSION</code>,</li>
+</ul>
+<p>  <code>DEFAULT_TUNING_CONFIG</code>, <code>KNOB_METADATA</code> (mode, section, connection-level flag, range, step, wire</p>
+<p>  field name), <code>projectMode()</code>, <code>canonicalize()</code> (hand-written emitter — <strong>not</strong></p>
+<p>  <code>JSON.stringify</code>), <code>fingerprint()</code>, <code>diff()</code>, <code>clampGateParams()</code>,</p>
+<p>  <code>DEEPGRAM_CONNECTION_LEVEL_PATHS</code>, allow-list offline fallbacks.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>frontend/src/pages/tuningCapabilities.ts</code> — <code>fetchCapabilities()</code> using the</li>
+</ul>
+<p>  <code>VITE_API_BASE_URL</code> idiom duplicated in <code>cascadeConfig.ts</code> / <code>realtimeConfig.ts</code>.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>frontend/src/pages/WorkbenchPage.tsx</code> — the fingerprint chip in <code>navbar-end</code></li>
+</ul>
+<p>  (<code>data-testid=&quot;tuning-fingerprint&quot;</code>) and the one in the latency strip</p>
+<p>  (<code>data-testid=&quot;tuning-fingerprint-latency&quot;</code>), passed as a <strong>plain prop</strong>, rendered as a *sibling*</p>
+<p>  of the existing badge content (never inside <code>realtime-latency-badge</code>, whose text the capture</p>
+<p>  harness regexes with <code>/(\d+)\s*ms/</code>).</p>
+<p><strong>Repo root</strong></p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>shared/tuning-fingerprint-cases.json</code> — the cross-language parity fixture</li>
+</ul>
+<p>  (<code>[{name, config, mode, expectedFingerprint}]</code>), read <strong>byte-identically</strong> by both test suites.</p>
+    <h4 class="font-semibold">Acceptance criteria</h4><p>Story ACs: <strong>1.12</strong> (fingerprint visible, changes on any knob change, identical under key</p>
+<p>reordering), <strong>1.11</strong> (server <code>.env</code>-derived defaults are published, not blanks — the display half</p>
+<p>lands in 02).</p>
+<p>Brief tests: <strong>S1</strong> (TS/Py fingerprint parity over every fixture case), <strong>S2</strong> (canonicalisation:</p>
+<p>absent keys omitted, <code>false</code>/<code>0</code>/<code>&quot;&quot;</code> kept, keys sorted, integral floats emitted without a decimal</p>
+<p>point), <strong>F14</strong> *(backend half)* (<code>find_spec</code> → <code>None</code> ⇒ <code>stages.deepfilternet.installed == false</code></p>
+<p>with the <code>uv sync --extra denoise</code> reason), <strong>E11</strong> (a fabricated <code>schemaVersion: 2</code> changes every</p>
+<p>fingerprint), <strong>E15</strong> (<code>http://localhost:5183</code> accepted by the WS origin guard).</p>
+<p>Also green, unchanged: <code>backend/tests/test_realtime.py:127</code> and <code>:130-151</code>.</p>
+    <h4 class="font-semibold">Out of scope for this ticket</h4><p>The panel itself; any knob editing; <code>POST /api/tuning/transcript-check</code>; real stage detection with</p>
+<p>extras installed (16/17); any change to <code>POST /api/realtime/session</code> (04).</p>
+<p>---</p>
+  </div>
+</details>
+
+<details class="collapse collapse-arrow bg-base-200 rounded-box" id="t02">
+  <summary class="collapse-title font-semibold flex flex-wrap items-center gap-2"><span class="badge badge-outline">02</span> Tuning panel shell: sections, knob primitives, Apply/Revert <span class="badge badge-success badge-sm">Tier 1</span> <span class="badge badge-ghost badge-sm">right-sized (~3.5 hrs).</span> <span class="text-xs text-base-content/60">depends on: 01</span></summary>
+  <div class="collapse-content text-sm space-y-3">
+    <h4 class="font-semibold">What to build</h4><p>The panel as a shell you can open, scroll, mode-switch, and press Apply in — with the section</p>
+<p>skeleton and the disabled inventory rows that make it the single inventory (locked decision 11), and</p>
+<p>the pending/disabled/failure treatments that every later ticket reuses. **Later tickets add their</p>
+<p>own knob rows to their own sections** — that is what keeps them vertical and what makes the cut</p>
+<p>protocol work.</p>
+<p><strong>Frontend scope</strong></p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>frontend/src/pages/TuningPanel.tsx</code> (+ <code>.test.tsx</code>) — the <code>&lt;aside id=&quot;tuning-panel&quot;&gt;</code> per</li>
+</ul>
+<p>  wireframe §5: header (title + mode badge + applied fingerprint chip + close), <strong>six</strong></p>
+<p>  <code>&lt;details class=&quot;collapse collapse-arrow bg-base-200 rounded-box&quot;&gt;</code> sections in signal order with</p>
+<p>  their summary status chips, sticky footer (<code>Apply</code> / <code>Revert</code> / <code>role=&quot;status&quot; aria-live=&quot;polite&quot;</code></p>
+<p>  line). Split <code>TuningSection.tsx</code> out <strong>only if</strong> the file exceeds ~400 lines (wireframe §2).</p>
+<ul class="list-disc pl-5 space-y-1">
+<li>Knob primitives: <code>KnobRow</code>, <code>RangeKnob</code> (always paired with a numeric readout), <code>NumberKnob</code>,</li>
+</ul>
+<p>  <code>SegmentedKnob</code> (real radios in <code>role=&quot;radiogroup&quot;</code>), <code>ProviderDefaultKnob</code> (the checkbox that</p>
+<p>  means *the key is omitted entirely*).</p>
+<ul class="list-disc pl-5 space-y-1">
+<li>The three-layer <strong>pending treatment</strong> (amber inset left rule + amber dot + <code>was: &lt;value&gt;</code> badge)</li>
+</ul>
+<p>  and the <code>reconnects</code> ghost chip, plus the two <strong>disabled variants</strong> (<code>not installed</code> +</p>
+<p>  <code>uv sync --extra denoise</code> hint; <code>benchmark only</code>) — built once here, reused by every later ticket.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><strong>Disabled inventory rows shipped now</strong>: Demucs, denoiser (DNS64) (<code>benchmark only</code>, permanently</li>
+</ul>
+<p>  disabled), DeepFilterNet and noisereduce in their <code>not installed</code> variant driven by</p>
+<p>  <code>capabilities.stages</code>. Wave-U-Net is <strong>absent entirely</strong> (story AC 5.5 — verified by absence).</p>
+<ul class="list-disc pl-5 space-y-1">
+<li>Models &amp; voices section: curated <code>select</code>s populated from <code>capabilities.allowLists</code>, **no free</li>
+</ul>
+<p>  text** (behaviour wiring is ticket 18).</p>
+<ul class="list-disc pl-5 space-y-1">
+<li>Transcript check section: the <code>off | flag | correct</code> <code>join</code>, with <code>correct</code> rendered</li>
+</ul>
+<p>  <code>btn-disabled</code> + visible explanatory line in Realtime (behaviour is 14/15).</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>frontend/src/pages/useTuningConfig.ts</code> (+ <code>.test.ts</code>) — <code>draft</code>, per-mode <code>applied</code>, derived</li>
+</ul>
+<p>  <code>pending = diff(applied[mode], projectMode(draft, mode))</code>, capabilities fetch with <strong>skeleton</strong></p>
+<p>  and <strong>fallback-to-<code>DEFAULT_TUNING_CONFIG</code></strong> states, <code>applyState: &#x27;idle&#x27; | &#x27;applying&#x27; | &#x27;failed&#x27;</code></p>
+<p>  + <code>attempt</code>. Apply while disconnected commits <code>draft → applied</code> locally, stamps a new fingerprint</p>
+<p>  and clears pending (wireframe §4 — Apply stays <strong>enabled</strong> while disconnected).</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>WorkbenchPage.tsx</code> — the <code>Tuning</code> toggle in <code>navbar-end</code> <strong>before</strong> the connection badge, with</li>
+</ul>
+<p>  <code>aria-expanded</code> / <code>aria-controls=&quot;tuning-panel&quot;</code> and the <code>{n} pending</code> badge; transcript grid</p>
+<p>  drops to one column while open; main column becomes <code>flex-1 min-w-0</code>; Escape closes and returns</p>
+<p>  focus to the toggle; opening does <strong>not</strong> steal focus.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li>All <code>data-testid</code>s from wireframe §8 for everything rendered here; all copy verbatim from</li>
+</ul>
+<p>  wireframe §7.</p>
+<p><strong>Backend scope</strong>: None. <strong>Harness scope</strong>: None.</p>
+    <h4 class="font-semibold">Acceptance criteria</h4><p>Story ACs: <strong>1.1</strong> *(section skeleton + the inventory rows; the remaining knob rows arrive with</p>
+<p>tickets 04, 06, 11, 12, 13, 14, 15, 16, 17, 18 — AC 1.1 is verified complete at the end of the</p>
+<p>run)*, <strong>1.11</strong> (display half), <strong>1.13</strong> (mode-scoped rendering, nothing copied across),</p>
+<p><strong>5.4</strong> (offline stages visible, disabled, tagged <code>benchmark only</code>), <strong>5.5</strong> (Wave-U-Net absent),</p>
+<p><strong>5.6</strong> (pickers are fixed lists, no free-text entry).</p>
+<p>Brief tests: <strong>S3</strong>, <strong>S13</strong>, <strong>S14</strong>, <strong>S25</strong> *(rendering half: Cascade offers off/flag/correct,</p>
+<p>Realtime renders <code>correct</code> disabled)*, <strong>S30</strong> *(component half)*, <strong>S31</strong>, <strong>F13</strong> (capabilities</p>
+<p>fetch failure → <code>DEFAULT_TUNING_CONFIG</code> + all server denoise rows <code>not installed</code>),</p>
+<p><strong>F14</strong> *(component half)*, <strong>E5</strong> (Apply while disconnected commits, persists intent, clears</p>
+<p>pending). Accessibility per wireframe §9 in full.</p>
+    <h4 class="font-semibold">Out of scope for this ticket</h4><p>localStorage / presets / export / import (03); any transport call (<code>applyTuning</code> is not wired here —</p>
+<p>the footer button commits locally only); the Turn detection, Endpointing, Segmentation, Microphone,</p>
+<p>RMS gate and RNNoise <strong>rows</strong> (they arrive with the tickets that make them do something).</p>
+<p>---</p>
+  </div>
+</details>
+
+<details class="collapse collapse-arrow bg-base-200 rounded-box" id="t03">
+  <summary class="collapse-title font-semibold flex flex-wrap items-center gap-2"><span class="badge badge-outline">03</span> Persistence, presets, export / import, reset <span class="badge badge-success badge-sm">Tier 1</span> <span class="badge badge-ghost badge-sm">right-sized (~3 hrs).</span> <span class="text-xs text-base-content/60">depends on: 02</span></summary>
+  <div class="collapse-content text-sm space-y-3">
+    <h4 class="font-semibold">What to build</h4><p><strong>Frontend scope</strong></p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>frontend/src/pages/tuningPresets.ts</code> (+ <code>.test.ts</code>) — <code>BUILT_IN_PRESETS</code></li>
+</ul>
+<p>  (<code>Provider defaults</code>, <code>Tuned turn-taking</code>, <code>Max denoise</code>); read/write for</p>
+<p>  <code>boostlingo.tuning.v1</code> (<code>{schemaVersion, draft, applied: {cascade, realtime}}</code>) and</p>
+<p>  <code>boostlingo.tuning.presets.v1</code>; schema-version handling (missing/≠1 ⇒ discard the entry with a</p>
+<p>  <code>console.warn</code> and fall back to server defaults; unknown keys dropped with a warning; missing keys</p>
+<p>  filled from server defaults).</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>useTuningConfig.ts</code> — the persistence effect, preset select/apply, <code>Save as…</code> inline name input,</li>
+</ul>
+<p>  <code>Export</code>, <code>Import</code> (file or paste), <code>Reset to defaults</code> (restores the <strong>server</strong> defaults, not a</p>
+<p>  preset), <code>Preset modified</code> marker, and the retired-model fallback.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>TuningPanel.tsx</code> header wiring: <code>tuning-preset</code>, <code>tuning-preset-name</code>, <code>tuning-preset-save</code>,</li>
+</ul>
+<p>  <code>tuning-export</code>, <code>tuning-import</code>, <code>tuning-import-file</code>, <code>tuning-reset</code>.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>tuningConfig.ts</code> gains <code>parseImported()</code> and <code>migrate()</code>.</li>
+</ul>
+<p><strong>Backend scope</strong>: None (by design). <strong>Harness scope</strong>: None.</p>
+    <h4 class="font-semibold">Acceptance criteria</h4><p>Story ACs: <strong>1.8</strong> (survives reload; nothing stored server-side), <strong>1.9</strong> (built-in presets set every</p>
+<p>knob in one action; a user preset survives reload), <strong>1.10</strong> (export → import round-trips exactly).</p>
+<p>Brief tests: <strong>S10</strong>, <strong>S11</strong>, <strong>S12</strong>, <strong>F10</strong> (malformed JSON → inline</p>
+<p><code>That file isn&#x27;t a valid tuning config.</code>, draft untouched), <strong>F11</strong> (unknown keys → known keys</p>
+<p>imported + <code>Imported. Ignored {n} unknown field(s): {names}.</code>), <strong>F12</strong> (retired model id →</p>
+<p><code>{model} is no longer available — using {default}.</code>), <strong>E13</strong> *(unit half: the &quot;Max denoise&quot; preset</p>
+<p>produces a valid config with a distinct fingerprint)*.</p>
+    <h4 class="font-semibold">Out of scope for this ticket</h4><p>Server-side or account preset storage (permanently out of scope); any transport behaviour.</p>
+<p>---</p>
+  </div>
+</details>
+
+<details class="collapse collapse-arrow bg-base-200 rounded-box" id="t04">
+  <summary class="collapse-title font-semibold flex flex-wrap items-center gap-2"><span class="badge badge-outline">04</span> Realtime start-of-session tuning (+ OpenAI `noise_reduction`) <span class="badge badge-success badge-sm">Tier 1</span> <span class="badge badge-ghost badge-sm">right-sized (~4 hrs).</span> <span class="text-xs text-base-content/60">depends on: </span></summary>
+  <div class="collapse-content text-sm space-y-3">
+    <h4 class="font-semibold">What to build</h4><p><strong>Backend scope</strong> (<code>backend/app/api/realtime.py</code>)</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>RealtimeSessionRequest</code> gains the optional nested <code>tuning: ModeTuningConfig</code> — nested, so the wire</li>
+</ul>
+<p>  document is byte-identical to what <code>fingerprint()</code> hashes.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>_turn_detection()</code> becomes <code>_turn_detection(tuning: RealtimeTuning | None)</code>. **With <code>tuning=None</code></li>
+</ul>
+<p>  it behaves exactly as today** (reads <code>settings.realtime_vad_*</code>) — that is what keeps</p>
+<p>  <code>test_realtime.py:127</code> and <code>:130-151</code> green unchanged. With <code>tuning</code> present the request is</p>
+<p>  authoritative and <code>.env</code> is <strong>not</strong> merged in.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li>Mapping per the brief&#x27;s table: <code>model</code> → <code>session.model</code>; <code>voice</code> →</li>
+</ul>
+<p>  <code>session.audio.output.voice</code>; <code>turnDetection.type</code> always present; <code>threshold</code> /</p>
+<p>  <code>prefixPaddingMs</code> / <code>silenceDurationMs</code> only if not <code>None</code> <strong>and</strong> <code>type == &quot;server_vad&quot;</code>;</p>
+<p>  <code>eagerness</code> only if not <code>None</code> <strong>and</strong> <code>type == &quot;semantic_vad&quot;</code>; <code>interruptResponse</code> if not</p>
+<p>  <code>None</code>. <code>noiseReduction</code>: absent ⇒ <strong>no key</strong>; <code>&quot;off&quot;</code> ⇒ <code>&quot;noise_reduction&quot;: null</code>; else</p>
+<p>  <code>{&quot;type&quot;: &quot;&lt;value&gt;&quot;}</code>. <code>client.*</code> and <code>transcriptCheck</code> are <strong>not</strong> sent to OpenAI but are echoed</p>
+<p>  and hashed.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li>Validation → <strong>explicit <code>HTTPException(400)</code> naming the field, before any OpenAI call</strong>, for all</li>
+</ul>
+<p>  eight rules in the brief&#x27;s table (schemaVersion, model, voice, threshold range, prefixPadding /</p>
+<p>  silenceDuration ranges, <code>eagerness</code> with <code>server_vad</code>, <code>correct</code> in Realtime, transcript-check</p>
+<p>  model). Language validation must still run <strong>first</strong> — <code>assertServersUp()</code> in the capture harness</p>
+<p>  probes with <code>sourceLanguage: &#x27;zz&#x27;</code> and expects that exact 400.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>RealtimeSessionResponse</code> gains <code>fingerprint</code> + <code>appliedTuning</code> (camelCase; the four existing</li>
+</ul>
+<p>  snake_case fields are untouched because they mirror OpenAI&#x27;s own names).</p>
+<p>  <code>appliedTuning</code> preserves the absent-key idiom so</p>
+<p>  <code>fingerprint(appliedTuning) == fingerprint(request.tuning)</code>.</p>
+<p><strong>Frontend scope</strong></p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>TuningPanel.tsx</code>: the <strong>Turn detection (Realtime)</strong> section rows — <code>server_vad | semantic_vad</code></li>
+</ul>
+<p>  radios, <code>threshold</code>, <code>prefixPaddingMs</code>, <code>silenceDurationMs</code>, <code>interruptResponse</code>, <code>eagerness</code></p>
+<p>  (greyed with a <code>semantic_vad only</code> note while <code>server_vad</code> is selected), each with its</p>
+<p>  <code>Provider default</code> checkbox; plus the <strong>OpenAI noise reduction</strong> segmented control in the Denoise</p>
+<p>  chain (<code>Realtime only</code> chip when in Cascade). Closing note: a greyed field omits the key.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>sessionHandle.ts</code>: <code>connect: (languages, tuning?) =&gt; void</code>, <code>appliedFingerprint?: string | null</code></li>
+</ul>
+<p>  (the <code>applyTuning?</code> member arrives in 05).</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>useRealtimeSession.ts</code>: sends <code>tuning</code> in the session POST body; stores the server&#x27;s</li>
+</ul>
+<p>  <code>fingerprint</code> / <code>appliedTuning</code> as the authoritative applied config.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>WorkbenchPage.tsx</code>: passes <code>appliedForMode</code> at <strong>all three</strong> <code>connect()</code> call sites (mic button,</li>
+</ul>
+<p>  error-banner Try again, mode-switch reconnect).</p>
+    <h4 class="font-semibold">Acceptance criteria</h4><p>Story ACs: <strong>1.2</strong> (panel values reach <code>session.audio.input.turn_detection</code>), <strong>1.3</strong> (unset stays</p>
+<p>unset — key absent from the outbound payload), <strong>3.6</strong> (<code>noise_reduction</code> mapping incl. the</p>
+<p>three-state + absent semantics), <strong>5.7</strong> *(HTTP half: 400 for out-of-allow-list model/voice)*.</p>
+<p>Brief tests: <strong>S4</strong>, <strong>S5</strong>, <strong>F1</strong>, <strong>F2</strong>, <strong>F3</strong>, <strong>F5</strong> *(HTTP half: <code>schemaVersion: 2</code> → 400)*.</p>
+    <h4 class="font-semibold">Out of scope for this ticket</h4><p><code>session.update</code> / live apply (05); model &amp; voice <strong>pickers</strong> as UI (18 — the allow-list *validation*</p>
+<p>lands here because the schema already carries the fields); the Cascade side (06).</p>
+<p>---</p>
+  </div>
+</details>
+
+<details class="collapse collapse-arrow bg-base-200 rounded-box" id="t05">
+  <summary class="collapse-title font-semibold flex flex-wrap items-center gap-2"><span class="badge badge-outline">05</span> Realtime live apply <span class="badge badge-success badge-sm">Tier 1</span> <span class="badge badge-ghost badge-sm">right-sized (~2.5 hrs).</span> <span class="text-xs text-base-content/60">depends on: 04</span></summary>
+  <div class="collapse-content text-sm space-y-3">
+    <h4 class="font-semibold">What to build</h4><p><strong>Frontend scope</strong></p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>sessionHandle.ts</code>: <code>applyTuning?: (config: ModeTuningConfig) =&gt; Promise&lt;ApplyResult&gt;</code> (the</li>
+</ul>
+<p>  documented optional-member extension pattern, already used 5×), plus the <code>ApplyResult</code> union.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>useRealtimeSession.ts</code>:</li>
+<li><code>pc.createDataChannel(&#x27;oai-events&#x27;)</code> gains</li>
+</ul>
+<p>    <code>onopen = () =&gt; { dcReadyRef.current = true; flushPendingTuning(); }</code>; **never <code>send()</code> unless</p>
+<p>    <code>readyState === &#x27;open&#x27;</code>** (it is receive-only today).</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>applyTuning(config)</code>: if a reply is streaming (between</li>
+</ul>
+<p>    <code>response.output_audio_transcript.delta</code> and <code>response.done</code> + <code>REALTIME_MUTE_TAIL_MS</code>) <strong>or</strong></p>
+<p>    the channel isn&#x27;t open → store in a <strong>single</strong> <code>pendingTuningRef</code> slot and return</p>
+<p>    <code>{ok: true, deferred: true}</code> (last write wins ⇒ <strong>rapid Applies coalesce for free</strong>);</p>
+<p>    otherwise send exactly the GA <code>session.update</code> shape from the brief (<code>session.type: &quot;realtime&quot;</code>,</p>
+<p>    only <code>audio.input</code> present, absent-key idiom preserved, <code>&quot;off&quot;</code> ⇒ <code>noise_reduction: null</code>).</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>response.done</code>&#x27;s existing unmute timeout <strong>and</strong> <code>dataChannel.onopen</code> both call</li>
+</ul>
+<p>    <code>flushPendingTuning()</code>.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>model</code> / <code>voice</code> rows are marked <strong>&quot;applies at next connect&quot;</strong> — they are not live-updatable.</li>
+<li><code>useTuningConfig.ts</code> / footer: <code>Applying…</code> spinner state, <code>Applied · cfg:… · HH:MM:SS</code>,</li>
+</ul>
+<p>  <code>Applying after the current reply…</code> deferred status.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>frontend/src/test/mockRealtimeApis.ts</code>: <code>MockRTCDataChannel</code> gains <code>readyState</code> and <code>emitOpen()</code>.</li>
+</ul>
+<p><strong>Backend scope</strong>: None (by design). <strong>Harness scope</strong>: None.</p>
+    <h4 class="font-semibold">Acceptance criteria</h4><p>Story ACs: <strong>1.5</strong> (a <code>session.update</code> with the new value goes out on <code>oai-events</code>, the session is</p>
+<p><strong>not</strong> torn down, the panel shows it applied).</p>
+<p>Brief tests: <strong>S7</strong>, <strong>E2</strong> (Apply during a streaming reply is queued and fires after</p>
+<p><code>response.done</code> + <code>REALTIME_MUTE_TAIL_MS</code>), <strong>E3</strong> (Apply while the channel is <code>connecting</code> is</p>
+<p>flushed by <code>onopen</code>).</p>
+    <h4 class="font-semibold">Out of scope for this ticket</h4><p>Anything Cascade; the failure dialog (Realtime <code>session.update</code> cannot fail the way a Deepgram</p>
+<p>reconnect can — the dialog belongs to 07).</p>
+<p>---</p>
+  </div>
+</details>
+
+<details class="collapse collapse-arrow bg-base-200 rounded-box" id="t06">
+  <summary class="collapse-title font-semibold flex flex-wrap items-center gap-2"><span class="badge badge-outline">06</span> Cascade start-of-session tuning + non-connection-level live apply <span class="badge badge-success badge-sm">Tier 1</span> <span class="badge badge-ghost badge-sm">right-sized (~4.5 hrs, top of the band).</span> <span class="text-xs text-base-content/60">depends on: 01, 02</span></summary>
+  <div class="collapse-content text-sm space-y-3">
+    <h4 class="font-semibold">What to build</h4><p><strong>Backend scope</strong></p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>backend/app/providers/deepgram_stt.py</code>: <code>@dataclass(frozen=True) DeepgramParams</code> **whose defaults</li>
+</ul>
+<p>  are today&#x27;s module-level <code>Final</code> constants**, <code>from_tuning()</code>, <code>stream(..., params=None)</code>,</p>
+<p>  <code>_url(params)</code>. <strong>The constants stay</strong> — which is why <code>test_providers.py:291-320</code>&#x27;s URL-substring</p>
+<p>  assertions pass unchanged. *(That is a design constraint, not luck.)*</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>backend/app/orchestrator.py</code>:</li>
+<li><code>_SessionTuning</code> (<code>current</code> / <code>previous</code> / <code>pending</code> / <code>request_id</code> / <code>reconnecting</code>),</li>
+</ul>
+<p>    <strong>constructed inside <code>_start_new_session</code></strong> alongside the four providers. **Never mutate the</p>
+<p>    module-level constants** — doing so would silently re-parameterise every other concurrent</p>
+<p>    session&#x27;s STT connection. This is the single sharpest hazard in the feature.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>_parse_cascade_tuning()</code> — <strong>tolerant</strong> per the documented asymmetric posture: a field that</li>
+</ul>
+<p>    fails to parse or falls outside its allow-list/range keeps the current value and logs a warning.</p>
+<p>    The WS never 400s and never closes on a bad tuning field.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>start_session</code> accepts <code>tuning</code>; the legacy top-level <code>segmentationMode</code> stays supported for</li>
+</ul>
+<p>    <code>?segMode=</code>, and <code>tuning.cascade.segmentation.mode</code> <strong>wins</strong> when both are present.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li>Unsolicited <code>tuning_applied{requestId: null, fingerprint, reconnectedStt: false}</code> sent</li>
+</ul>
+<p>    immediately after <code>session_started</code>.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>_pump_client_messages</code> gains the <code>update_tuning</code> branch; <strong>non-connection-level</strong> changes</li>
+</ul>
+<p>    (segmentation mode/model, transcript-check mode/model, translation model, TTS voices, server</p>
+<p>    denoise params) assign <code>tuning_state.current = new</code> and reply <code>tuning_applied{reconnectedStt:</p>
+<p>    false}</code> immediately — these are read *per segment* or *per frame*, so the next one picks them up.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>tuning_failed</code> message shape defined, drawing <code>message</code> from the existing</li>
+</ul>
+<p>    <code>_CLIENT_ERROR_MESSAGES</code> map (raw provider text never reaches the browser).</p>
+<p><strong>Frontend scope</strong></p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>TuningPanel.tsx</code>: the <strong>Endpointing (Cascade)</strong> section (<code>endpointingMs</code>, <code>utteranceEndMs</code>,</li>
+</ul>
+<p>  <code>diarize</code>, summary carrying the <code>reconnects STT</code> chip) and the <strong>Segmentation</strong> section</p>
+<p>  (<code>hybrid | llm_priority</code> join + segmentation model select).</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>useCascadeSession.ts</code>: <code>tuning</code> inside <code>start_session</code> (strictly the first message);</li>
+</ul>
+<p>  <code>applyTuning()</code> sending <code>{type:&quot;update_tuning&quot;, requestId, tuning}</code>; handling <code>tuning_applied</code> /</p>
+<p>  <code>tuning_failed</code>; the <strong>client-side playback deferral</strong> — hold the config in one <code>pendingTuningRef</code></p>
+<p>  slot while <code>isPlaybackActiveRef.current</code> is true, flush when playback clears, status line</p>
+<p>  <code>Applying after the current reply…</code>. Same slot coalesces rapid Applies before they hit the wire.</p>
+    <h4 class="font-semibold">Acceptance criteria</h4><p>Story ACs: <strong>1.4</strong> (start-of-session values observable in the Deepgram connection URL under test),</p>
+<p><strong>1.6</strong> (non-connection-level live apply: no Deepgram restart, effective for the next segment),</p>
+<p><strong>5.7</strong> *(WS half: fall back to the default and log, never kill the session)*.</p>
+<p>Brief tests: <strong>S6</strong>, <strong>S8</strong>, <strong>F4</strong>, <strong>F5</strong> *(WS half)*, <strong>E1</strong> (Apply during Cascade TTS playback is</p>
+<p>accepted, queued, sent once playback clears — nothing on the wire while <code>isPlaybackActiveRef</code> is</p>
+<p>true), <strong>E16</strong> (unknown <code>update_tuning</code> fields ignored; unknown server message type warned-and-</p>
+<p>ignored client-side), plus new <code>test_providers.py</code> cases for non-default <code>DeepgramParams</code>.</p>
+    <h4 class="font-semibold">Out of scope for this ticket</h4><p>The deliberate reconnect and everything around it (07); the denoise chain in <code>audio_iter</code> (16); the</p>
+<p>transcript check in <code>_process_segment</code> (14).</p>
+<p>---</p>
+  </div>
+</details>
+
+<details class="collapse collapse-arrow bg-base-200 rounded-box" id="t07">
+  <summary class="collapse-title font-semibold flex flex-wrap items-center gap-2"><span class="badge badge-outline">07</span> Cascade connection-level apply: deliberate Deepgram reconnect + failure dialog <span class="badge badge-success badge-sm">Tier 1</span> <span class="badge badge-ghost badge-sm">right-sized (~4.5 hrs, top of the band, and the riskiest ticket in the run).</span> <span class="text-xs text-base-content/60">depends on: 06</span></summary>
+  <div class="collapse-content text-sm space-y-3">
+    <h4 class="font-semibold">What to build</h4><p><strong>Backend scope</strong> (<code>backend/app/orchestrator.py</code>)</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>_RECONNECT</code> sentinel: <code>_handle_update_tuning</code> sets <code>tuning_state.pending = new</code>,</li>
+</ul>
+<p>  <code>request_id</code>, then <code>audio_queue.put_nowait(_RECONNECT)</code> — an ordinary object in FIFO order behind</p>
+<p>  every already-enqueued frame. A second <code>update_tuning</code> before the reconnect completes just</p>
+<p>  overwrites <code>pending</code>; a fresh sentinel is enqueued <strong>only if <code>pending</code> was <code>None</code></strong>, so two</p>
+<p>  Applies 200 ms apart produce <strong>exactly one</strong> reconnect with the later config.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>audio_iter()</code> gains one line: popping <code>_RECONNECT</code> <code>return</code>s, ending *this* stream&#x27;s iterator</li>
+</ul>
+<p>  only. Frames after the sentinel stay in the queue, in order.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>_run_stt</code>&#x27;s <code>StopAsyncIteration</code> branch gains the <code>tuning_state.pending is not None</code> path: park</li>
+</ul>
+<p>  any in-flight clause check (<code>_park_stale</code>), **flush a non-empty buffer via</p>
+<p>  <code>_cut_segment(..., trigger=&quot;tuning_reconnect&quot;, ...)</code>**, rotate</p>
+<p>  <code>previous / current / pending</code>, set <code>reconnecting = True</code>, <code>continue</code> the existing outer</p>
+<p>  <code>while True</code> so a fresh <code>audio_iter()</code> over the <strong>same <code>audio_queue</code></strong> is streamed with</p>
+<p>  <code>DeepgramParams.from_tuning(...)</code>. On the first result from the new connection, send</p>
+<p>  <code>tuning_applied{reconnectedStt: true}</code>.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li>Failure path in the existing <code>except ProviderError</code> handler: <strong>every</strong> failed attempt logs</li>
+</ul>
+<p>  (<code>logger.warning(&quot;tuning reconnect attempt %d/%d failed …&quot;)</code>) <strong>and</strong> emits</p>
+<p>  <code>tuning_failed{requestId, attempt, maxAttempts, message}</code>.</p>
+<p>  <code>maxAttempts = 1 + len(retry_backoffs(exc))</code> — reuses <code>_resilience.py</code>&#x27;s existing 3-attempt /</p>
+<p>  0.5-1-2 s budget, <strong>no new retry mechanism</strong>. On exhaustion: <strong>revert</strong> to <code>previous</code> and keep the</p>
+<p>  session running. If the reverted reconnect also fails, fall through to today&#x27;s terminal path</p>
+<p>  unchanged.</p>
+<p>&gt; <strong>Do not &quot;simplify&quot; the sentinel into <code>asyncio.wait({queue.get(), event.wait()})</code>.</strong> That drops an</p>
+<p>&gt; item when the losing <code>get()</code> is cancelled after a <code>put_nowait</code> has handed it one. The</p>
+<p>&gt; sentinel-in-the-queue design is what makes &quot;no frame is lost&quot; true.</p>
+<p><strong>Frontend scope</strong></p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>useCascadeSession.ts</code>: <code>tuning_failed</code> → <code>console.warn</code> per attempt (the gate addendum requires</li>
+</ul>
+<p>  logging on <strong>both</strong> sides), attempt counter surfaced through <code>ApplyResult</code>.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>TuningPanel.tsx</code> / <code>useTuningConfig.ts</code>: the <code>Apply (reconnects STT)</code> label + per-row <code>reconnects</code></li>
+</ul>
+<p>  chips (driven by <code>DEEPGRAM_CONNECTION_LEVEL_PATHS</code>), reuse of the existing</p>
+<p>  <code>CONNECTION_BADGE.reconnecting</code> amber badge, the</p>
+<p>  <code>Reconnecting STT with the new parameters… (attempt {i} of {n})</code> status line, and the</p>
+<p>  <code>role=&quot;alertdialog&quot; aria-modal=&quot;true&quot;</code> failure <code>&lt;dialog&gt;</code> (<code>tuning-apply-failed-dialog</code>,</p>
+<p>  <code>tuning-apply-retry</code>, <code>tuning-apply-revert</code>) with the attempt log, no dismiss-by-backdrop, focus</p>
+<p>  trapped and restored to <code>tuning-apply</code>.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>segmentation.ts</code>: <code>&#x27;tuning_reconnect&#x27; → &#x27;reconfig&#x27;</code> in <code>segmentTriggerLabel</code>.</li>
+</ul>
+    <h4 class="font-semibold">Acceptance criteria</h4><p>Story ACs: <strong>1.7</strong> (every frame sent before, during and after the reconnect appears in the</p>
+<p>transcript — no frame dropped, no segment lost), plus the <strong>Step 3 gate addendum</strong> (no confirmation</p>
+<p>dialog; reconnect immediately; existing reconnecting badge; log every failure both sides; dialog with</p>
+<p>Retry / Revert after the retry budget).</p>
+<p>Brief tests: <strong>S9</strong> (two fake sockets: first got A,B, second got C,D, none dropped or duplicated,</p>
+<p>second URL carries the new params), <strong>F6</strong>, <strong>F7</strong>, <strong>E4</strong> (two Applies 200 ms apart ⇒ exactly one</p>
+<p>reconnect with the later config), <strong>E6</strong> (the in-flight partial is cut with</p>
+<p><code>trigger: &quot;tuning_reconnect&quot;</code> and appears; nothing double-cut).</p>
+    <h4 class="font-semibold">Out of scope for this ticket</h4><p>Anything that isn&#x27;t a Deepgram connection-level parameter (06 handles those).</p>
+<p>---</p>
+  </div>
+</details>
+
+<details class="collapse collapse-arrow bg-base-200 rounded-box" id="t08">
+  <summary class="collapse-title font-semibold flex flex-wrap items-center gap-2"><span class="badge badge-outline">08</span> Noisy corpus generator + manifest <span class="badge badge-success badge-sm">Tier 2</span> <span class="badge badge-ghost badge-sm">right-sized (~2.5 hrs).</span> <span class="text-xs text-base-content/60">depends on: none</span></summary>
+  <div class="collapse-content text-sm space-y-3">
+    <h4 class="font-semibold">What to build</h4><p><strong>Harness scope</strong></p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>backend/tests/fixtures/make_noisy_corpus.py</code> — for each of the 33 clean items produce variants</li>
+</ul>
+<p>  for <strong>babble</strong> (several overlaid TTS speakers, same and other language), <strong>street</strong>, and</p>
+<p>  <strong>fan/white</strong>, each at <strong>20 / 10 / 5 dB SNR</strong>, all mono 16-bit 16 kHz, via RMS-matched mixing with</p>
+<p>  a fixed <code>seed</code>. Uses the stdlib <code>wave</code> module (matching <code>stt_replay.py</code> and the harness&#x27;s</p>
+<p>  hand-written WAV header) — <strong>no <code>soundfile</code></strong>.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>backend/tests/fixtures/noisy/noisy_manifest.json</code> writer with the exact shape from the brief</li>
+</ul>
+<p>  (<code>generatedAt</code> UTC, <code>seed</code>, <code>sampleRate</code>, per-item <code>condition</code> / <code>snrDb</code> / <code>measuredSnrDb</code> /</p>
+<p>  <code>peakScale</code> and the inherited reference text/translation and language pair).</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>backend/tests/fixtures/noisy/SCRIPT.md</code> — how to regenerate, what each condition is, why the audio</li>
+</ul>
+<p>  is not committed.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>.gitignore</code> gains <code>backend/tests/fixtures/noisy/*.wav</code> and <code>noisy_manifest.json</code> (the existing</li>
+</ul>
+<p>  &quot;generated audio is not committed, the script + SCRIPT.md are&quot; convention).</p>
+<ul class="list-disc pl-5 space-y-1">
+<li>Prints a summary table of what it generated (items × conditions × SNRs, measured SNR spread).</li>
+</ul>
+<p><strong>Backend scope</strong>: None. <strong>Frontend scope</strong>: None.</p>
+    <h4 class="font-semibold">Acceptance criteria</h4><p>Story ACs: <strong>2.1</strong> (the full variant set, mono/16-bit/16 kHz, audio git-ignored, script + SCRIPT.md</p>
+<p>committed), <strong>2.8</strong> *(partial: per-item skip rather than failing the run)*.</p>
+<p>Brief tests: <strong>S15</strong> (measured SNR of each output within ±0.5 dB of its label, asserted on a</p>
+<p>synthetic 1 s tone — <strong>no real corpus needed to run the test</strong>), <strong>F16</strong> (a missing or wrong-format</p>
+<p>corpus WAV → per-item skip with the printed <code>ffmpeg</code> conversion command, run exits 0).</p>
+    <h4 class="font-semibold">Out of scope for this ticket</h4><p>Running anything through STT (09); the Realtime half (10); any <code>TuningConfig</code> awareness — this script</p>
+<p>only makes audio.</p>
+<p>---</p>
+  </div>
+</details>
+
+<details class="collapse collapse-arrow bg-base-200 rounded-box" id="t09">
+  <summary class="collapse-title font-semibold flex flex-wrap items-center gap-2"><span class="badge badge-outline">09</span> Cascade tuning sweep runner + paste-ready table + COMPARISON §7 <span class="badge badge-success badge-sm">Tier 2</span> <span class="badge badge-ghost badge-sm">right-sized (~3.5 hrs).</span> <span class="text-xs text-base-content/60">depends on: 01, 08</span></summary>
+  <div class="collapse-content text-sm space-y-3">
+    <h4 class="font-semibold">What to build</h4><p><strong>Harness scope</strong></p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>backend/tests/fixtures/stt_replay.py</code>: add</li>
+</ul>
+<p>  <code>transcribe_wav_detailed(..., tuning=, offline_stages=) -&gt; ReplayResult</code>; <code>transcribe_wav</code></p>
+<p>  delegates and <strong>keeps returning <code>str</code></strong> so existing callers are untouched.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>backend/tests/fixtures/run_tuning_sweep.py</code> — the runner: <code>--config</code> (repeatable), <code>--limit</code>,</li>
+</ul>
+<p>  <code>--only</code>, <code>--conditions</code>, <code>--snr</code>, <code>--out</code>, <code>--yes</code>; one row per (item, condition, SNR) carrying</p>
+<p>  the <strong>fingerprint</strong> (computed by <code>backend/app/tuning/fingerprint.py</code>, not re-implemented);</p>
+<p>  <code>wer</code>, <code>correctedWer</code> (column defined here, populated by 14), <code>addedLatencyMs</code>,</p>
+<p>  <code>providerLatencyMs</code>, <code>status</code>, <code>skipReason</code>; **resume by skipping rows already present in</p>
+<p>  <code>--out</code>**; <code>_MAX_ROWS_WITHOUT_CONFIRM = 200</code> refusal with an estimated wall-clock; a</p>
+<p>  <code>condition: &quot;clean&quot;, snrDb: null</code> row per item in <strong>every</strong> run; <code>offline_stages</code> honoured</p>
+<p>  (applied to the whole WAV before replay) even though the panel shows them disabled.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li>Paste-ready markdown table: one row per fingerprint, following the existing <code>COMPARISON.md</code></li>
+</ul>
+<p>  row-printing convention.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>COMPARISON.md</code> gains <strong>§7 Tuning-config comparisons</strong> as a skeleton: the table</li>
+</ul>
+<p>  (<code>fingerprint / mode / condition / SNR / WER / corrected WER / judge acceptance / added latency /</p>
+<p>  provider latency</code>), a &quot;what each fingerprint is&quot; list, and the exact reproduce commands — following</p>
+<p>  the existing per-table provenance convention. *(Prose stays human-written — out of scope by story.)*</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>.gitignore</code> gains <code>backend/tests/fixtures/tuning_sweep*.json</code>. <code>README.md</code> documents the command.</li>
+</ul>
+<p><strong>Backend scope</strong>: None beyond importing the tuning package. <strong>Frontend scope</strong>: None.</p>
+    <h4 class="font-semibold">Acceptance criteria</h4><p>Story ACs: <strong>2.2</strong>, <strong>2.5</strong> (clean baseline always shown), <strong>2.6</strong> (paste-ready markdown +</p>
+<p>COMPARISON.md section), <strong>2.7</strong> (added latency reported <strong>separately</strong> from provider latency — this</p>
+<p>is where AC 2.7 is satisfied; there is deliberately <strong>no live per-frame readout</strong> in the UI),</p>
+<p><strong>2.8</strong> (real-recording manifest absent → friendly message, exit 0).</p>
+<p>Brief tests: <strong>S16</strong>, <strong>S19</strong>, <strong>S20</strong>, <strong>S30</strong> *(sweep half: a config naming Demucs/DNS64 is</p>
+<p>honoured)*, <strong>F17</strong>, <strong>E12</strong> (over-cap refusal + estimated wall-clock), <strong>E14</strong> (manifest present but</p>
+<p>every file missing → zero-result report, exit 0).</p>
+<p>Noisy-variant runs are <strong>report-only</strong> — <code>WER_THRESHOLD = 0.20</code> in <code>test_quality_wer.py</code> stays a</p>
+<p>clean-corpus assertion and is not touched (Step 3 gate answer 2).</p>
+    <h4 class="font-semibold">Out of scope for this ticket</h4><p>The Realtime half (10); the actual denoise stage implementations (16/17) — the runner calls whatever</p>
+<p><code>build_denoise_chain</code> returns, which is <code>[]</code> until then.</p>
+<p>---</p>
+  </div>
+</details>
+
+<details class="collapse collapse-arrow bg-base-200 rounded-box" id="t10">
+  <summary class="collapse-title font-semibold flex flex-wrap items-center gap-2"><span class="badge badge-outline">10</span> Realtime capture harness `--tuning` + fingerprint through the report <span class="badge badge-success badge-sm">Tier 2</span> <span class="badge badge-ghost badge-sm">right-sized (~2 hrs).</span> <span class="text-xs text-base-content/60">depends on: 01, 02, 03, 04</span></summary>
+  <div class="collapse-content text-sm space-y-3">
+    <h4 class="font-semibold">What to build</h4><p><strong>Harness scope</strong></p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>frontend/e2e/realtime-quality-capture.mjs</code>: <code>--tuning &lt;file&gt;</code> in the arg parser; before Connect,</li>
+</ul>
+<p>  the harness <strong>imports the whole config through <code>tuning-import</code> / <code>tuning-import-file</code></strong> (rather</p>
+<p>  than driving 30 controls — this is exactly why that testid exists), then scrapes the applied</p>
+<p>  fingerprint from <code>tuning-fingerprint-latency</code>; stamps <code>fingerprint</code> and <code>tuningFile</code> on the output</p>
+<p>  envelope and <code>fingerprint</code> on <strong>every item</strong>.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li>Must still pass <code>assertServersUp()</code> — it probes with <code>sourceLanguage: &#x27;zz&#x27;</code> and expects that 400;</li>
+</ul>
+<p>  ticket 04&#x27;s new validation must not change that error&#x27;s text or precedence.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>backend/tests/fixtures/run_realtime_quality_report.py</code>: <code>_identity()</code>, the summary block and the</li>
+</ul>
+<p>  printed COMPARISON row all gain the fingerprint.</p>
+<p><strong>Backend scope</strong>: None. <strong>Frontend scope</strong>: None (it consumes ticket 02/03&#x27;s testids).</p>
+    <h4 class="font-semibold">Acceptance criteria</h4><p>Story ACs: <strong>2.3</strong> (the config is applied in the UI before connecting; captures carry the</p>
+<p>fingerprint), <strong>2.4</strong> (every result row and the summary block carry the fingerprint; WER, judge</p>
+<p>acceptance and end-to-end latency reported).</p>
+<p>Brief tests: <strong>S17</strong> (e2e smoke, no live keys — asserts the import happened and the chip text</p>
+<p>matches), <strong>S18</strong>.</p>
+    <h4 class="font-semibold">Out of scope for this ticket</h4><p>Sweeping N configs × M conditions in one command on the Realtime side (one browser launch per clip is</p>
+<p>a hard Chromium constraint; the Cascade half in 09 is where bulk sweeping happens).</p>
+<p>---</p>
+  </div>
+</details>
+
+<details class="collapse collapse-arrow bg-base-200 rounded-box" id="t11">
+  <summary class="collapse-title font-semibold flex flex-wrap items-center gap-2"><span class="badge badge-outline">11</span> Microphone constraint toggles, both modes <span class="badge badge-info badge-sm">Tier 3</span> <span class="badge badge-ghost badge-sm">right-sized (~1.5 hrs).</span> <span class="text-xs text-base-content/60">depends on: 04, 06</span></summary>
+  <div class="collapse-content text-sm space-y-3">
+    <h4 class="font-semibold">What to build</h4><p><strong>Frontend scope</strong></p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>TuningPanel.tsx</code>: the <strong>Microphone</strong> section — EC / NS / AGC toggles with the wire field name in</li>
+</ul>
+<p>  muted mono on the right, and the inline footnote</p>
+<p>  <code>Applied at getUserMedia time — takes effect on the next connect.</code> These knobs do <strong>not</strong> trigger a</p>
+<p>  reconnect in either mode.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>useCascadeSession.ts</code> and <code>useRealtimeSession.ts</code>: build the <code>getUserMedia</code> constraints from</li>
+</ul>
+<p>  <code>tuning.client.microphone</code> instead of the current hardcoded <code>true</code>s.</p>
+<p><strong>Backend scope</strong>: None (browser constraints never reach the server; they are hashed into the</p>
+<p>fingerprint so a run is still identifiable). <strong>Harness scope</strong>: None.</p>
+    <h4 class="font-semibold">Acceptance criteria</h4><p>Story ACs: <strong>3.1</strong> (<code>getUserMedia</code> called with exactly those values in both modes).</p>
+<p>Brief tests: <strong>S21</strong> (both hooks, via <code>installMockGetUserMedia</code>).</p>
+    <h4 class="font-semibold">Out of scope for this ticket</h4><p>Any DSP graph work (12).</p>
+<p>---</p>
+  </div>
+</details>
+
+<details class="collapse collapse-arrow bg-base-200 rounded-box" id="t12">
+  <summary class="collapse-title font-semibold flex flex-wrap items-center gap-2"><span class="badge badge-outline">12</span> RMS noise gate + Realtime client-DSP re-plumbing <span class="badge badge-info badge-sm">Tier 3</span> <span class="badge badge-ghost badge-sm">right-sized (~4 hrs).</span> <span class="text-xs text-base-content/60">depends on: 05, 06, 11</span></summary>
+  <div class="collapse-content text-sm space-y-3">
+    <h4 class="font-semibold">What to build</h4><p><strong>Frontend scope</strong></p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>frontend/src/pages/rmsGate.ts</code> (+ <code>.test.ts</code>) — the unit-tested source of truth for the gate math</li>
+</ul>
+<p>  exactly as specified in the brief (per-128-sample RMS → dBFS → open/close, <code>floorGain =</p>
+<p>  fullMute ? 0 : 10 ** (-attenuationDb/20)</code>, attack/hold/release ramps). Boundaries documented and</p>
+<p>  safe: <code>-80 dBFS</code> = always open, <code>0 dBFS</code> = always closed, neither crashes nor divides by zero.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>frontend/public/gate-processor.js</code> — <strong>one</strong> shared gate worklet used by <strong>both</strong> modes. Params</li>
+</ul>
+<p>  arrive via <code>processorOptions</code> at construction and <code>port.postMessage({type:&#x27;gateParams&#x27;, …})</code> for</p>
+<p>  live adjust. The math is <strong>hand-mirrored</strong> from <code>rmsGate.ts</code> (the worklet realm cannot import TS),</p>
+<p>  with the header comment saying so — exactly as <code>floatSampleToInt16</code> already is. The worklet clamps</p>
+<p>  defensively; <code>clampGateParams()</code> clamps on the main thread too.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>useCascadeSession.ts</code>: insert the gate node at the single insertion point</li>
+</ul>
+<p>  (<code>micSource.connect(workletNode)</code>); the analyser tap stays pre-processing and unchanged.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>useRealtimeSession.ts</code> — <strong>the genuinely new plumbing</strong>: when any client stage is enabled, build</li>
+</ul>
+<p>  <code>getUserMedia → AudioContext → [gate] → MediaStreamAudioDestinationNode</code>, and</p>
+<p>  <code>pc.addTrack(sentTrack, …)</code>. <strong>The mute-during-reply logic must target the sent track</strong> — add</p>
+<p>  <code>sentTrackRef</code> and mute *that*; <code>mediaStreamRef</code> stays only for teardown. When no client stage is</p>
+<p>  enabled, keep the raw track and <strong>do not create the DSP context</strong>, so the default config&#x27;s measured</p>
+<p>  latency does not move.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>TuningPanel.tsx</code>: the <strong>RMS gate</strong> rows in the Denoise chain (threshold range with numeric</li>
+</ul>
+<p>  readout, hold / attack / release, attenuation range labelled <code>0 dB (off) … 60 dB … mute</code>,</p>
+<p>  <code>Full mute</code> checkbox).</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>frontend/src/test/mockCascadeApis.ts</code>: <code>FakeAudioContext</code> gains <code>createMediaStreamDestination()</code>,</li>
+</ul>
+<p>  constructor-honouring <code>sampleRate</code> and gain-node stubs; <code>FakeAudioWorkletNode</code> gains</p>
+<p>  <code>processorOptions</code> capture and a <strong>two-way</strong> <code>port</code> with <code>postMessage</code>.</p>
+<p>  <code>mockRealtimeApis.ts</code>: <code>MockRTCPeerConnection</code> records <code>addTrack</code> arguments.</p>
+<p><strong>Backend scope</strong>: None. <strong>Harness scope</strong>: None.</p>
+    <h4 class="font-semibold">Acceptance criteria</h4><p>Story ACs: <strong>3.2</strong> (attenuated by exactly <code>attenuationDb</code>, above-threshold passes at unity, full mute</p>
+<p>silences), <strong>3.3</strong> (threshold change on a connected session takes effect <strong>without</strong> reconnecting),</p>
+<p><strong>3.5</strong> (the WebRTC track carries processed audio <strong>and</strong> the mute targets the track actually being</p>
+<p>sent — the single most likely silent regression in this feature).</p>
+<p>Brief tests: <strong>S22</strong>, <strong>S23</strong>, <strong>S24</strong>, <strong>E7</strong> (threshold at <code>0</code> and <code>-80</code> neither crashes the</p>
+<p>worklet nor produces a silence-only transcript), <strong>E8</strong> (<code>attenuationDb = 0</code> is a no-op; <code>fullMute</code></p>
+<p>overrides <code>attenuationDb</code>).</p>
+    <h4 class="font-semibold">Out of scope for this ticket</h4><p>RNNoise and the 48 kHz context switch (13) — the graph built here runs at today&#x27;s rates.</p>
+<p>---</p>
+  </div>
+</details>
+
+<details class="collapse collapse-arrow bg-base-200 rounded-box" id="t13">
+  <summary class="collapse-title font-semibold flex flex-wrap items-center gap-2"><span class="badge badge-outline">13</span> RNNoise (48 kHz contexts, 3:1 decimator) <span class="badge badge-info badge-sm">Tier 3</span> <span class="badge badge-ghost badge-sm">right-sized (~3.5 hrs).</span> <span class="text-xs text-base-content/60">depends on: 12</span></summary>
+  <div class="collapse-content text-sm space-y-3">
+    <h4 class="font-semibold">What to build</h4><p><strong>Frontend scope</strong></p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>frontend/package.json</code>: <code>@sapphi-red/web-noise-suppressor</code> (chosen over <code>@jitsi/rnnoise-wasm</code></li>
+</ul>
+<p>  because it ships a working AudioWorklet with the 480-sample/48 kHz framing already handled).</p>
+<p>  Import the wasm and the worklet with Vite&#x27;s <code>?url</code> suffix and **verify both resolve under</p>
+<p>  <code>vite dev</code> and <code>vite build</code> before building on it.**</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>frontend/src/pages/resample.ts</code> (+ <code>.test.ts</code>) — the unit-tested 48 k→16 k decimator (8-tap FIR</li>
+</ul>
+<p>  low-pass + 3:1), source of truth for the worklet.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>frontend/public/cascade-pcm-processor.js</code> — the decimator, gated on <code>sampleRate === 48000</code>, driven</li>
+</ul>
+<p>  by <code>processorOptions.targetSampleRate</code>; header comment gains the hand-sync note pointing at</p>
+<p>  <code>resample.ts</code>.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>useCascadeSession.ts</code>: <code>new AudioContext({ sampleRate: rnnoiseEnabled ? 48000 : 16000 })</code> — when</li>
+</ul>
+<p>  RNNoise is off the graph stays at 16 kHz <strong>exactly as today</strong>.</p>
+<p>  <code>useRealtimeSession.ts</code>: the DSP context runs at 48 kHz natively.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>TuningPanel.tsx</code>: the <strong>RNNoise</strong> row (toggle + voice-probability threshold range) with the</li>
+</ul>
+<p>  48 kHz/480-sample footnote.</p>
+<p><strong>Harness scope</strong></p>
+<ul class="list-disc pl-5 space-y-1">
+<li>Confirm the sweep from 09 emits an RNNoise <strong>clean-baseline</strong> row so a 16→48→16 round-trip</li>
+</ul>
+<p>  regression is visible.</p>
+<p><strong>Backend scope</strong>: None.</p>
+    <h4 class="font-semibold">Acceptance criteria</h4><p>Story ACs: <strong>3.4</strong> (mic audio passes through RNNoise in both modes and the transcript is non-empty</p>
+<p>for a clean clip — i.e. resampling does not destroy the signal), <strong>3.7</strong> (each tier-3 stage has at</p>
+<p>least one benchmarked fingerprint on the noisy corpus with its WER delta versus the same config with</p>
+<p>the stage disabled — satisfied by running 09&#x27;s sweep and 10&#x27;s capture once tier 3 lands; **this</p>
+<p>ticket owns making that happen**, as the last tier-3 ticket).</p>
+<p>Brief tests: <strong>E9</strong> (the 48 k context + 3:1 decimator still yields 960-byte / 30 ms frames, and</p>
+<p><code>resample.ts</code>&#x27;s output matches the worklet&#x27;s), <strong>E10</strong> (the clean-baseline row exists in the sweep).</p>
+    <h4 class="font-semibold">Out of scope for this ticket</h4><p>Server-side denoise (16/17).</p>
+<p>---</p>
+  </div>
+</details>
+
+<details class="collapse collapse-arrow bg-base-200 rounded-box" id="t14">
+  <summary class="collapse-title font-semibold flex flex-wrap items-center gap-2"><span class="badge badge-outline">14</span> Cascade transcript check: off / flag / correct <span class="badge badge-info badge-sm">Tier 4</span> <span class="badge badge-ghost badge-sm">right-sized (~3.5 hrs).</span> <span class="text-xs text-base-content/60">depends on: 06</span></summary>
+  <div class="collapse-content text-sm space-y-3">
+    <h4 class="font-semibold">What to build</h4><p><strong>Backend scope</strong></p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>backend/app/providers/transcript_check.py</code> — <code>TranscriptChecker</code> / <code>TranscriptCheckResult</code>, shaped</li>
+</ul>
+<p>  exactly like <code>segmentation_checker.py</code> (one client per object, tight explicit timeout</p>
+<p>  <code>httpx.Timeout(6.0, connect=3.0)</code>, <code>response_format={&quot;type&quot;:&quot;json_object&quot;}</code>, <code>max_tokens=200</code>).</p>
+<p>  Any <code>OpenAIError</code> or parse failure → <code>TranscriptCheckResult(flagged=False, corrected_text=None,</p>
+<p>  failed=True)</code> — <strong>never raises</strong>.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>orchestrator._process_segment</code>, called **between <code>_resolve_direction</code> and the TTS/translation</li>
+</ul>
+<p>  kickoff**: <code>off</code> ⇒ no call, no latency message, no extra fields; <code>flag</code> ⇒ fire the task, let</p>
+<p>  translation start immediately with the original text, re-send <code>source_transcript</code> with</p>
+<p>  <code>flagged: true</code> when the verdict lands; <code>correct</code> ⇒ <code>await</code>, translate</p>
+<p>  <code>result.corrected_text or segment.text</code>, re-send <code>source_transcript</code> with the corrected <code>text</code>,</p>
+<p>  <code>flagged: true</code> and <code>correctedFrom</code>. Either way emit</p>
+<p>  <code>{&quot;type&quot;:&quot;latency&quot;,&quot;stage&quot;:&quot;transcript_check&quot;,&quot;ms&quot;:&lt;cumulative since speech_end&gt;}</code>.</p>
+<p>  <code>result.failed</code> ⇒ the existing non-fatal <code>retryable: true</code> error message, original text used.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>backend/tests/conftest.py</code>: a <strong>second</strong> autouse fixture stubbing <code>orchestrator.TranscriptChecker</code>,</li>
+</ul>
+<p>  matching the existing <code>SegmentationChecker</code> stub, so legacy tests never hit OpenAI.</p>
+<p><strong>Frontend scope</strong></p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>sessionHandle.ts</code>: <code>LatencyStage</code> gains <code>&#x27;transcript_check&#x27;</code>; <code>TranscriptSegment</code> gains</li>
+</ul>
+<p>  <code>flagged?</code> and <code>correctedFrom?</code>.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>latencyTracking.ts</code>: <code>&#x27;transcript_check&#x27;</code> in <code>LATENCY_STAGES</code>, ordered **after <code>speech_end</code>,</li>
+</ul>
+<p>  before <code>translation_first_token</code>**.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>WorkbenchPage.tsx</code> <code>TranscriptPaneBody</code>: the flag badge next to the existing trigger annotation —</li>
+</ul>
+<p>  <code>data-testid=&quot;segment-suspicious-badge&quot;</code>, <code>⚑ check</code>, <code>badge badge-warning badge-soft badge-xs</code>.</p>
+<p>  <strong>Badge only, no toast</strong> (Step 3 gate answer 3). The *check-failure* toast is a different event and</p>
+<p>  is unchanged.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>TuningPanel.tsx</code>: the Cascade <strong>Transcript check</strong> section is now live (<code>off | flag | correct</code> +</li>
+</ul>
+<p>  check-model select).</p>
+<p><strong>Harness scope</strong></p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>run_tuning_sweep.py</code> populates the <code>correctedWer</code> column when</li>
+</ul>
+<p>  <code>cascade.transcriptCheck.mode == &quot;correct&quot;</code> (the column is defined in 09).</p>
+    <h4 class="font-semibold">Acceptance criteria</h4><p>Story ACs: <strong>4.1</strong>, <strong>4.3</strong> (flag is non-blocking — translation proceeds with the original text and</p>
+<p>does not wait), <strong>4.4</strong> (correct rewrites before translation, displayed transcript updated, dedicated</p>
+<p>latency stage), <strong>4.5</strong> (raw <strong>and</strong> corrected WER per item in the report), <strong>4.6</strong> (off ⇒ no call, no</p>
+<p>extra latency stage), <strong>4.7</strong> (failure ⇒ original text, session continues, non-fatal toast).</p>
+<p>Brief tests: <strong>S26</strong>, <strong>S27</strong>, <strong>F8</strong>, <strong>F9</strong>.</p>
+    <h4 class="font-semibold">Out of scope for this ticket</h4><p>Realtime <code>flag</code> (15) — no backend seam exists for it.</p>
+<p>---</p>
+  </div>
+</details>
+
+<details class="collapse collapse-arrow bg-base-200 rounded-box" id="t15">
+  <summary class="collapse-title font-semibold flex flex-wrap items-center gap-2"><span class="badge badge-outline">15</span> Realtime transcript check `flag` via `POST /api/tuning/transcript-check` <span class="badge badge-info badge-sm">Tier 4</span> <span class="badge badge-ghost badge-sm">right-sized (~2 hrs).</span> <span class="text-xs text-base-content/60">depends on: 04, 05, 14</span></summary>
+  <div class="collapse-content text-sm space-y-3">
+    <h4 class="font-semibold">What to build</h4><p><strong>Backend scope</strong></p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>backend/app/api/tuning.py</code> gains <code>POST /api/tuning/transcript-check</code>:</li>
+</ul>
+<p>  <code>{text, language, mode, model}</code> → <code>{flagged, correctedText, elapsedMs}</code>. <code>mode ∈ {flag, correct}</code>;</p>
+<p>  <code>model ∉ TEXT_MODELS</code> → 400; <code>text</code> over 2000 chars → 400. **A provider failure returns</p>
+<p>  <code>200 {&quot;flagged&quot;: false, &quot;correctedText&quot;: null, &quot;elapsedMs&quot;: …, &quot;failed&quot;: true}</code>** — the caller must</p>
+<p>  never break on it. Reuses <code>TranscriptChecker</code> from 14. No auth (as everything else).</p>
+<p><strong>Frontend scope</strong></p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>useRealtimeSession.ts</code>: when a source-transcript turn settles and</li>
+</ul>
+<p>  <code>realtime.transcriptCheck.mode === &#x27;flag&#x27;</code>, call the endpoint best-effort and non-blocking; a</p>
+<p>  failure is <code>console.warn</code>&#x27;d and dropped. Render the same <code>segment-suspicious-badge</code> from 14.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>TuningPanel.tsx</code>: the Realtime <strong>Transcript check</strong> section is now live — <code>off | flag</code> only, with</li>
+</ul>
+<p>  <code>correct</code> <code>btn-disabled</code> plus the visible line</p>
+<p>  <code>correct is unavailable: no seam in Realtime.</code> (a <code>title</code> alone is not accessible on a</p>
+<p>  non-focusable element).</p>
+<p><strong>Harness scope</strong>: None.</p>
+    <h4 class="font-semibold">Acceptance criteria</h4><p>Story ACs: <strong>4.2</strong> (Realtime offers only <code>off</code> / <code>flag</code>; <code>correct</code> is not selectable), <strong>4.3</strong></p>
+<p>*(Realtime half: non-blocking)*.</p>
+<p>Brief tests: <strong>S25</strong> *(behaviour half)*, plus <code>test_tuning_api.py</code> cases for the new route.</p>
+    <h4 class="font-semibold">Out of scope for this ticket</h4><p><code>correct</code> mode in Realtime — permanently out of scope (locked decision 4).</p>
+<p>---</p>
+  </div>
+</details>
+
+<details class="collapse collapse-arrow bg-base-200 rounded-box" id="t16">
+  <summary class="collapse-title font-semibold flex flex-wrap items-center gap-2"><span class="badge badge-outline">16</span> Server denoise chain: protocol + noisereduce + capability gating <span class="badge badge-ghost badge-sm">Tier 5</span> <span class="badge badge-ghost badge-sm">right-sized (~3.5 hrs).</span> <span class="text-xs text-base-content/60">depends on: 02, 06</span></summary>
+  <div class="collapse-content text-sm space-y-3">
+    <h4 class="font-semibold">What to build</h4><p><strong>Backend scope</strong></p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>backend/app/providers/denoise.py</code> — <code>DenoiseStage</code> Protocol (<code>name</code>, <code>process(frame) -&gt; bytes</code></li>
+</ul>
+<p>  same byte length, <code>reset()</code>), <code>NoopStage</code>, <code>NoisereduceStage</code>, <code>build_denoise_chain(tuning)</code>,</p>
+<p>  <code>find_spec</code>-based detection and the module-level <code>_last_init_error</code>. Fixed chain order (cheap</p>
+<p>  first): <code>noisereduce → deepfilternet</code>.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>NoisereduceStage</code>: <code>noisereduce</code> has no streaming API, so keep a <code>_NR_CONTEXT_MS = 480</code> ring</li>
+</ul>
+<p>  buffer, run <code>reduce_noise(y, sr=16000, prop_decrease=…, stationary=…)</code> over the buffer per new</p>
+<p>  frame and emit the <strong>last 30 ms</strong>. Zero added algorithmic delay, real CPU cost — measured by</p>
+<p>  ticket 09, not optimised here. *(If the measured number is bad, the honest fix is to mark the</p>
+<p>  stage benchmark-only, not to optimise it in this slice.)*</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>orchestrator.audio_iter()</code> applies the chain <strong>before</strong> Deepgram — the single choke point every</li>
+</ul>
+<p>  mic frame passes through. Every stage must handle <strong>arbitrary frame lengths</strong> (nothing enforces the</p>
+<p>  960-byte size). When nothing is enabled <code>build_denoise_chain</code> returns <code>[]</code> and the path is skipped</p>
+<p>  entirely — <strong>zero cost when off</strong>. Rebuild the chain when <code>tuning_state.current</code> changes identity,</p>
+<p>  calling <code>reset()</code> on the old chain. Offline stages (<code>demucs</code>, <code>dns64</code>) are <strong>never</strong> constructed</p>
+<p>  live: log <code>&quot;offline-only denoise stage %s ignored in the live path&quot;</code> once.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>backend/pyproject.toml</code>: the first <code>[project.optional-dependencies]</code> — the <strong><code>bench</code></strong> extra</li>
+</ul>
+<p>  (<code>noisereduce</code>, <code>numpy</code>). Per the Step 7 gate these are *not* main deps, so a default install</p>
+<p>  correctly shows noisereduce as <code>not installed</code>.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>/api/tuning/capabilities</code> <code>stages</code> now reports <code>installed: true</code> when the extra is present.</li>
+</ul>
+<p><strong>Frontend scope</strong></p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>TuningPanel.tsx</code>: the <strong>noisereduce</strong> row becomes live when <code>capabilities.stages.noisereduce</li>
+</ul>
+<p>  .installed</code> — toggle + <code>propDecrease</code> range + stationary/non-stationary join; otherwise it keeps</p>
+<p>  the <code>not installed</code> variant built in ticket 02.</p>
+<p><strong>Harness scope</strong>: <code>run_tuning_sweep.py</code> already honours the config; verify a noisereduce fingerprint</p>
+<p>produces a distinct row.</p>
+    <h4 class="font-semibold">Acceptance criteria</h4><p>Story ACs: <strong>5.1</strong> *(noisereduce half)*, <strong>5.2</strong> (every microphone frame is processed before reaching</p>
+<p>Deepgram), <strong>5.3</strong> (capability discovery drives enabled/disabled; <strong>core CI runs without torch</strong>),</p>
+<p><strong>5.4</strong> (offline stages selectable in a benchmark config file while disabled in the panel).</p>
+<p>Brief tests: <strong>S28</strong> *(generic half: a fake stage&#x27;s call count equals the frame count)*, <strong>S29</strong></p>
+<p>(<code>find_spec</code> monkeypatched to a spec ⇒ <code>installed: true</code> and the panel row enabled), plus</p>
+<p><code>backend/tests/test_denoise.py</code> (chain construction, detection, arbitrary frame lengths).</p>
+    <h4 class="font-semibold">Out of scope for this ticket</h4><p>DeepFilterNet and torch (17); GPU anything (permanently out of scope).</p>
+<p>---</p>
+  </div>
+</details>
+
+<details class="collapse collapse-arrow bg-base-200 rounded-box" id="t17">
+  <summary class="collapse-title font-semibold flex flex-wrap items-center gap-2"><span class="badge badge-outline">17</span> DeepFilterNet stage + optional `denoise` torch extra <span class="badge badge-ghost badge-sm">Tier 5</span> <span class="badge badge-ghost badge-sm">right-sized (~2.5 hrs).</span> <span class="text-xs text-base-content/60">depends on: 16</span></summary>
+  <div class="collapse-content text-sm space-y-3">
+    <h4 class="font-semibold">What to build</h4><p><strong>Backend scope</strong></p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>DeepFilterNetStage</code> in <code>denoise.py</code>: resample 16 k→48 k (<code>torchaudio.functional.resample</code>, ships</li>
+</ul>
+<p>  with torch), run 3 DFN hops per 30 ms frame, resample back. <code>init_df()</code> is **lazy on first use and</p>
+<p>  cached** — never called from the capabilities route, which uses <code>find_spec</code> only. A load failure</p>
+<p>  sets <code>_last_init_error</code> and the stage <strong>degrades to <code>NoopStage</code> for the rest of the session</strong> with</p>
+<p>  one warning log, rather than killing it.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>backend/pyproject.toml</code>: the <strong><code>denoise</code></strong> extra (<code>torch&gt;=2.4</code>, <code>deepfilternet&gt;=0.5.6</code>) with the</li>
+</ul>
+<p>  CPU wheel index pinned (<code>[[tool.uv.index]]</code> → <code>https://download.pytorch.org/whl/cpu</code> plus</p>
+<p>  <code>[tool.uv.sources] torch = {index = &quot;pytorch-cpu&quot;}</code>). Installed with <code>uv sync --extra denoise</code>.</p>
+<p>  <strong>Core CI stays torch-free.</strong></p>
+<ul class="list-disc pl-5 space-y-1">
+<li>Capabilities distinguishes the two failure modes: <code>installed: false</code> +</li>
+</ul>
+<p>  <code>torch not installed — run \</code>uv sync --extra denoise\`<code> <strong>vs</strong> </code>installed: true<code> +</p>
+<p>  </code>model weights unavailable — see the server log.<code></p>
+<ul class="list-disc pl-5 space-y-1">
+<li></code>README.md<code> documents </code>uv sync --extra denoise<code> and </code>--extra bench<code>.</li>
+</ul>
+<p><strong>Frontend scope</strong></p>
+<ul class="list-disc pl-5 space-y-1">
+<li></code>TuningPanel.tsx<code>: the <strong>DeepFilterNet</strong> row becomes live when installed — toggle + attenuation</li>
+</ul>
+<p>  limit dB + post-filter strength; the two distinct hint strings for the two failure modes (wireframe</p>
+<p>  §7), always as <strong>visible text</strong>, never a </code>title` alone.</p>
+<p><strong>Harness scope</strong>: None beyond the sweep already honouring the config.</p>
+    <h4 class="font-semibold">Acceptance criteria</h4><p>Story ACs: <strong>5.1</strong> *(DeepFilterNet half, with its own parameters visible)*, <strong>5.3</strong> (the &quot;installed&quot;</p>
+<p>side of capability discovery).</p>
+<p>Brief tests: <strong>S28</strong> (DeepFilterNet selected ⇒ every mic frame passes through</p>
+<p><code>DeepFilterNetStage.process</code> before Deepgram), <strong>F15</strong> (torch installed but <code>init_df()</code> raises ⇒</p>
+<p><code>installed: true</code> + <code>model weights unavailable…</code>, and the stage degrades to no-op mid-session rather</p>
+<p>than killing it).</p>
+    <h4 class="font-semibold">Out of scope for this ticket</h4><p>Demucs / DNS64 / Wave-U-Net in the live path — permanently out of scope; they exist only as sweep</p>
+<p>options (09) and disabled inventory rows (02).</p>
+<p>---</p>
+  </div>
+</details>
+
+<details class="collapse collapse-arrow bg-base-200 rounded-box" id="t18">
+  <summary class="collapse-title font-semibold flex flex-wrap items-center gap-2"><span class="badge badge-outline">18</span> Model / voice pickers wired through both transports + allow-list validation <span class="badge badge-ghost badge-sm">Tier 6</span> <span class="badge badge-ghost badge-sm">right-sized (~2.5 hrs).</span> <span class="text-xs text-base-content/60">depends on: 02, 04, 06</span></summary>
+  <div class="collapse-content text-sm space-y-3">
+    <h4 class="font-semibold">What to build</h4><p><strong>Backend scope</strong></p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>orchestrator.py</code>: <code>tuning.cascade.translationModel</code>, <code>segmentation.model</code>,</li>
+</ul>
+<p>  <code>transcriptCheck.model</code>, <code>ttsVoiceA</code> / <code>ttsVoiceB</code> and <code>deepgram.model</code> are read from</p>
+<p>  <code>tuning_state.current</code> <strong>per segment / per stream</strong>, never from module constants. Out-of-allow-list</p>
+<p>  values <strong>fall back to the default and log</strong> — the WS never 400s and never closes (asymmetric</p>
+<p>  posture, story AC 5.7).</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>allowlists.elevenlabs_voices()</code> = the two configured voices + <code>ELEVENLABS_VOICE_IDS_EXTRA</code></li>
+</ul>
+<p>  (Step 7 gate answer 3); no hard-coded premade list. <code>.env.example</code> documents it.</p>
+<p><strong>Frontend scope</strong></p>
+<ul class="list-disc pl-5 space-y-1">
+<li><code>TuningPanel.tsx</code> Models &amp; voices section wired to the draft (it already renders from</li>
+</ul>
+<p>  <code>capabilities.allowLists</code>); the footnote naming the server-side allow-list; Realtime <code>model</code> /</p>
+<p>  <code>voice</code> rows marked <strong>&quot;applies at next connect&quot;</strong>.</p>
+<p><strong>Harness scope</strong>: None.</p>
+    <h4 class="font-semibold">Acceptance criteria</h4><p>Story ACs: <strong>5.6</strong> (fixed curated lists, no free text — re-asserted end-to-end here), <strong>5.7</strong></p>
+<p>(HTTP rejects with 400 — already covered by 04; **the Cascade WebSocket falls back to the default</p>
+<p>rather than killing the session**).</p>
+<p>Brief tests: <strong>S31</strong> *(end-to-end half)*, <strong>F4</strong> *(Cascade fallback, extended to every picker)*.</p>
+    <h4 class="font-semibold">Out of scope for this ticket</h4><p>Adding new models or voices beyond the curated constants; free-text entry (explicitly forbidden).</p>
+  </div>
+</details></div>
+  </section>
+  <section id="cuts" class="space-y-3">
+    <h2 class="text-2xl font-semibold">Cut candidates (ordered, cut from the bottom)</h2>
+    <div class="card bg-base-200 shadow"><div class="card-body text-sm"><div class="overflow-x-auto"><table class="table table-xs">
+<tr><th>Order</th><th>Cut</th><th>Tier</th><th>Saves</th><th>What is lost</th></tr>
+<tr><td>1</td><td><strong>Ticket 18</strong></td><td>6</td><td>~2.5 hrs</td><td>Model/voice pickers render but only Realtime model/voice apply; Cascade pickers go disabled. Model constants stay as they are today.</td></tr>
+<tr><td>2</td><td><strong>Ticket 17</strong></td><td>5</td><td>~2.5 hrs</td><td>No DeepFilterNet; <code>stages.deepfilternet.installed</code> stays <code>false</code> forever and the row stays in its <code>not installed</code> state. No torch anywhere.</td></tr>
+<tr><td>3</td><td><strong>Ticket 16</strong></td><td>5</td><td>~3.5 hrs</td><td>No server-side denoise at all; both server stage rows permanently disabled (the panel still lists them — locked decision 11). <code>audio_iter</code> untouched.</td></tr>
+<tr><td>4</td><td><strong>Ticket 15</strong></td><td>4</td><td>~2 hrs</td><td>Realtime transcript check disabled (<code>off</code> only); Cascade keeps all three modes. No new HTTP endpoint.</td></tr>
+<tr><td>5</td><td><strong>Ticket 14</strong></td><td>4</td><td>~3.5 hrs</td><td>No transcript check at all; the section goes disabled; no <code>transcript_check</code> latency stage; the <code>correctedWer</code> column stays empty.</td></tr>
+<tr><td>6</td><td><strong>Ticket 13</strong></td><td>3</td><td>~3.5 hrs</td><td>No RNNoise; no new npm runtime dependency; both audio contexts stay at today&#x27;s rates and <code>cascade-pcm-processor.js</code> is untouched.</td></tr>
+<tr><td>7</td><td><strong>Ticket 12</strong></td><td>3</td><td>~4 hrs</td><td>No RMS gate and <strong>no Realtime client-DSP re-plumbing</strong> — the highest-risk frontend change in the run disappears. Cutting 12 forces cutting 13.</td></tr>
+<tr><td>8</td><td><strong>Ticket 11</strong></td><td>3</td><td>~1.5 hrs</td><td>Mic constraints stay hardcoded <code>true</code>; the Microphone section goes disabled with a reason.</td></tr>
+</table></div>
+    <p class="text-sm mt-2"><strong>Not cuttable without losing the feature's point:</strong> tiers 1–2 (01–10). Honest minimum if the slice must shrink hard: <strong>01–07 + 08–09</strong> (~29 hrs).</p></div></div>
+  </section>
+  <section id="choices" class="space-y-3">
+    <h2 class="text-2xl font-semibold">Places the brief leaves the builder a choice <span class="text-base-content/50 text-base font-normal">(each with a recommendation — approving the tickets adopts them)</span></h2>
+    <div class="card bg-warning/10 border border-warning/40"><div class="card-body text-sm"><ul class="list-disc pl-5 space-y-1">
+<li><strong>Babble / street / fan noise sources.</strong> The brief says babble is &quot;several overlaid TTS speakers&quot;</li>
+</ul>
+<p>   but does not say whether <code>make_noisy_corpus.py</code> calls <code>generate_audio_fixtures.py</code> (needs an</p>
+<p>   ElevenLabs key, so the generator becomes key-gated) or synthesises the noise procedurally</p>
+<p>   (filtered/shaped noise, no key, fully reproducible from <code>seed</code>). **Recommendation: procedural for</p>
+<p>   street/fan/white, reuse of existing generated TTS clips for babble with a self-skip when they are</p>
+<p>   absent** — it keeps ticket 08 key-free and deterministic. Ticket 08 must state which it chose in</p>
+<p>   <code>SCRIPT.md</code>.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><strong>Does the Cascade sweep run the LLM judge?</strong> <code>tuning_sweep.json</code>&#x27;s row shape has no judge column,</li>
+</ul>
+<p>   but COMPARISON §7&#x27;s table has <code>judge acceptance</code>. Either the Cascade half fills it (extra cost and</p>
+<p>   an extra key dependency) or §7&#x27;s judge column is Realtime-only and the Cascade rows leave it</p>
+<p>   blank. <strong>Recommendation: Realtime-only, blank for Cascade rows, stated in the §7 provenance line.</strong></p>
+<ul class="list-disc pl-5 space-y-1">
+<li><strong><code>TuningSection.tsx</code> split</strong> — the brief says &quot;only if <code>TuningPanel.tsx</code> exceeds ~400 lines&quot;.</li>
+</ul>
+<p>   Builder&#x27;s call at the time; both are pre-approved.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><strong>Chain-rebuild trigger.</strong> &quot;Rebuilt whenever <code>tuning_state.current</code> changes identity&quot; does not</li>
+</ul>
+<p>   specify the mechanism (identity check per frame vs. explicit rebuild at the assignment site).</p>
+<p>   <strong>Recommendation: rebuild at the assignment site in <code>_handle_update_tuning</code></strong> — no per-frame cost.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><strong><code>flag</code> mode&#x27;s re-sent <code>source_transcript</code>.</strong> The brief says re-send the segment with</li>
+</ul>
+<p>   <code>flagged: true</code>; it does not say how the client reconciles two messages for the same <code>segmentId</code>.</p>
+<p>   <strong>Recommendation: merge by <code>segmentId</code> in the existing transcript state</strong> — the pane already keys</p>
+<p>   on it; confirm no duplicate segment is appended.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><strong><code>ELEVENLABS_VOICE_IDS_EXTRA</code> parsing.</strong> pydantic-settings parses <code>list[str]</code> from env as JSON by</li>
+</ul>
+<p>   default, which surprises people who write a comma-separated list. Ticket 01 must pick one and</p>
+<p>   document it in <code>.env.example</code>.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><strong><code>appliedTuning</code> serialisation.</strong> Preserving the absent-key idiom can be <code>model_dump(exclude_none</li>
+</ul>
+<p>   =True, by_alias=True)</code> or a hand-rolled emitter; only the *result* is contractual</p>
+<p>   (<code>fingerprint(appliedTuning) == fingerprint(request.tuning)</code>).</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><strong>Panel open/closed state across reloads.</strong> Not specified anywhere. **Recommendation: do not</li>
+</ul>
+<p>   persist it** — the panel opens closed; one less thing in localStorage.</p>
+<ul class="list-disc pl-5 space-y-1">
+<li><strong>Number formatting parity</strong> (<code>Py repr(round(x, 2))</code> vs <code>TS String(x)</code>) is the single most likely</li>
+</ul>
+<p>   place for a silent fingerprint mismatch. <code>shared/tuning-fingerprint-cases.json</code> must include at</p>
+<p>   least one case per float knob at a non-integral step value, or S1 will pass while the real system</p>
+<p>   disagrees.</p></div></div>
+  </section>
+  <section id="gate" class="card bg-primary text-primary-content shadow-lg"><div class="card-body">
+    <h2 class="card-title">Step 9 gate</h2>
+    <p class="text-sm">Approve / request changes / reject in chat — and say whether the granularity feels right (18 tickets ≈ 3 hrs each; coarser = ~10 tickets ≈ 5.5 hrs; finer = ~25). Approval publishes <code>.scratch/tuning-lab/issues/NN-*.md</code> + index and starts Wave 0 (tickets 01 and 08 in parallel).</p>
+  </div></section>
+  <footer class="text-xs text-base-content/50 pt-6 border-t border-base-300">Source: <code>.scratch/tuning-lab/05-tickets-draft.md</code> · design: app's own DaisyUI v5 <code>luxury</code> theme.</footer>
+</main>
+</body>
+</html>

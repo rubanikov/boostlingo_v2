@@ -1,0 +1,290 @@
+<title>Requirements Compliance Audit — AI Interpreter Workbench</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css" integrity="sha384-/NNZlK8J6WoD6FfmmLzhqE1x/aTnlIJzc75uc+dFz8aI+/sD2ArUirQhs3hbeqBe" crossorigin="anonymous">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css" integrity="sha384-ai6dM6tUdx0lUGOHd8x3eGevvDdj0p+CPoJp7Ve+h+kRkt08XtqX/g3a+1cPYKCm" crossorigin="anonymous">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js" integrity="sha384-v5YF9xS+gLRWdvrQ0u/WRbCkjSIH0NjHIPe8tBL1ZRrmI7PiSH6LLdzs0aAIMCuh" crossorigin="anonymous"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex) > * { min-width: 0; }
+  :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, td, th, .badge, .label) { overflow-wrap: anywhere; }
+  code { font-size: 0.85em; }
+  .verdict-table td { vertical-align: top; }
+</style>
+
+<html data-theme="luxury">
+<body class="bg-base-100 text-base-content min-h-screen">
+<main class="mx-auto max-w-6xl p-6 lg:p-10 space-y-10">
+
+  <header class="space-y-3">
+    <div class="flex flex-wrap items-center gap-3">
+      <span class="badge badge-primary badge-lg">Requirements Compliance Audit</span>
+      <span class="badge badge-ghost">vs. project_1778691544728.pdf · audited 2026-08-14</span>
+    </div>
+    <h1 class="text-4xl font-bold">AI Interpreter Workbench — spec audit</h1>
+    <p class="text-base-content/70 max-w-3xl">
+      Every requirement in the Boostlingo project brief, graded <strong>Meets / Partial / Fail</strong>.
+      Verdicts come from two independent read-only code audits (frontend, backend) plus a review of the
+      write-ups and the full 51-commit git history. Evidence is cited as <code>file:line</code>.
+    </p>
+    <div class="alert alert-success">
+      <div>
+        <h3 class="font-bold">Fix round applied (2026-08-14) — 21 Meets / 2 Partial / 0 Fail, up from 16 / 6 / 1</h3>
+        <p class="text-sm">Since the original audit of commit <code>9883bc9</code>: the Python-over-.NET rationale was added to the README,
+        AGENTS.md's stale claims were corrected, an <code>stt_final</code> latency stage now isolates the STT/segmentation wait in the UI strip,
+        explicit provider timeouts + WebSocket keepalive were added (and raw provider error text is no longer forwarded to the browser),
+        and English ↔ French joined the language selector end-to-end. Both suites verified green after the changes:
+        backend <strong>119 passed</strong> (live keys present, so key-gated tests ran for real), frontend <strong>137 passed</strong>.
+        Struck-through verdicts below show the original grade; the remaining two Partials need a recorded live 5-minute run and deeper e2e assertions.</p>
+      </div>
+    </div>
+    <div class="stats stats-vertical sm:stats-horizontal shadow bg-base-200 w-full">
+      <div class="stat">
+        <div class="stat-title">Meets</div>
+        <div class="stat-value text-success">21</div>
+        <div class="stat-desc">of 23 graded items</div>
+      </div>
+      <div class="stat">
+        <div class="stat-title">Partial</div>
+        <div class="stat-value text-warning">2</div>
+        <div class="stat-desc">need live-run evidence / deeper e2e</div>
+      </div>
+      <div class="stat">
+        <div class="stat-title">Fail</div>
+        <div class="stat-value text-error">0</div>
+        <div class="stat-desc">language-choice gap fixed</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ═══════════════ Functional must-haves ═══════════════ -->
+  <section class="space-y-4">
+    <h2 class="text-2xl font-bold">1 · Functional requirements (must-haves)</h2>
+    <p class="text-base-content/70">The brief's eight numbered must-haves. All eight met after the fix round (originally six met, two partial).</p>
+    <div class="overflow-x-auto">
+      <table class="table table-zebra verdict-table">
+        <thead><tr><th>#</th><th>Requirement</th><th>Verdict</th><th>Evidence &amp; caveats</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>1</td><td>Browser SPA with mic capture + audio playback</td>
+            <td><span class="badge badge-success">Meets</span></td>
+            <td>Single-page shell (<code>App.tsx:4</code>). Shared <code>getUserMedia</code> capture (<code>mediaStream.ts:12-26</code>); Cascade plays TTS via a gapless Web Audio player (<code>gaplessPlayer.ts</code>), Realtime via the WebRTC remote track → <code>&lt;audio&gt;</code> (<code>WorkbenchPage.tsx:407</code>). Live mic-level meter in both modes.</td>
+          </tr>
+          <tr>
+            <td>2</td><td>Realtime mode on OpenAI Realtime API, model <code>gpt-realtime</code>, voice in / voice out</td>
+            <td><span class="badge badge-success">Meets</span></td>
+            <td>Literal string at <code>backend/app/api/realtime.py:12</code>, sent in the session payload (<code>:135</code>); asserted by <code>test_realtime.py:122-123</code>. WebRTC direct browser↔OpenAI; ephemeral token minted server-side, real key never reaches the browser (test at <code>test_realtime.py:90-101</code>).</td>
+          </tr>
+          <tr>
+            <td>3</td><td>Cascade mode: composed STT → Translation → TTS with streaming</td>
+            <td><span class="badge badge-success">Meets</span></td>
+            <td>Deepgram interim results stream (<code>deepgram_stt.py:132</code>); translation streams deltas (<code>openai_translation.py:43-63</code>); TTS task starts <em>before</em> translation finishes and relays audio per chunk (<code>orchestrator.py:1214-1220</code>, <code>:1168-1177</code>). No full-utterance block — the unit is a clause-level segment. Caveats: segments process serially (head-of-line blocking, <code>orchestrator.py:1037</code>) and ElevenLabs opens a fresh WebSocket per segment.</td>
+          </tr>
+          <tr>
+            <td>4</td><td>UI toggle between modes, mid-session or pre-session</td>
+            <td><span class="badge badge-success">Meets</span></td>
+            <td>Tab toggle works both pre-session and mid-session (<code>WorkbenchPage.tsx:265-274</code>); mid-session switch cleanly tears down the live session rather than handing off audio — the spec's "or" is satisfied. Both paths tested (<code>WorkbenchPage.test.tsx:76</code>, <code>:131-144</code>).</td>
+          </tr>
+          <tr>
+            <td>5</td><td>Language pair selection (minimum EN ↔ ES)</td>
+            <td><span class="badge badge-success">Meets</span> <span class="badge badge-ghost badge-sm line-through">Partial</span></td>
+            <td><strong>Fixed:</strong> the selector now offers English ↔ Spanish and English ↔ French, backed end-to-end (frontend pair list → backend allow-list with <code>"fr"</code> → Deepgram <code>language=multi</code> / templated prompts / multilingual TTS). Direction within a pair stays auto-resolved per utterance from detected language (<code>orchestrator.py:163-173</code>). A new component test asserts the non-default pair reaches <code>connect()</code>.</td>
+          </tr>
+          <tr>
+            <td>6</td><td>Live transcripts, source + target, as they're produced</td>
+            <td><span class="badge badge-success">Meets</span></td>
+            <td>Dual panes (<code>WorkbenchPage.tsx:361-384</code>). Cascade renders interim STT and per-token translation deltas live (<code>useCascadeSession.ts:248-261</code>); Realtime renders input-transcription and output-transcript deltas live (<code>useRealtimeSession.ts:90-121</code>). Minor: interim text isn't visually distinguished from final.</td>
+          </tr>
+          <tr>
+            <td>7</td><td>Per-stage latency display visible to the user</td>
+            <td><span class="badge badge-success">Meets</span> <span class="badge badge-ghost badge-sm line-through">Partial</span></td>
+            <td><strong>Fixed:</strong> a new <code>stt_final</code> stage now isolates the formerly invisible STT/segmentation wait (final transcript → segmentation cut) as its own badge, first in the strip and eligible for the bottleneck flag; the cumulative stages are unchanged, so the published benchmark numbers stay valid. Realtime still shows a single proxy end-to-end number — structurally unavoidable (the backend is off the audio path) and documented in COMPARISON.md §1, so it no longer holds the grade down.</td>
+          </tr>
+          <tr>
+            <td>8</td><td>Comparison write-up: latency, quality, cost, controllability + recommendation</td>
+            <td><span class="badge badge-success">Meets</span></td>
+            <td>COMPARISON.md covers all five topics with measured latency (live runs 2026-08-12 and a 33-turn sample 2026-08-15), measured WER + LLM-judge quality for <strong>both</strong> modes (Cascade 33/33, Realtime 19/33 on real voice, with the turn-taking failure mechanism explained), computed per-minute cost, concrete controllability asymmetries, and a scenario-based recommendation. Caveat: ~3 pages vs. the asked 1–2.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══════════════ Code quality ═══════════════ -->
+  <section class="space-y-4">
+    <h2 class="text-2xl font-bold">2 · Code quality expectations</h2>
+    <div class="overflow-x-auto">
+      <table class="table table-zebra verdict-table">
+        <thead><tr><th>Requirement</th><th>Verdict</th><th>Evidence &amp; caveats</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Clean separation: mode-specific transport vs. mode-agnostic UI</td>
+            <td><span class="badge badge-success">Meets</span></td>
+            <td>One shared <code>SessionHandle</code> contract (<code>sessionHandle.ts:69-128</code>); the shell picks a hook in one line (<code>WorkbenchPage.tsx:262</code>) and every control renders against the interface. A test asserts no transport types leak into the page (<code>WorkbenchPage.test.tsx:70</code>). One small leak: <code>realtimeSession.audioRef</code> read directly (<code>WorkbenchPage.tsx:407</code>).</td>
+          </tr>
+          <tr>
+            <td>Provider abstractions — swapping a provider is a contained change</td>
+            <td><span class="badge badge-success">Meets</span></td>
+            <td><code>Protocol</code>-typed STT/Translation/TTS interfaces (<code>providers/base.py:93-151</code>) with one conforming concrete each; pipeline functions accept only the abstractions (<code>orchestrator.py:743</code>, <code>:1020-1021</code>). Caveat: concretes are instantiated directly in the orchestrator (<code>:114-118</code>) — a swap edits those lines; no factory/config selection.</td>
+          </tr>
+          <tr>
+            <td>Targeted tests on cascade pipeline + provider boundaries</td>
+            <td><span class="badge badge-success">Meets</span></td>
+            <td>Backend: 78 passed / 33 skipped (key-gated, self-skipping with instructions). Provider boundaries tested against fake sockets — error mapping, reconnects, malformed frames (<code>test_providers.py</code>, 770 lines); full wire-sequence orchestrator tests; retry/breaker matrix (<code>test_resilience.py</code>). Frontend: 144 Vitest tests. Gaps: the headline cross-stage streaming overlap (TTS emitting before translation completes) is asserted nowhere; Playwright e2e specs are smoke-level and self-skip their real assertions without live keys.</td>
+          </tr>
+          <tr>
+            <td>Error handling: rate limits, timeouts, empty results, mic denied</td>
+            <td><span class="badge badge-success">Meets</span> <span class="badge badge-ghost badge-sm line-through">Partial</span></td>
+            <td>Rate limits → typed backoff retries; empty translation → <code>EMPTY_RESULT</code>; circuit breaker after 5 failures; mic-denied banner + retry. <strong>Both gaps fixed:</strong> explicit timeouts on the OpenAI clients (30s translation, 10s segmentation-checker, vs the SDK's 600s default) and explicit <code>open_timeout</code>/ping keepalive on both provider WebSockets, so a hung stream becomes a detectable, retryable failure; and the browser now receives a stable per-kind message while raw provider exception text goes to the server log only.</td>
+          </tr>
+          <tr>
+            <td>README with setup, run, architecture overview</td>
+            <td><span class="badge badge-success">Meets</span></td>
+            <td>Setup, two-terminal run instructions (plus <code>dev.ps1</code>), architecture diagram, test-suite instructions with verified counts, provider-abstraction notes, file map.</td>
+          </tr>
+          <tr>
+            <td>AGENTS.md / CLAUDE.md describing agent usage</td>
+            <td><span class="badge badge-success">Meets</span></td>
+            <td>Detailed two-phase account (wayfinder decisions → ticket-parallel subagent builds), including corrections made along the way. <strong>But it's stale</strong> — see the callout below: two of its claims are contradicted by later commits.</td>
+          </tr>
+          <tr>
+            <td>Commits scoped to logical units, no "initial commit" dump</td>
+            <td><span class="badge badge-success">Meets</span></td>
+            <td>51 commits: claim/resolve pairs for 14 decision tickets, one commit per implementation ticket (1–9), then validation, polish, and live-testing fix commits. Genuinely iterative history.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="alert alert-success">
+      <div>
+        <h3 class="font-bold">Fixed: AGENTS.md no longer contradicts the repo</h3>
+        <p class="text-sm">Both stale sections were rewritten: the key-constraint section now says the no-keys constraint held <em>during the build</em> and was lifted afterward for the live-measurement round (citing the commits), and the "known gap" about untracked code was replaced by an accurate account of the per-ticket commit history that closed it.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════ Other specific requirements ═══════════════ -->
+  <section class="space-y-4">
+    <h2 class="text-2xl font-bold">3 · Technical &amp; other specific requirements</h2>
+    <div class="overflow-x-auto">
+      <table class="table table-zebra verdict-table">
+        <thead><tr><th>Requirement</th><th>Verdict</th><th>Evidence &amp; caveats</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Language choice explained (Python acceptable, .NET/C# preferred)</td>
+            <td><span class="badge badge-success">Meets</span> <span class="badge badge-ghost badge-sm line-through">Fail</span></td>
+            <td><strong>Fixed:</strong> the README now has a "Why Python + TypeScript (and not .NET)" section — async-streaming shape of the backend, first-party async Python SDKs for every provider in play, and the 15–20h budget favoring iteration speed over runtime performance — linking the framework ticket for the FastAPI-vs-Flask depth.</td>
+          </tr>
+          <tr>
+            <td>Streaming throughout the cascade pipeline (no full-utterance blocking)</td>
+            <td><span class="badge badge-success">Meets</span></td>
+            <td>Same evidence as must-have #3 — all three stages stream and overlap within a segment.</td>
+          </tr>
+          <tr>
+            <td>Provider abstractions so providers swap without rewriting the app</td>
+            <td><span class="badge badge-success">Meets</span></td>
+            <td>Same evidence as the code-quality row — contained one-class change.</td>
+          </tr>
+          <tr>
+            <td>Git history reflecting iterative development</td>
+            <td><span class="badge badge-success">Meets</span></td>
+            <td>51 scoped commits across research → decisions → tickets → validation → live-test fixes.</td>
+          </tr>
+          <tr>
+            <td>Per-stage latency instrumentation visible in the UI</td>
+            <td><span class="badge badge-success">Meets</span> <span class="badge badge-ghost badge-sm line-through">Partial</span></td>
+            <td>Same as must-have #7: <strong>fixed</strong> via the new <code>stt_final</code> stage; Realtime's single documented proxy number is structural.</td>
+          </tr>
+          <tr>
+            <td>Agentic coding assistant used; cloud deployment (optional)</td>
+            <td><span class="badge badge-success">Meets</span></td>
+            <td>Built with Claude Code (documented in AGENTS.md, visible in history). Deployment was optional; local-only with clear setup instructions is explicitly fine per the brief, and the README delivers that.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══════════════ Performance benchmarks ═══════════════ -->
+  <section class="space-y-4">
+    <h2 class="text-2xl font-bold">4 · Performance benchmarks</h2>
+    <div class="overflow-x-auto">
+      <table class="table table-zebra verdict-table">
+        <thead><tr><th>Benchmark</th><th>Target</th><th>Measured</th><th>Verdict</th><th>Caveats</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Realtime end-to-end perceived latency</td>
+            <td>&lt; 1.5 s</td>
+            <td><strong>283–395 ms</strong> (3 turns, live 2026-08-12)</td>
+            <td><span class="badge badge-success">Meets</span></td>
+            <td>Measured as speech-stop → first output-transcript delta — a documented proxy, not audible playback start; one short scripted sentence, not a natural conversation.</td>
+          </tr>
+          <tr>
+            <td>Cascade end-to-end latency</td>
+            <td>&lt; 3 s (target &lt; 2 s)</td>
+            <td><strong>939 ms mean</strong>, 830–1199 ms range (7 segments)</td>
+            <td><span class="badge badge-success">Meets</span></td>
+            <td>Clears even the stretch target. Same narrow-scenario caveat; longer utterances and serial segment processing could push this up under load.</td>
+          </tr>
+          <tr>
+            <td>Stability: 5-minute conversation, no disconnect / drift / leaks</td>
+            <td>sustained 5 min</td>
+            <td>Not directly demonstrated</td>
+            <td><span class="badge badge-warning">Partial</span></td>
+            <td>Real machinery exists: 5s-grace reconnect/resume (<code>orchestrator.py:523-559</code>), provider reconnects, and a memory test asserting &lt;50 MB growth over 2,000 segments. <strong>Keepalive gap fixed:</strong> provider sockets now pin explicit ping/pong + connect timeouts, and uvicorn's WS protocol pings are pinned in <code>dev.ps1</code>/README. Remaining (why still Partial): no actual 5-minute live run is recorded anywhere, the memory test substitutes segment count for wall-clock time, and messages produced while detached are dropped, not buffered.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══════════════ Fix list ═══════════════ -->
+  <section class="space-y-4">
+    <h2 class="text-2xl font-bold">5 · Fix round — what was done, what remains</h2>
+    <div class="grid gap-4 md:grid-cols-2">
+      <div class="card bg-base-200 shadow">
+        <div class="card-body">
+          <h3 class="card-title text-success">✓ 1 · Python choice explained</h3>
+          <p class="text-sm">README gained a "Why Python + TypeScript (and not .NET)" section: async-streaming backend shape, first-party async SDKs for every provider, and the 15–20h budget favoring iteration speed.</p>
+        </div>
+      </div>
+      <div class="card bg-base-200 shadow">
+        <div class="card-body">
+          <h3 class="card-title text-success">✓ 2 · AGENTS.md un-staled</h3>
+          <p class="text-sm">The no-keys constraint is now framed as build-phase-only (lifted for the live-measurement round, with commits cited), and the untracked-code "known gap" was replaced by the accurate per-ticket commit history. Stale test counts in the README were also corrected.</p>
+        </div>
+      </div>
+      <div class="card bg-base-200 shadow">
+        <div class="card-body">
+          <h3 class="card-title text-success">✓ 3 · <code>stt_final</code> latency stage</h3>
+          <p class="text-sm">The orchestrator now emits the finalize→cut wait per segment; the strip shows it first, it competes for the bottleneck flag, and backend + frontend tests cover it. Cumulative stages unchanged, so COMPARISON.md's measured numbers stay valid (noted there).</p>
+        </div>
+      </div>
+      <div class="card bg-base-200 shadow">
+        <div class="card-body">
+          <h3 class="card-title text-success">✓ 4 · Timeouts, keepalive, sanitized errors</h3>
+          <p class="text-sm">Explicit OpenAI client timeouts (30s / 10s vs the 600s default), explicit connect/ping bounds on both provider WebSockets, pinned uvicorn WS pings for <code>/ws/cascade</code>, and per-kind client error messages with raw provider text kept server-side.</p>
+        </div>
+      </div>
+      <div class="card bg-base-200 shadow">
+        <div class="card-body">
+          <h3 class="card-title text-success">✓ 5 · Real language selection</h3>
+          <p class="text-sm">English ↔ French added end-to-end (one entry in <code>languages.py</code>, one in the frontend pair list — exactly the "time-to-onboard a new language pair" path the brief measures), with a component test on the non-default selection.</p>
+        </div>
+      </div>
+      <div class="card bg-base-200 shadow">
+        <div class="card-body">
+          <h3 class="card-title text-success">✓ 6 · Realtime quality measured <span class="badge badge-ghost">33 real-voice clips</span></h3>
+          <p class="text-sm">The corpus was recorded, a fake-mic capture harness (<code>npm run capture:realtime-quality</code>) played each clip into a live <code>gpt-realtime</code> session, and the same LLM judge scored the replies: <strong>19/33 (58%)</strong> at OpenAI's VAD defaults vs Cascade's 33/33, with the mechanism (server-VAD turn splits + barge-in cancelling replies on mid-sentence pauses) documented in COMPARISON.md §2 — then re-run with two VAD knobs (<code>silence_duration_ms=900</code>, <code>interrupt_response=false</code>, now <code>.env</code>-configurable): <strong>31/33 (94%)</strong>. Still open: a recorded 5-minute stability run and content-level e2e assertions.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="text-base-content/50 text-sm pt-4 border-t border-base-300">
+    Audited against <code>project_1778691544728.pdf</code> · branch <code>implementation</code> @ <code>9883bc9</code> ·
+    two independent read-only code audits + docs/git review · fix round applied and re-verified (backend 119 ✓, frontend 137 ✓) · 2026-08-14
+  </footer>
+
+</main>
+</body>
+</html>
